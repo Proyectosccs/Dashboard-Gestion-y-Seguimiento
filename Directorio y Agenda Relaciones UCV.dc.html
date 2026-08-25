@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Control operativo UCV — CONEKTADOS</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -1403,12 +1404,36 @@ const BOARD_ITEMS = {
   kanban: { emoji: '🧩', label: 'Tablero Kanban' }
 };
 
+const SUPABASE_URL = 'https://hcylkagvwfncdaaizutn.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_E-cV9DiNK9rctFCxzondvA_7OppBD7Y';
+const SUPABASE_TABLE = 'ucv_board_state';
+const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+const STORE_KEY_TO_FIELD = {
+  'ucv-contacts-v1': 'contacts',
+  'ucv-interactions-v2': 'interactions',
+  'ucv-tasks-v2': 'tasks',
+  'ucv-journeys-v3': 'journeys',
+  'ucv-volunteers-v1': 'volunteers',
+  'ucv-app-status-v1': 'appStatuses',
+  'ucv-unit-info-v1': 'unitInfo',
+  'ucv-ui-v1': 'ui'
+};
+
 function readStore(key, fallback) {
   try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch (e) { return fallback; }
 }
 
-function writeStore(key, value) {
+function writeLocal(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* El tablero sigue funcionando sin persistencia. */ }
+}
+
+function writeStore(key, value) {
+  writeLocal(key, value);
+  if (!sb) return;
+  sb.from(SUPABASE_TABLE).upsert({ key: key, value: value, updated_at: new Date().toISOString() }).then(function (res) {
+    if (res.error) console.error('Error al sincronizar con Supabase (' + key + ')', res.error);
+  });
 }
 
 function normalizeJourney(j) {
@@ -1482,6 +1507,48 @@ class Component extends DCLogic {
     contactModal: null,
     contactForm: { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar' }
   };
+
+  componentDidMount() {
+    if (!sb) return;
+    this._loadFromSupabase();
+    this._sbChannel = sb.channel('ucv-board-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: SUPABASE_TABLE }, payload => {
+        const row = payload.new;
+        if (!row || !row.key) return;
+        this._applyRemote(row.key, row.value);
+      })
+      .subscribe();
+  }
+
+  componentWillUnmount() {
+    if (sb && this._sbChannel) sb.removeChannel(this._sbChannel);
+  }
+
+  _applyRemote(key, value) {
+    const field = STORE_KEY_TO_FIELD[key];
+    if (!field) return;
+    let v = value;
+    if (field === 'journeys' && Array.isArray(v)) v = v.map(normalizeJourney);
+    if (field === 'ui') v = cloneUI(v);
+    writeLocal(key, v);
+    this.setState({ [field]: v });
+  }
+
+  async _loadFromSupabase() {
+    const res = await sb.from(SUPABASE_TABLE).select('key,value');
+    if (res.error) { console.error('Error al cargar datos de Supabase', res.error); return; }
+    const patch = {};
+    (res.data || []).forEach(row => {
+      const field = STORE_KEY_TO_FIELD[row.key];
+      if (!field) return;
+      let v = row.value;
+      if (field === 'journeys' && Array.isArray(v)) v = v.map(normalizeJourney);
+      if (field === 'ui') v = cloneUI(v);
+      writeLocal(row.key, v);
+      patch[field] = v;
+    });
+    if (Object.keys(patch).length) this.setState(patch);
+  }
 
   unitIndex() {
     if (this._ui) return this._ui;
