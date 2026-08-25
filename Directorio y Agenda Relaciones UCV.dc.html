@@ -2526,10 +2526,23 @@ class Component extends DCLogic {
     }));
 
     const unitBox = { background: '#fff', borderRadius: 14, padding: '9px 10px', display: 'flex', flexDirection: 'column', gap: 6, borderWidth: 1.5, borderStyle: 'solid' };
+    const hasMedicalPerson = unitId => {
+      const info = s.unitInfo[unitId];
+      if (!info) return false;
+      const respMatch = !!info.responsibleName && (info.responsibleRole === 'Médico' || info.responsibleRole === 'Estudiante');
+      const suppMatch = !!info.supportName && (info.supportRole === 'Médico' || info.supportRole === 'Estudiante');
+      return respMatch || suppMatch;
+    };
     const buildFacultyCard = f => {
       const cols = f.cols.map(col => {
         let unitsSource = col.units;
-        if (f.id === 'med' && !col.title) {
+        if (f.id === 'med' && col.title) {
+          unitsSource = unitsSource.slice().sort((a, b) => {
+            const aHas = hasMedicalPerson(a.id) ? 0 : 1;
+            const bHas = hasMedicalPerson(b.id) ? 0 : 1;
+            return aHas - bHas;
+          });
+        } else if (f.id === 'med' && !col.title) {
           unitsSource = unitsSource.slice().sort((a, b) => {
             const aHas = shown.some(c => c.unit === a.id) ? 0 : 1;
             const bHas = shown.some(c => c.unit === b.id) ? 0 : 1;
