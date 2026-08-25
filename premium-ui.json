@@ -1,0 +1,12 @@
+{
+  "profile": "product-admin",
+  "sourceRoots": ["."],
+  "locale": "es-VE",
+  "canonicalMap": "UX-CONTRACT.md",
+  "requiredCapabilities": ["Select/Listbox", "Date", "Form", "Scrollbar", "CRUD"],
+  "ownership": {
+    "Select/Listbox": "native",
+    "Date": "native"
+  },
+  "requiredCommands": []
+}

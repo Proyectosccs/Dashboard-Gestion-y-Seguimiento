@@ -1,0 +1,2637 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Control operativo UCV — CONEKTADOS</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
+<script src="_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/_ds_bundle.js"></script>
+<style>
+  body { margin: 0; background: var(--color-bg); }
+  a { color: var(--color-accent-700); text-decoration: none; }
+  a:hover { color: var(--color-accent-800); }
+  *:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  input, select, textarea, button { font-family: var(--font-body); }
+  html { scrollbar-color: var(--color-neutral-500) var(--color-neutral-200); scrollbar-width: auto; }
+  *::-webkit-scrollbar { width: 11px; height: 11px; }
+  *::-webkit-scrollbar-track { background: var(--color-neutral-200); }
+  *::-webkit-scrollbar-thumb { background: var(--color-neutral-500); border: 3px solid var(--color-neutral-200); border-radius: 999px; }
+  *::-webkit-scrollbar-thumb:hover { background: var(--color-neutral-600); }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto; transition-duration: .01ms; animation-duration: .01ms; } }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); padding: 22px 22px 60px; box-sizing: border-box">
+
+  <div style="max-width: 1560px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px">
+
+    <header style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 18px 26px">
+      <div style="flex: 1 1 380px; min-width: 0">
+        <div style="font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase; font-weight: 700; color: var(--color-accent-700)">Universidad Central de Venezuela · CONEKTADOS</div>
+        <h1 style="{{ pageTitleStyle }}">{{ uiText.pageTitle }}</h1>
+        <p style="margin: 0; font-size: 14.5px; color: var(--color-neutral-700); max-width: 70ch; text-wrap: pretty">{{ uiText.pageSubtitle }}</p>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+        <sc-for list="{{ navigationTabs }}" as="t" hint-placeholder-count="5">
+          <button onClick="{{ t.open }}" style="{{ t.style }}" style-hover="{{ tabHover }}">{{ t.emoji }} {{ t.label }}</button>
+        </sc-for>
+        <button onClick="{{ openCustomize }}" style="border: 1px solid var(--color-neutral-400); cursor: pointer; border-radius: 999px; padding: 9px 14px; font-size: 13px; font-weight: 700; background: #fff; color: var(--color-neutral-800)" style-hover="{{ chipHover }}">✏️ Modo edición</button>
+      </div>
+    </header>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px">
+      <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="5">
+        <div style="{{ k.style }}">
+          <div style="font-size: 22px; line-height: 1">{{ k.emoji }}</div>
+          <div style="font-family: var(--font-heading); font-size: 34px; line-height: 1">{{ k.value }}</div>
+          <div style="font-size: 12.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; opacity: .82">{{ k.label }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{ showContactFilters }}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--color-neutral-100); border-radius: 999px; padding: 12px 16px; box-shadow: var(--shadow-sm)">
+      <div style="display: flex; align-items: center; gap: 8px; flex: 1 1 260px; background: #fff; border-radius: 999px; padding: 9px 16px; border: 1px solid var(--color-neutral-300)">
+        <span style="font-size: 15px">🔍</span>
+        <input aria-label="Buscar contactos" type="text" placeholder="Buscar por nombre, escuela, especialidad o rol…" value="{{ query }}" onChange="{{ onQuery }}" style="border: none; outline: none; flex: 1; font-size: 14px; background: transparent; color: var(--color-text); min-width: 0" />
+      </div>
+      <select aria-label="Filtrar por unidad" value="{{ facultyFilter }}" onChange="{{ onFaculty }}" style="border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 10px 16px; font-size: 13.5px; color: var(--color-text); cursor: pointer">
+        <option value="all">🏛️ Todas las unidades</option>
+        <sc-for list="{{ facultyOptions }}" as="o" hint-placeholder-count="7">
+          <option value="{{ o.id }}">{{ o.label }}</option>
+        </sc-for>
+      </select>
+      <select aria-label="Filtrar por rol" value="{{ roleFilter }}" onChange="{{ onRole }}" style="border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 10px 16px; font-size: 13.5px; color: var(--color-text); cursor: pointer">
+        <option value="all">👥 Todos los roles</option>
+        <option value="Coordinador">🧭 Coordinador</option>
+        <option value="Enlace">🔗 Enlace</option>
+        <option value="Profesional del Área">🩺 Profesional del Área</option>
+        <option value="Por confirmar">❔ Rol por confirmar</option>
+      </select>
+      <button onClick="{{ toggleFollow }}" style="{{ followBtnStyle }}">⏰ Requieren seguimiento</button>
+      <button onClick="{{ clearFilters }}" style="border: none; background: transparent; color: var(--color-neutral-700); font-size: 13px; cursor: pointer; text-decoration: underline; padding: 8px">Limpiar</button>
+      <button onClick="{{ newContact }}" style="border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">➕ Agregar contacto</button>
+      <div style="font-size: 13px; font-weight: 700; color: var(--color-accent-700); margin-left: auto; padding-right: 6px">{{ resultLabel }}</div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; flex-direction: column; gap: 18px">
+      <div style="{{ boardSectionStyles.intro }}">
+        <button onClick="{{ newTask }}" style="align-self: flex-start; border: none; border-radius: 999px; padding: 14px 22px; background: var(--color-accent-400); color: var(--color-neutral-900); font-weight: 700; cursor: pointer; font-size: 15px" style-hover="{{ lightHover }}">＋ Agregar tarea</button>
+      </div>
+
+      <div style="{{ boardSectionStyles.upcoming }}">
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+          <div>
+            <div style="font-family: var(--font-heading); font-size: 19px">{{ uiText.upcomingTitle }}</div>
+            <div style="font-size: 12px; color: var(--color-neutral-700)">Se alimentan automáticamente desde el calendario.</div>
+          </div>
+          <button onClick="{{ newJourney }}" style="margin-left: auto; border: none; border-radius: 999px; padding: 9px 14px; background: var(--color-accent-500); color: #fff; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">＋ Agregar evento</button>
+        </div>
+        <div style="display: flex; gap: 9px; overflow-x: auto; padding-bottom: 4px">
+          <sc-for list="{{ upcomingJourneys }}" as="j" hint-placeholder-count="3">
+            <button onClick="{{ j.edit }}" style="{{ j.cardStyle }}">
+              <div style="font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: {{ j.color }}; font-weight: 700">{{ j.dateLabel }} · {{ j.statusLabel }}</div>
+              <div style="font-size: 13px; font-weight: 700; margin-top: 3px">{{ j.title }}</div>
+              <div style="font-size: 10.5px; color: var(--color-accent-700); margin-top: 3px; font-weight: 700">{{ j.eventTypeLabel }}</div>
+              <div style="font-size: 11.5px; color: var(--color-neutral-700); margin-top: 3px">{{ j.location }}</div>
+              <div style="font-size: 11px; margin-top: 6px">Auditoría interna: <strong>{{ j.readiness }}</strong></div>
+            </button>
+          </sc-for>
+          <sc-if value="{{ upcomingEmpty }}" hint-placeholder-val="{{ true }}">
+            <div style="width: 100%; border: 1px dashed var(--color-neutral-400); border-radius: 16px; padding: 16px; text-align: center; font-size: 12.5px; color: var(--color-neutral-600)">Todavía no hay eventos agendados. Usa “Agregar evento” para crear el primero.</div>
+          </sc-if>
+        </div>
+      </div>
+
+      <div style="{{ boardSectionStyles.kanban }}">
+        <sc-for list="{{ boardColumns }}" as="col" hint-placeholder-count="4">
+          <section style="{{ col.sectionStyle }}" aria-label="{{ col.label }}" onDragOver="{{ col.onDragOver }}" onDragLeave="{{ col.onDragLeave }}" onDrop="{{ col.onDrop }}">
+            <div style="display: flex; align-items: center; gap: 9px; padding: 3px 4px 12px">
+              <span style="font-size: 18px">{{ col.emoji }}</span>
+              <div style="font-weight: 700; font-size: 14px">{{ col.label }}</div>
+              <div style="margin-left: auto; background: #fff; border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 700">{{ col.count }}</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px; min-height: 44px">
+              <sc-for list="{{ col.tasks }}" as="task" hint-placeholder-count="2">
+                <sc-if value="{{ task.isPlaceholder }}" hint-placeholder-val="{{ false }}">
+                  <div style="{{ task.placeholderStyle }}"></div>
+                </sc-if>
+                <sc-if value="{{ !task.isPlaceholder }}" hint-placeholder-val="{{ true }}">
+                <article draggable="{{ task.draggable }}" onDragStart="{{ task.dragStart }}" onDragEnd="{{ task.dragEnd }}" onDragOver="{{ task.onCardDragOver }}" style="{{ task.cardStyle }}">
+                  <div style="display: flex; gap: 8px; align-items: flex-start">
+                    <div style="min-width: 0; flex: 1">
+                      <div style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: {{ task.areaColor }}">{{ task.area }}</div>
+                      <div style="font-weight: 700; line-height: 1.25; margin-top: 3px">{{ task.title }}</div>
+                    </div>
+                    <span style="{{ task.priorityStyle }}">{{ task.priorityLabel }}</span>
+                  </div>
+                  <p style="margin: 0; font-size: 12.5px; color: var(--color-neutral-700); line-height: 1.4; text-wrap: pretty">{{ task.detail }}</p>
+                  <div style="display: grid; gap: 5px; font-size: 11.5px; color: var(--color-neutral-800)">
+                    <div>👤 <strong>{{ task.owner }}</strong></div>
+                    <div>🗓️ {{ task.horizon }}</div>
+                    <div>➡️ {{ task.nextAction }}</div>
+                  </div>
+                  <sc-if value="{{ task.achievement }}" hint-placeholder-val="{{ false }}">
+                    <div style="background: #eafbf0; border: 1px solid #b7e4c7; border-radius: 10px; padding: 6px 9px; font-size: 11px; color: #1f7a3d; text-wrap: pretty">🎯 {{ task.achievement }}</div>
+                  </sc-if>
+                  <div style="display: flex; gap: 6px; padding-top: 2px">
+                    <button aria-label="Mover tarea a la columna anterior" onClick="{{ task.movePrev }}" disabled="{{ task.noPrev }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); border-radius: 999px; width: 32px; height: 32px; cursor: pointer">←</button>
+                    <button onClick="{{ task.edit }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); border-radius: 999px; padding: 7px 11px; font-size: 11.5px; font-weight: 700; cursor: pointer; flex: 1">Editar</button>
+                    <button aria-label="Mover tarea a la columna siguiente" onClick="{{ task.moveNext }}" disabled="{{ task.noNext }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); border-radius: 999px; width: 32px; height: 32px; cursor: pointer">→</button>
+                  </div>
+                </article>
+                </sc-if>
+              </sc-for>
+              <sc-if value="{{ col.empty }}" hint-placeholder-val="{{ false }}">
+                <div style="border: 1px dashed var(--color-neutral-400); border-radius: 18px; padding: 18px 12px; text-align: center; font-size: 12.5px; color: var(--color-neutral-600)">Arrastra una tarjeta aquí o usa las flechas.</div>
+              </sc-if>
+            </div>
+          </section>
+        </sc-for>
+      </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isCalendar }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #fff; border-radius: 28px; padding: 18px; box-shadow: var(--shadow-md); display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+          <div style="min-width: 250px; flex: 1">
+            <div style="font-family: var(--font-heading); font-size: 25px">{{ uiText.calendarTitle }}</div>
+            <div style="font-size: 12.5px; color: var(--color-neutral-700)">Cada evento agregado aparece aquí y en “Próximos eventos” del tablero operativo.</div>
+          </div>
+          <button aria-label="Mes anterior" onClick="{{ previousMonth }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); width: 38px; height: 38px; border-radius: 999px; cursor: pointer; font-size: 18px">‹</button>
+          <div style="font-family: var(--font-heading); font-size: 18px; min-width: 165px; text-align: center; text-transform: capitalize">{{ calendarMonthLabel }}</div>
+          <button aria-label="Mes siguiente" onClick="{{ nextMonth }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); width: 38px; height: 38px; border-radius: 999px; cursor: pointer; font-size: 18px">›</button>
+          <button onClick="{{ goToday }}" style="border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 9px 13px; cursor: pointer; font-weight: 700">Hoy</button>
+          <button onClick="{{ newJourney }}" style="border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 10px 15px; cursor: pointer; font-weight: 700" style-hover="{{ primaryHover }}">＋ Evento</button>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px">
+          <sc-for list="{{ journeyLegend }}" as="l" hint-placeholder-count="4">
+            <span style="display: inline-flex; align-items: center; gap: 6px; background: var(--color-neutral-100); border-radius: 999px; padding: 5px 9px"><span style="width: 9px; height: 9px; border-radius: 999px; background: {{ l.color }}"></span>{{ l.label }}</span>
+          </sc-for>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(7, minmax(42px, 1fr)); gap: 6px">
+          <sc-for list="{{ weekDays }}" as="d" hint-placeholder-count="7">
+            <div style="font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-neutral-600); font-weight: 700; text-align: center; padding: 3px 0">{{ d }}</div>
+          </sc-for>
+          <sc-for list="{{ calendarCells }}" as="cell" hint-placeholder-count="35">
+            <sc-if value="{{ cell.blank }}" hint-placeholder-val="{{ false }}"><div style="min-height: 96px"></div></sc-if>
+            <sc-if value="{{ cell.day }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ cell.open }}" style="{{ cell.style }}" style-hover="{{ calendarCellHover }}">
+                <span style="display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700"><span style="{{ cell.numberStyle }}">{{ cell.number }}</span><span style="margin-left: auto; font-size: 10px; color: var(--color-neutral-600)">{{ cell.countLabel }}</span></span>
+                <span style="display: flex; flex-direction: column; gap: 4px; margin-top: auto">
+                  <sc-for list="{{ cell.events }}" as="e" hint-placeholder-count="2">
+                    <span style="{{ e.style }}">{{ e.time }}{{ e.title }}</span>
+                  </sc-for>
+                  <sc-if value="{{ cell.hasMore }}" hint-placeholder-val="{{ false }}"><span style="font-size: 9.5px; color: var(--color-neutral-600); text-align: left">＋{{ cell.moreCount }} más</span></sc-if>
+                  <sc-if value="{{ cell.hasVolunteerInfo }}" hint-placeholder-val="{{ false }}">
+                    <span style="display: flex; gap: 6px; font-size: 9px; font-weight: 700">
+                      <sc-if value="{{ cell.showAvailable }}" hint-placeholder-val="{{ false }}"><span style="color: #1f7a3d">🟢 {{ cell.volunteerAvailableCount }}</span></sc-if>
+                      <sc-if value="{{ cell.showAssigned }}" hint-placeholder-val="{{ false }}"><span style="color: #1f5aa3">🔵 {{ cell.volunteerAssignedCount }}</span></sc-if>
+                    </span>
+                  </sc-if>
+                </span>
+              </button>
+            </sc-if>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isHierarchy }}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; flex-direction: column; gap: 0; align-items: stretch">
+
+        <div style="display: flex; justify-content: center">
+          <div style="background: var(--color-neutral-900); color: #fff; border-radius: 24px; padding: 18px 34px; display: flex; align-items: center; gap: 16px; box-shadow: var(--shadow-md)">
+            <span style="font-size: 30px">🎓</span>
+            <div style="font-family: var(--font-heading); font-size: 26px; line-height: 1.1; text-align: left">Universidad Central de Venezuela<span style="opacity: .6"> (UCV)</span></div>
+          </div>
+        </div>
+        <div style="width: 2px; height: 22px; background: var(--color-neutral-400); margin: 0 auto"></div>
+        <div style="display: flex; justify-content: center">
+          <div style="background: #fff; border: 2px solid var(--color-neutral-900); border-radius: 999px; padding: 12px 30px; display: flex; align-items: center; gap: 12px; font-family: var(--font-heading); font-size: 21px; box-shadow: var(--shadow-sm)">🏛️ Rectorado</div>
+        </div>
+        <div style="width: 2px; height: 22px; background: var(--color-neutral-400); margin: 0 auto"></div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px">
+          <sc-for list="{{ adminUnits }}" as="a" hint-placeholder-count="3">
+            <div style="{{ a.style }}">
+              <div style="display: flex; align-items: center; gap: 10px">
+                <span style="font-size: 20px">{{ a.emoji }}</span>
+                <div style="{{ a.titleStyle }}">{{ a.name }}</div>
+              </div>
+              <sc-for list="{{ a.contacts }}" as="c" hint-placeholder-count="1">
+                <button onClick="{{ c.open }}" style="{{ c.chipStyle }}" style-hover="{{ chipHover }}">
+                  <span style="font-size: 17px">{{ c.emoji }}</span>
+                  <span style="min-width: 0; display: flex; flex-direction: column">
+                    <span style="font-size: 13px; font-weight: 700">{{ c.name }}</span>
+                    <span style="font-size: 11px; color: var(--color-neutral-700)">{{ c.roleShort }}</span>
+                  </span>
+                  <span style="margin-left: auto; font-size: 12px">{{ c.flag }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="width: 2px; height: 26px; background: var(--color-neutral-400); margin: 0 auto"></div>
+
+        <div style="display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap">
+          <div style="flex: 2 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+            <sc-for list="{{ medCards }}" as="f" hint-placeholder-count="1">
+              <div style="{{ f.cardStyle }}">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 11px 14px 12px">
+                  <div style="width: 30px; height: 30px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-family: var(--font-heading); font-size: 16px; flex: none; background: rgba(255,255,255,.22); color: #fff">{{ f.num }}</div>
+                  <div style="font-weight: 700; font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: #fff; line-height: 1.25">{{ f.name }}</div>
+                  <div style="margin-left: auto; background: rgba(255,255,255,.22); color: #fff; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 700; flex: none">{{ f.count }}</div>
+                </div>
+                <div style="{{ f.colsStyle }}">
+                  <sc-for list="{{ f.cols }}" as="col" hint-placeholder-count="1">
+                    <div style="display: flex; flex-direction: column; gap: 8px">
+                      <sc-if value="{{ col.hasTitle }}" hint-placeholder-val="{{ false }}">
+                        <div style="background: rgba(255,255,255,.86); border-radius: 16px; padding: 9px 12px">
+                          <div style="font-family: var(--font-heading); font-size: 16px; text-align: center">{{ col.title }}</div>
+                          <div style="font-size: 11px; color: var(--color-neutral-700); text-align: center; margin-top: 3px; text-wrap: pretty">{{ col.note }}</div>
+                        </div>
+                      </sc-if>
+                      <div style="{{ col.unitsStyle }}">
+                      <sc-for list="{{ col.units }}" as="u" hint-placeholder-count="3">
+                        <div style="{{ u.boxStyle }}">
+                          <div style="display: flex; align-items: flex-start; gap: 8px">
+                            <span style="font-size: 16px; line-height: 1.2">{{ u.emoji }}</span>
+                            <div style="min-width: 0; flex: 1">
+                              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px">
+                                <div style="{{ u.titleStyle }}">{{ u.name }}</div>
+                                <label style="display: inline-flex; align-items: center; gap: 4px; min-width: 0" title="Estado del desarrollo de la app">
+                                  <span aria-hidden="true">📱</span>
+                                  <select aria-label="{{ u.appLabel }}" value="{{ u.appStatus }}" onChange="{{ u.onAppStatus }}" style="{{ u.appStatusStyle }}">
+                                    <option value="developing">En desarrollo</option>
+                                    <option value="resolved">Desarrollo de la app resuelto</option>
+                                    <option value="not_started">Sin desarrollar aún</option>
+                                  </select>
+                                </label>
+                                <button type="button" aria-label="Editar responsable, apoyo y triaje" title="Editar responsable, apoyo y triaje" onClick="{{ u.editUnit }}" style="{{ u.editIconStyle }}">✏️</button>
+                              </div>
+                              <div style="font-size: 10.5px; color: var(--color-neutral-600); line-height: 1.3; margin-top: 2px">{{ u.note }}</div>
+                              <sc-if value="{{ u.hasUnitSummary }}" hint-placeholder-val="{{ false }}">
+                                <div style="font-size: 10px; color: var(--color-neutral-600); line-height: 1.3; margin-top: 2px">{{ u.unitSummaryLine }}</div>
+                              </sc-if>
+                            </div>
+                          </div>
+                          <sc-for list="{{ u.contacts }}" as="c" hint-placeholder-count="1">
+                            <button onClick="{{ c.open }}" style="{{ c.chipStyle }}" style-hover="{{ chipHover }}">
+                              <span style="font-size: 15px">{{ c.emoji }}</span>
+                              <span style="min-width: 0; display: flex; flex-direction: column; flex: 1">
+                                <span style="font-size: 12.5px; font-weight: 700; line-height: 1.2">{{ c.name }}</span>
+                                <span style="font-size: 10.5px; color: var(--color-neutral-700)">{{ c.roleShort }}</span>
+                              </span>
+                              <span style="font-size: 11px">{{ c.flag }}</span>
+                            </button>
+                          </sc-for>
+                        </div>
+                      </sc-for>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+            <sc-for list="{{ otherCards }}" as="f" hint-placeholder-count="6">
+              <div style="{{ f.cardStyle }}">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 11px 14px 12px">
+                  <div style="width: 30px; height: 30px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-family: var(--font-heading); font-size: 16px; flex: none; background: rgba(255,255,255,.22); color: #fff">{{ f.num }}</div>
+                  <div style="font-weight: 700; font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: #fff; line-height: 1.25">{{ f.name }}</div>
+                  <div style="margin-left: auto; background: rgba(255,255,255,.22); color: #fff; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 700; flex: none">{{ f.count }}</div>
+                </div>
+                <div style="{{ f.colsStyle }}">
+                  <sc-for list="{{ f.cols }}" as="col" hint-placeholder-count="1">
+                    <div style="display: flex; flex-direction: column; gap: 8px">
+                      <sc-if value="{{ col.hasTitle }}" hint-placeholder-val="{{ false }}">
+                        <div style="background: rgba(255,255,255,.86); border-radius: 16px; padding: 9px 12px">
+                          <div style="font-family: var(--font-heading); font-size: 16px; text-align: center">{{ col.title }}</div>
+                          <div style="font-size: 11px; color: var(--color-neutral-700); text-align: center; margin-top: 3px; text-wrap: pretty">{{ col.note }}</div>
+                        </div>
+                      </sc-if>
+                      <div style="{{ col.unitsStyle }}">
+                      <sc-for list="{{ col.units }}" as="u" hint-placeholder-count="2">
+                        <div style="{{ u.boxStyle }}">
+                          <div style="display: flex; align-items: flex-start; gap: 8px">
+                            <span style="font-size: 16px; line-height: 1.2">{{ u.emoji }}</span>
+                            <div style="min-width: 0; flex: 1">
+                              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px">
+                                <div style="{{ u.titleStyle }}">{{ u.name }}</div>
+                                <label style="display: inline-flex; align-items: center; gap: 4px; min-width: 0" title="Estado del desarrollo de la app">
+                                  <span aria-hidden="true">📱</span>
+                                  <select aria-label="{{ u.appLabel }}" value="{{ u.appStatus }}" onChange="{{ u.onAppStatus }}" style="{{ u.appStatusStyle }}">
+                                    <option value="developing">En desarrollo</option>
+                                    <option value="resolved">Desarrollo de la app resuelto</option>
+                                    <option value="not_started">Sin desarrollar aún</option>
+                                  </select>
+                                </label>
+                                <button type="button" aria-label="Editar responsable, apoyo y triaje" title="Editar responsable, apoyo y triaje" onClick="{{ u.editUnit }}" style="{{ u.editIconStyle }}">✏️</button>
+                              </div>
+                              <div style="font-size: 10.5px; color: var(--color-neutral-600); line-height: 1.3; margin-top: 2px">{{ u.note }}</div>
+                              <sc-if value="{{ u.hasUnitSummary }}" hint-placeholder-val="{{ false }}">
+                                <div style="font-size: 10px; color: var(--color-neutral-600); line-height: 1.3; margin-top: 2px">{{ u.unitSummaryLine }}</div>
+                              </sc-if>
+                            </div>
+                          </div>
+                          <sc-for list="{{ u.contacts }}" as="c" hint-placeholder-count="1">
+                            <button onClick="{{ c.open }}" style="{{ c.chipStyle }}" style-hover="{{ chipHover }}">
+                              <span style="font-size: 15px">{{ c.emoji }}</span>
+                              <span style="min-width: 0; display: flex; flex-direction: column; flex: 1">
+                                <span style="font-size: 12.5px; font-weight: 700; line-height: 1.2">{{ c.name }}</span>
+                                <span style="font-size: 10.5px; color: var(--color-neutral-700)">{{ c.roleShort }}</span>
+                              </span>
+                              <span style="font-size: 11px">{{ c.flag }}</span>
+                            </button>
+                          </sc-for>
+                        </div>
+                      </sc-for>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 26px">
+          <div style="background: var(--color-accent-2-100); border: 1.5px solid var(--color-accent-2-300); border-radius: 22px; padding: 16px 18px; display: flex; gap: 14px">
+            <span style="font-size: 24px">ℹ️</span>
+            <div>
+              <div style="font-family: var(--font-heading); font-size: 19px; margin-bottom: 6px">Nota</div>
+              <p style="margin: 0; font-size: 13px; color: var(--color-neutral-800); text-wrap: pretty">Medicina se maneja como un área operativa única para los eventos; la especialidad del profesional se selecciona por área clínica. El ícono ✏️ junto a cada especialidad permite asignar responsable, apoyo y el estado del triaje.</p>
+            </div>
+          </div>
+          <div style="background: var(--color-accent-100); border: 1.5px solid var(--color-accent-300); border-radius: 22px; padding: 16px 18px; display: flex; gap: 14px">
+            <span style="font-size: 24px">📋</span>
+            <div>
+              <div style="font-family: var(--font-heading); font-size: 19px; margin-bottom: 6px">Cómo usar el directorio</div>
+              <p style="margin: 0; font-size: 13px; color: var(--color-neutral-800); text-wrap: pretty">Toca cualquier nombre del esquema para ver su ficha, registrar una reunión, llamada o correo y fijar la próxima fecha de seguimiento. El punto 🔴 marca seguimiento vencido.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isList }}" hint-placeholder-val="{{ false }}">
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 14px">
+        <sc-for list="{{ listContacts }}" as="c" hint-placeholder-count="6">
+          <div style="{{ c.cardStyle }}">
+            <div style="display: flex; gap: 12px; align-items: center">
+              <div style="{{ c.avatarStyle }}">{{ c.emoji }}</div>
+              <div style="min-width: 0; flex: 1">
+                <div style="font-size: 15.5px; font-weight: 700; line-height: 1.2">{{ c.name }}</div>
+                <div style="font-size: 12px; color: var(--color-neutral-700); margin-top: 2px">{{ c.affiliation }}</div>
+              </div>
+              <div style="{{ c.roleStyle }}">{{ c.roleShort }}</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--color-neutral-800)">
+              <div>✉️ {{ c.email }}</div>
+              <div>📱 {{ c.phone }}</div>
+            </div>
+            <div style="background: var(--color-accent-2-100); border-radius: 14px; padding: 10px 12px; display: grid; gap: 4px; font-size: 12px">
+              <div>📍 Estado: <strong>{{ c.status }}</strong></div>
+              <div>➡️ Próxima acción: {{ c.action }}</div>
+            </div>
+            <div style="background: var(--color-neutral-100); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 12px">
+              <div>🕒 Última: <strong>{{ c.lastLabel }}</strong></div>
+              <div style="{{ c.followStyle }}">⏰ Seguimiento: <strong>{{ c.followLabel }}</strong></div>
+            </div>
+            <button onClick="{{ c.open }}" style="border: none; cursor: pointer; border-radius: 999px; padding: 10px 14px; font-size: 13px; font-weight: 700; background: var(--color-accent-500); color: #fff" style-hover="{{ primaryHover }}">✍️ Registrar interacción</button>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isTimeline }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 900px">
+        <sc-for list="{{ timeline }}" as="t" hint-placeholder-count="6">
+          <div style="{{ t.cardStyle }}">
+            <div style="width: 42px; height: 42px; border-radius: 999px; background: var(--color-neutral-100); display: flex; align-items: center; justify-content: center; font-size: 20px; flex: none">{{ t.emoji }}</div>
+            <div style="flex: 1; min-width: 0">
+              <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline">
+                <div style="font-size: 14.5px; font-weight: 700">{{ t.contactName }}</div>
+                <div style="font-size: 12px; color: var(--color-neutral-700)">{{ t.affiliation }}</div>
+                <div style="margin-left: auto; font-size: 12px; font-weight: 700; color: var(--color-accent-700)">{{ t.dateLabel }}</div>
+              </div>
+              <div style="font-size: 12.5px; font-weight: 700; margin-top: 5px">{{ t.typeLabel }}</div>
+              <p style="margin: 4px 0 0; font-size: 13px; color: var(--color-neutral-800); text-wrap: pretty">{{ t.notes }}</p>
+              <div style="font-size: 12px; margin-top: 6px; color: var(--color-neutral-700)">{{ t.followLabel }}</div>
+            </div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ timelineEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="background: var(--color-neutral-100); border-radius: 20px; padding: 26px; text-align: center; font-size: 14px; color: var(--color-neutral-700)">Sin interacciones registradas con estos filtros. 🌱</div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isVolunteers }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 20px">
+
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+          <div style="flex: 1 1 260px">
+            <div style="font-family: var(--font-heading); font-size: 19px">Voluntariado</div>
+            <div style="font-size: 12px; color: var(--color-neutral-700)">Revisa las jornadas, gestiona voluntarios y usa el calendario para agregar eventos o personas.</div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <div>
+            <div style="font-family: var(--font-heading); font-size: 19px">Eventos y jornadas</div>
+            <div style="font-size: 12px; color: var(--color-neutral-700)">Compara la disponibilidad con cada jornada y asigna voluntarios a mano.</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <sc-for list="{{ volunteerJourneys }}" as="j" hint-placeholder-count="3">
+              <div style="background: #fff; border-radius: 18px; padding: 13px 15px; box-shadow: var(--shadow-sm); display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+                <div style="min-width: 200px; flex: 1">
+                  <div style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: {{ j.color }}">{{ j.dateLabel }} · {{ j.statusLabel }}</div>
+                  <div style="font-size: 14px; font-weight: 700; margin-top: 2px">{{ j.title }}</div>
+                  <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px">
+                    <sc-for list="{{ j.assignedVolunteers }}" as="av" hint-placeholder-count="2">
+                      <span style="display: inline-flex; align-items: center; gap: 5px; background: var(--color-accent-100); border-radius: 999px; padding: 4px 6px 4px 10px; font-size: 11.5px; font-weight: 700">{{ av.name }}<button aria-label="Quitar voluntario" onClick="{{ av.remove }}" style="border: none; background: transparent; cursor: pointer; font-size: 11px; padding: 0 3px">✕</button></span>
+                    </sc-for>
+                    <sc-if value="{{ j.noneAssigned }}" hint-placeholder-val="{{ true }}">
+                      <span style="font-size: 11.5px; color: var(--color-neutral-600)">Sin voluntarios asignados</span>
+                    </sc-if>
+                  </div>
+                </div>
+                <button onClick="{{ j.openAssign }}" style="border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 9px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">＋ Asignar voluntario</button>
+              </div>
+            </sc-for>
+            <sc-if value="{{ volunteerJourneysEmpty }}" hint-placeholder-val="{{ true }}">
+              <div style="border: 1px dashed var(--color-neutral-400); border-radius: 18px; padding: 20px; text-align: center; font-size: 12.5px; color: var(--color-neutral-600)">Todavía no hay eventos para asignar voluntarios.</div>
+            </sc-if>
+          </div>
+        </div>
+
+        <div style="background: #fff; border-radius: 22px; padding: 16px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 12px">
+          <button type="button" onClick="{{ toggleVolunteersPanel }}" style="border: none; background: transparent; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 0; text-align: left; font: inherit; color: inherit">
+            <span style="font-size: 14px">{{ volunteersToggleIcon }}</span>
+            <span style="font-family: var(--font-heading); font-size: 19px; flex: 1">{{ volunteersToggleLabel }}</span>
+          </button>
+          <sc-if value="{{ volunteersPanelOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 12px">
+              <button onClick="{{ newVolunteer }}" style="align-self: flex-start; border: none; border-radius: 999px; padding: 10px 16px; background: var(--color-accent-500); color: #fff; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">＋ Agregar voluntario</button>
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px">
+                <sc-for list="{{ volunteerCards }}" as="v" hint-placeholder-count="4">
+                  <div style="background: var(--color-neutral-100); border-radius: 20px; padding: 15px; display: flex; flex-direction: column; gap: 10px">
+                    <div style="display: flex; gap: 10px; align-items: flex-start">
+                      <div style="width: 42px; height: 42px; border-radius: 999px; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 19px; flex: none">🙋</div>
+                      <div style="min-width: 0; flex: 1">
+                        <div style="font-size: 14.5px; font-weight: 700; line-height: 1.2">{{ v.name }}</div>
+                        <div style="font-size: 12px; color: var(--color-neutral-700)">{{ v.skill }}</div>
+                      </div>
+                      <button aria-label="Eliminar voluntario" onClick="{{ v.remove }}" style="border: none; background: #fff; border-radius: 999px; width: 28px; height: 28px; cursor: pointer; font-size: 13px">✕</button>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--color-neutral-800)">
+                      <div>📱 {{ v.phone }}</div>
+                      <div>✉️ {{ v.email }}</div>
+                    </div>
+                    <div>
+                      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--color-neutral-600); margin-bottom: 4px">Disponibilidad</div>
+                      <div style="display: flex; flex-wrap: wrap; gap: 5px">
+                        <sc-for list="{{ v.availabilityChips }}" as="a" hint-placeholder-count="2">
+                          <span style="background: var(--color-accent-2-100); border-radius: 999px; padding: 4px 9px; font-size: 11px; font-weight: 700">{{ a.label }}</span>
+                        </sc-for>
+                        <sc-if value="{{ v.noAvailability }}" hint-placeholder-val="{{ false }}">
+                          <span style="font-size: 11.5px; color: var(--color-neutral-600)">Sin fechas marcadas</span>
+                        </sc-if>
+                      </div>
+                    </div>
+                    <div>
+                      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--color-neutral-600); margin-bottom: 4px">Asignado a</div>
+                      <div style="display: flex; flex-direction: column; gap: 4px">
+                        <sc-for list="{{ v.assignedEvents }}" as="e" hint-placeholder-count="1">
+                          <div style="font-size: 12px">🗓️ {{ e.title }} · {{ e.dateLabel }}</div>
+                        </sc-for>
+                        <sc-if value="{{ v.noAssigned }}" hint-placeholder-val="{{ true }}">
+                          <div style="font-size: 11.5px; color: var(--color-neutral-600)">Sin eventos asignados aún</div>
+                        </sc-if>
+                      </div>
+                    </div>
+                    <button onClick="{{ v.edit }}" style="border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 9px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer">Editar</button>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ volunteersEmpty }}" hint-placeholder-val="{{ true }}">
+                  <div style="border: 1px dashed var(--color-neutral-400); border-radius: 18px; padding: 22px; text-align: center; font-size: 13px; color: var(--color-neutral-600); grid-column: 1 / -1">Todavía no hay voluntarios registrados. Usa “Agregar voluntario” para crear el primero.</div>
+                </sc-if>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="background: #fff; border-radius: 22px; padding: 16px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+            <div style="min-width: 220px; flex: 1">
+              <div style="font-family: var(--font-heading); font-size: 19px">Calendario editable</div>
+              <div style="font-size: 12px; color: var(--color-neutral-700)">Toca un día para ver el detalle, agregar un evento o registrar un voluntario disponible esa fecha.</div>
+            </div>
+            <button aria-label="Mes anterior" onClick="{{ prevAvailabilityMonth }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); width: 36px; height: 36px; border-radius: 999px; cursor: pointer; font-size: 16px">‹</button>
+            <div style="font-family: var(--font-heading); font-size: 16px; min-width: 150px; text-align: center; text-transform: capitalize">{{ availabilityMonthLabel }}</div>
+            <button aria-label="Mes siguiente" onClick="{{ nextAvailabilityMonth }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); width: 36px; height: 36px; border-radius: 999px; cursor: pointer; font-size: 16px">›</button>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px">
+            <span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 9px; height: 9px; border-radius: 999px; background: #1f7a3d"></span>Disponible</span>
+            <span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 9px; height: 9px; border-radius: 999px; background: #1f5aa3"></span>Ya asignado a la jornada</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(7, minmax(42px, 1fr)); gap: 6px">
+            <sc-for list="{{ weekDays }}" as="d" hint-placeholder-count="7">
+              <div style="font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-neutral-600); font-weight: 700; text-align: center; padding: 3px 0">{{ d }}</div>
+            </sc-for>
+            <sc-for list="{{ availabilityCells }}" as="cell" hint-placeholder-count="35">
+              <sc-if value="{{ cell.blank }}" hint-placeholder-val="{{ false }}"><div style="min-height: 88px"></div></sc-if>
+              <sc-if value="{{ cell.day }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ cell.open }}" style="{{ cell.style }}" style-hover="{{ calendarCellHover }}">
+                  <span style="{{ cell.numberStyle }}">{{ cell.number }}</span>
+                  <sc-if value="{{ cell.hasEvent }}" hint-placeholder-val="{{ false }}"><span style="font-size: 9.5px; color: var(--color-accent-700); font-weight: 700">🗓️ evento</span></sc-if>
+                  <sc-for list="{{ cell.volunteerNames }}" as="vn" hint-placeholder-count="2">
+                    <span style="{{ vn.style }}">{{ vn.name }}</span>
+                  </sc-for>
+                  <sc-if value="{{ cell.hasExtraNames }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size: 9px; color: var(--color-neutral-600)">＋{{ cell.extraNamesCount }} más</span>
+                  </sc-if>
+                </button>
+              </sc-if>
+            </sc-for>
+          </div>
+        </div>
+
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ customizeOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.62); display: flex; align-items: flex-start; justify-content: center; padding: 28px 16px; overflow: auto; z-index: 130" onClick="{{ closeCustomize }}">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Personalizar dashboard" style="background: var(--color-bg); border-radius: 30px; width: 100%; max-width: 820px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; gap: 12px; align-items: center">
+          <div style="width: 46px; height: 46px; border-radius: 999px; display: grid; place-items: center; background: var(--color-accent-100); font-size: 22px">✏️</div>
+          <div style="min-width: 0; flex: 1">
+            <div style="font-family: var(--font-heading); font-size: 24px">Modo edición</div>
+            <div style="font-size: 12.5px; color: var(--color-neutral-700)">Personaliza textos, tamaños y orden. Los cambios se aplican al pulsar “Guardar diseño”.</div>
+          </div>
+          <button aria-label="Cerrar modo edición" onClick="{{ closeCustomize }}" style="border: none; background: var(--color-neutral-200); border-radius: 999px; width: 36px; height: 36px; font-size: 16px; cursor: pointer">✕</button>
+        </div>
+
+        <section style="background: #fff; border-radius: 20px; padding: 15px; display: flex; flex-direction: column; gap: 12px">
+          <div style="font-family: var(--font-heading); font-size: 18px">Textos editables</div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 11px">
+            <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Título principal
+              <input type="text" value="{{ customizeForm.pageTitle }}" onChange="{{ onCustomPageTitle }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: var(--color-neutral-100); color: var(--color-text)" />
+            </label>
+            <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Título de presentación
+              <input type="text" value="{{ customizeForm.boardIntro }}" onChange="{{ onCustomBoardIntro }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: var(--color-neutral-100); color: var(--color-text)" />
+            </label>
+            <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px; grid-column: 1 / -1">Subtítulo principal
+              <textarea value="{{ customizeForm.pageSubtitle }}" onChange="{{ onCustomPageSubtitle }}" rows="2" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: var(--color-neutral-100); color: var(--color-text); resize: none"></textarea>
+            </label>
+            <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Título de próximos eventos
+              <input type="text" value="{{ customizeForm.upcomingTitle }}" onChange="{{ onCustomUpcomingTitle }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: var(--color-neutral-100); color: var(--color-text)" />
+            </label>
+            <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Título del calendario
+              <input type="text" value="{{ customizeForm.calendarTitle }}" onChange="{{ onCustomCalendarTitle }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: var(--color-neutral-100); color: var(--color-text)" />
+            </label>
+          </div>
+        </section>
+
+        <section style="background: var(--color-accent-2-100); border: 1px solid var(--color-accent-2-300); border-radius: 20px; padding: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px">
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 6px">Tamaño de las burbujas y tarjetas
+            <select value="{{ customizeForm.bubbleSize }}" onChange="{{ onCustomBubbleSize }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <option value="compact">Compacto</option><option value="normal">Normal</option><option value="large">Grande</option>
+            </select>
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 6px">Tamaño del título principal
+            <select value="{{ customizeForm.titleSize }}" onChange="{{ onCustomTitleSize }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <option value="32">Pequeño</option><option value="40">Normal</option><option value="48">Grande</option>
+            </select>
+          </label>
+        </section>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 12px">
+          <section style="background: #fff; border-radius: 20px; padding: 15px; display: flex; flex-direction: column; gap: 9px">
+            <div style="font-family: var(--font-heading); font-size: 18px">Orden de las vistas</div>
+            <div style="font-size: 11.5px; color: var(--color-neutral-700)">Las flechas cambian la posición de las pestañas superiores.</div>
+            <sc-for list="{{ customizeTabs }}" as="i" hint-placeholder-count="5">
+              <div style="display: flex; align-items: center; gap: 8px; background: var(--color-neutral-100); border-radius: 14px; padding: 8px 9px">
+                <span style="font-size: 16px">{{ i.emoji }}</span><strong style="font-size: 12.5px; min-width: 0; flex: 1">{{ i.label }}</strong>
+                <button aria-label="Mover vista hacia arriba" onClick="{{ i.up }}" disabled="{{ i.noUp }}" style="border: 1px solid var(--color-neutral-300); background: #fff; width: 31px; height: 31px; border-radius: 999px; cursor: pointer">↑</button>
+                <button aria-label="Mover vista hacia abajo" onClick="{{ i.down }}" disabled="{{ i.noDown }}" style="border: 1px solid var(--color-neutral-300); background: #fff; width: 31px; height: 31px; border-radius: 999px; cursor: pointer">↓</button>
+              </div>
+            </sc-for>
+          </section>
+          <section style="background: #fff; border-radius: 20px; padding: 15px; display: flex; flex-direction: column; gap: 9px">
+            <div style="font-family: var(--font-heading); font-size: 18px">Orden del tablero</div>
+            <div style="font-size: 11.5px; color: var(--color-neutral-700)">Reubica los bloques principales de arriba hacia abajo.</div>
+            <sc-for list="{{ customizeSections }}" as="i" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; gap: 8px; background: var(--color-neutral-100); border-radius: 14px; padding: 8px 9px">
+                <span style="font-size: 16px">{{ i.emoji }}</span><strong style="font-size: 12.5px; min-width: 0; flex: 1">{{ i.label }}</strong>
+                <button aria-label="Mover bloque hacia arriba" onClick="{{ i.up }}" disabled="{{ i.noUp }}" style="border: 1px solid var(--color-neutral-300); background: #fff; width: 31px; height: 31px; border-radius: 999px; cursor: pointer">↑</button>
+                <button aria-label="Mover bloque hacia abajo" onClick="{{ i.down }}" disabled="{{ i.noDown }}" style="border: 1px solid var(--color-neutral-300); background: #fff; width: 31px; height: 31px; border-radius: 999px; cursor: pointer">↓</button>
+              </div>
+            </sc-for>
+          </section>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end">
+          <button onClick="{{ resetCustomize }}" style="margin-right: auto; border: none; background: transparent; color: var(--color-neutral-700); text-decoration: underline; padding: 10px; font-weight: 700; cursor: pointer">Restablecer borrador</button>
+          <button onClick="{{ closeCustomize }}" style="border: 1px solid var(--color-neutral-300); background: transparent; border-radius: 999px; padding: 11px 18px; font-weight: 700; cursor: pointer">Cancelar</button>
+          <button onClick="{{ saveCustomize }}" style="border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 11px 20px; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">Guardar diseño</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ dayModalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.55); display: flex; align-items: flex-start; justify-content: center; padding: 50px 18px; overflow: auto; z-index: 105" onClick="{{ closeDayModal }}">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Eventos del día" style="background: var(--color-bg); border-radius: 28px; width: 100%; max-width: 560px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; gap: 12px; align-items: center">
+          <div style="width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: var(--color-accent-100); font-size: 21px">📅</div>
+          <div style="min-width: 0; flex: 1">
+            <div style="font-family: var(--font-heading); font-size: 23px">{{ dayModalTitle }}</div>
+            <div style="font-size: 12.5px; color: var(--color-neutral-700)">Consulta, edita o agrega un evento para esta fecha.</div>
+          </div>
+          <button aria-label="Cerrar eventos del día" onClick="{{ closeDayModal }}" style="border: none; background: var(--color-neutral-200); border-radius: 999px; width: 36px; height: 36px; font-size: 16px; cursor: pointer">✕</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 9px">
+          <sc-for list="{{ dayJourneys }}" as="j" hint-placeholder-count="2">
+            <button onClick="{{ j.edit }}" style="text-align: left; border: 1px solid var(--color-neutral-200); border-left: 5px solid {{ j.color }}; border-radius: 17px; background: #fff; padding: 12px 14px; cursor: pointer">
+              <div style="display: flex; gap: 8px; align-items: center">
+                <strong style="font-size: 13.5px; min-width: 0; flex: 1">{{ j.title }}</strong>
+                <span style="font-size: 10.5px; color: {{ j.color }}; font-weight: 700">{{ j.statusLabel }}</span>
+              </div>
+              <div style="font-size: 11px; color: var(--color-accent-700); margin-top: 4px; font-weight: 700">{{ j.eventTypeLabel }}</div>
+              <div style="font-size: 12px; color: var(--color-neutral-700); margin-top: 5px">{{ j.timeLabel }} · {{ j.location }}</div>
+              <div style="font-size: 11.5px; margin-top: 6px">Auditoría interna: <strong>{{ j.readiness }}</strong></div>
+            </button>
+          </sc-for>
+          <sc-if value="{{ dayModalEmpty }}" hint-placeholder-val="{{ true }}">
+            <div style="border: 1px dashed var(--color-neutral-400); border-radius: 17px; padding: 20px; text-align: center; font-size: 12.5px; color: var(--color-neutral-600)">No hay eventos registrados para este día.</div>
+          </sc-if>
+        </div>
+        <button onClick="{{ addJourneyForDay }}" style="align-self: flex-end; border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 11px 18px; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">＋ Agregar evento este día</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ journeyModalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.62); display: flex; align-items: flex-start; justify-content: center; padding: 28px 16px; overflow: auto; z-index: 120" onClick="{{ closeJourneyModal }}">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Editar evento" style="background: var(--color-bg); border-radius: 30px; width: 100%; max-width: 760px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; gap: 12px; align-items: center">
+          <div style="width: 46px; height: 46px; border-radius: 999px; display: grid; place-items: center; background: var(--color-accent-100); font-size: 22px">🗓️</div>
+          <div style="min-width: 0; flex: 1">
+            <div style="font-family: var(--font-heading); font-size: 24px">{{ journeyModalTitle }}</div>
+            <div style="font-size: 12.5px; color: var(--color-neutral-700)">El evento aparecerá automáticamente en el calendario y en el tablero.</div>
+          </div>
+          <button aria-label="Cerrar editor de evento" onClick="{{ closeJourneyModal }}" style="border: none; background: var(--color-neutral-200); border-radius: 999px; width: 36px; height: 36px; font-size: 16px; cursor: pointer">✕</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px">
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px; grid-column: 1 / -1">Nombre del evento
+            <input type="text" placeholder="Ej. Evento de salud integral" value="{{ journeyForm.title }}" onChange="{{ onJourneyTitle }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Tipo de evento
+            <select value="{{ journeyForm.eventType }}" onChange="{{ onJourneyEventType }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <sc-for list="{{ eventTypes }}" as="t" hint-placeholder-count="6"><option value="{{ t.id }}">{{ t.label }}</option></sc-for>
+            </select>
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Hora (opcional)
+            <input type="time" value="{{ journeyForm.time }}" onChange="{{ onJourneyTime }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Lugar
+            <input type="text" placeholder="Por confirmar" value="{{ journeyForm.location }}" onChange="{{ onJourneyLocation }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Especialidad o área
+            <input type="text" placeholder="Por confirmar" value="{{ journeyForm.area }}" onChange="{{ onJourneyArea }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Responsable
+            <input type="text" placeholder="Por confirmar" value="{{ journeyForm.owner }}" onChange="{{ onJourneyOwner }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Estado
+            <select value="{{ journeyForm.status }}" onChange="{{ onJourneyStatus }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <option value="draft">Por confirmar</option><option value="preparing">En preparación</option><option value="confirmed">Confirmada</option><option value="completed">Completada</option>
+            </select>
+          </label>
+        </div>
+
+        <div style="background: var(--color-accent-2-100); border: 1px solid var(--color-accent-2-300); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+          <div>
+            <div style="font-family: var(--font-heading); font-size: 16px">Fecha(s) del evento</div>
+            <div style="font-size: 11.5px; color: var(--color-neutral-700)">Toca uno o varios días en el calendario. La hora es opcional y aplica a todas las fechas seleccionadas.</div>
+          </div>
+          <div style="background: #fff; border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center; gap: 8px">
+              <button type="button" aria-label="Mes anterior" onClick="{{ prevJourneyMonth }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); width: 30px; height: 30px; border-radius: 999px; cursor: pointer; font-size: 15px">‹</button>
+              <div style="font-family: var(--font-heading); font-size: 15px; flex: 1; text-align: center; text-transform: capitalize">{{ journeyCalendarLabel }}</div>
+              <button type="button" aria-label="Mes siguiente" onClick="{{ nextJourneyMonth }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); width: 30px; height: 30px; border-radius: 999px; cursor: pointer; font-size: 15px">›</button>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px">
+              <sc-for list="{{ weekDays }}" as="d" hint-placeholder-count="7">
+                <div style="font-size: 9.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--color-neutral-600); font-weight: 700; text-align: center">{{ d }}</div>
+              </sc-for>
+              <sc-for list="{{ journeyDateCells }}" as="cell" hint-placeholder-count="35">
+                <sc-if value="{{ cell.blank }}" hint-placeholder-val="{{ false }}"><div></div></sc-if>
+                <sc-if value="{{ cell.day }}" hint-placeholder-val="{{ true }}">
+                  <button type="button" onClick="{{ cell.toggle }}" style="{{ cell.style }}">{{ cell.number }}</button>
+                </sc-if>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px">
+            <sc-for list="{{ journeyDateChips }}" as="d" hint-placeholder-count="2">
+              <span style="display: inline-flex; align-items: center; gap: 5px; background: #fff; border-radius: 999px; padding: 5px 6px 5px 11px; font-size: 12px; font-weight: 700">{{ d.label }}<button type="button" aria-label="Quitar fecha" onClick="{{ d.remove }}" style="border: none; background: transparent; cursor: pointer; font-size: 11px; padding: 0 3px">✕</button></span>
+            </sc-for>
+            <sc-if value="{{ journeyDateChipsEmpty }}" hint-placeholder-val="{{ true }}">
+              <span style="font-size: 11.5px; color: var(--color-neutral-700)">Sin fechas seleccionadas todavía.</span>
+            </sc-if>
+          </div>
+        </div>
+
+        <div style="background: var(--color-accent-2-100); border: 1px solid var(--color-accent-2-300); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+          <div>
+            <div style="font-family: var(--font-heading); font-size: 18px">Auditoría interna · {{ journeyReadiness }}</div>
+            <div style="font-size: 11.5px; color: var(--color-neutral-700)">Marca cada información únicamente cuando esté completada y verificada.</div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px">
+            <sc-for list="{{ journeyChecks }}" as="c" hint-placeholder-count="5">
+              <label style="background: rgba(255,255,255,.82); border-radius: 14px; padding: 10px 11px; display: flex; gap: 9px; align-items: flex-start; font-size: 12.5px; cursor: pointer">
+                <input type="checkbox" checked="{{ c.checked }}" onChange="{{ c.toggle }}" style="margin-top: 2px; accent-color: var(--color-accent-500)" />
+                <span><strong>{{ c.emoji }}</strong> {{ c.label }}</span>
+              </label>
+            </sc-for>
+          </div>
+        </div>
+
+        <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Notas y requerimientos
+          <textarea placeholder="Información pendiente, materiales, coordinación, data…" value="{{ journeyForm.notes }}" onChange="{{ onJourneyNotes }}" rows="3" style="border: 1px solid var(--color-neutral-300); border-radius: 16px; padding: 11px 12px; background: #fff; color: var(--color-text); resize: none"></textarea>
+        </label>
+        <div style="display: flex; gap: 10px; justify-content: flex-end">
+          <button onClick="{{ closeJourneyModal }}" style="border: 1px solid var(--color-neutral-300); background: transparent; border-radius: 999px; padding: 11px 18px; font-weight: 700; cursor: pointer">Cancelar</button>
+          <button onClick="{{ saveJourney }}" style="border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 11px 20px; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">Guardar evento</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ taskModalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.58); display: flex; align-items: flex-start; justify-content: center; padding: 34px 16px; overflow: auto; z-index: 110" onClick="{{ closeTaskModal }}">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Editar tarea operativa" style="background: var(--color-bg); border-radius: 28px; width: 100%; max-width: 620px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 15px">
+        <div style="display: flex; gap: 12px; align-items: center">
+          <div style="width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: var(--color-accent-100); font-size: 21px">🧩</div>
+          <div style="min-width: 0; flex: 1">
+            <div style="font-family: var(--font-heading); font-size: 23px">{{ taskModalTitle }}</div>
+            <div style="font-size: 12.5px; color: var(--color-neutral-700)">Actualiza la responsabilidad, el horizonte y el siguiente paso.</div>
+          </div>
+          <button aria-label="Cerrar editor de tarea" onClick="{{ closeTaskModal }}" style="border: none; background: var(--color-neutral-200); border-radius: 999px; width: 36px; height: 36px; font-size: 16px; cursor: pointer">✕</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px">
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px; grid-column: 1 / -1">Título
+            <input type="text" value="{{ taskForm.title }}" onChange="{{ onTaskTitle }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Responsable
+            <input type="text" value="{{ taskForm.owner }}" onChange="{{ onTaskOwner }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Horizonte
+            <select value="{{ taskForm.horizon }}" onChange="{{ onTaskHorizon }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <option value="Hoy">Hoy</option><option value="Mañana">Mañana</option><option value="Esta semana">Esta semana</option><option value="Próxima semana">Próxima semana</option><option value="Por definir">Por definir</option>
+            </select>
+          </label>
+        </div>
+
+        <div style="background: var(--color-accent-2-100); border: 1px solid var(--color-accent-2-300); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 12px">
+          <div>
+            <div style="font-family: var(--font-heading); font-size: 16px">Clasificación de la tarea</div>
+            <div style="font-size: 11.5px; color: var(--color-neutral-700)">Elige el área, el estado y la prioridad con las etiquetas de color.</div>
+          </div>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 6px">Área
+            <span style="display: flex; flex-wrap: wrap; gap: 7px">
+              <sc-for list="{{ taskAreaChips }}" as="o" hint-placeholder-count="6">
+                <button type="button" onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
+              </sc-for>
+            </span>
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 6px">Estado
+            <span style="display: flex; flex-wrap: wrap; gap: 7px">
+              <sc-for list="{{ taskStatusChips }}" as="o" hint-placeholder-count="4">
+                <button type="button" onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.emoji }} {{ o.label }}</button>
+              </sc-for>
+            </span>
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 6px">Prioridad
+            <span style="display: flex; flex-wrap: wrap; gap: 7px">
+              <sc-for list="{{ taskPriorityChips }}" as="o" hint-placeholder-count="3">
+                <button type="button" onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
+              </sc-for>
+            </span>
+          </label>
+        </div>
+        <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Detalle
+          <textarea value="{{ taskForm.detail }}" onChange="{{ onTaskDetail }}" rows="3" style="border: 1px solid var(--color-neutral-300); border-radius: 16px; padding: 11px 12px; background: #fff; color: var(--color-text); resize: none"></textarea>
+        </label>
+        <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Próxima acción
+          <textarea value="{{ taskForm.nextAction }}" onChange="{{ onTaskNextAction }}" rows="2" style="border: 1px solid var(--color-neutral-300); border-radius: 16px; padding: 11px 12px; background: #fff; color: var(--color-text); resize: none"></textarea>
+        </label>
+        <div style="display: flex; gap: 10px; justify-content: flex-end">
+          <button onClick="{{ closeTaskModal }}" style="border: 1px solid var(--color-neutral-300); background: transparent; border-radius: 999px; padding: 11px 18px; font-weight: 700; cursor: pointer">Cancelar</button>
+          <button onClick="{{ saveTask }}" style="border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 11px 20px; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">Guardar tarea</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ unitModalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.58); display: flex; align-items: flex-start; justify-content: center; padding: 34px 16px; overflow: auto; z-index: 113" onClick="{{ closeUnitModal }}">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Editar especialidad" style="background: var(--color-bg); border-radius: 28px; width: 100%; max-width: 560px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 15px">
+        <div style="display: flex; gap: 12px; align-items: center">
+          <div style="width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: var(--color-accent-100); font-size: 21px">🩺</div>
+          <div style="min-width: 0; flex: 1">
+            <div style="font-family: var(--font-heading); font-size: 21px">{{ unitModalTitle }}</div>
+            <div style="font-size: 12.5px; color: var(--color-neutral-700)">Responsable, apoyo y estado del triaje para esta especialidad.</div>
+          </div>
+          <button aria-label="Cerrar editor de especialidad" onClick="{{ closeUnitModal }}" style="border: none; background: var(--color-neutral-200); border-radius: 999px; width: 36px; height: 36px; font-size: 16px; cursor: pointer">✕</button>
+        </div>
+
+        <div style="background: var(--color-neutral-100); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 8px">
+          <div style="font-family: var(--font-heading); font-size: 15px">Especialista responsable</div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px">
+            <input type="text" placeholder="Nombre" value="{{ unitForm.responsibleName }}" onChange="{{ onUnitResponsibleName }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+            <input type="text" placeholder="Teléfono" value="{{ unitForm.responsiblePhone }}" onChange="{{ onUnitResponsiblePhone }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+            <input type="text" placeholder="Correo" value="{{ unitForm.responsibleEmail }}" onChange="{{ onUnitResponsibleEmail }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </div>
+        </div>
+        <div style="background: var(--color-neutral-100); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 8px">
+          <div style="font-family: var(--font-heading); font-size: 15px">Estudiante o voluntario que registra los datos</div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px">
+            <input type="text" placeholder="Nombre" value="{{ unitForm.supportName }}" onChange="{{ onUnitSupportName }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+            <input type="text" placeholder="Teléfono" value="{{ unitForm.supportPhone }}" onChange="{{ onUnitSupportPhone }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+            <input type="text" placeholder="Correo" value="{{ unitForm.supportEmail }}" onChange="{{ onUnitSupportEmail }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </div>
+        </div>
+
+        <div style="background: var(--color-accent-2-100); border: 1px solid var(--color-accent-2-300); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+          <div>
+            <div style="font-family: var(--font-heading); font-size: 15px">¿Enviaron sus campos para el triaje?</div>
+            <div style="font-size: 11.5px; color: var(--color-neutral-700)">Marca el estado y anexa una imagen, un PDF/escrito, o pega el texto directamente.</div>
+          </div>
+          <span style="display: flex; flex-wrap: wrap; gap: 7px">
+            <sc-for list="{{ unitTriageChips }}" as="o" hint-placeholder-count="2">
+              <button type="button" onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
+            </sc-for>
+          </span>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+            <input type="file" accept=".pdf,.doc,.docx,.txt,image/*" onChange="{{ onUnitAttachment }}" style="font-size: 12px" />
+            <sc-if value="{{ unitHasAttachment }}" hint-placeholder-val="{{ false }}">
+              <span style="display: inline-flex; align-items: center; gap: 6px; background: #fff; border-radius: 999px; padding: 5px 6px 5px 12px; font-size: 12px; font-weight: 700">📎 {{ unitAttachmentName }}<button type="button" aria-label="Quitar archivo" onClick="{{ removeUnitAttachment }}" style="border: none; background: transparent; cursor: pointer; font-size: 11px; padding: 0 4px">✕</button></span>
+            </sc-if>
+          </div>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">O pega aquí el texto del triaje
+            <textarea value="{{ unitForm.attachmentText }}" onChange="{{ onUnitAttachmentText }}" rows="3" placeholder="Pega el texto recibido…" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text); resize: none"></textarea>
+          </label>
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end">
+          <button onClick="{{ closeUnitModal }}" style="border: 1px solid var(--color-neutral-300); background: transparent; border-radius: 999px; padding: 11px 18px; font-weight: 700; cursor: pointer">Cancelar</button>
+          <button onClick="{{ saveUnitInfo }}" style="border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 11px 20px; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ contactModalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.58); display: flex; align-items: flex-start; justify-content: center; padding: 34px 16px; overflow: auto; z-index: 112" onClick="{{ closeContactModal }}">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Editar contacto" style="background: var(--color-bg); border-radius: 28px; width: 100%; max-width: 620px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 15px">
+        <div style="display: flex; gap: 12px; align-items: center">
+          <div style="width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: var(--color-accent-100); font-size: 21px">👤</div>
+          <div style="min-width: 0; flex: 1">
+            <div style="font-family: var(--font-heading); font-size: 23px">{{ contactModalTitle }}</div>
+            <div style="font-size: 12.5px; color: var(--color-neutral-700)">Solo información confirmada; deja “Por confirmar” lo que aún no se sabe.</div>
+          </div>
+          <button aria-label="Cerrar editor de contacto" onClick="{{ closeContactModal }}" style="border: none; background: var(--color-neutral-200); border-radius: 999px; width: 36px; height: 36px; font-size: 16px; cursor: pointer">✕</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px">
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px; grid-column: 1 / -1">Nombre
+            <input type="text" value="{{ contactForm.name }}" onChange="{{ onContactName }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Rol
+            <select value="{{ contactForm.role }}" onChange="{{ onContactRole }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <sc-for list="{{ roleOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+            </select>
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Unidad
+            <select value="{{ contactForm.unit }}" onChange="{{ onContactUnit }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <sc-for list="{{ unitOptions }}" as="o" hint-placeholder-count="8"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+            </select>
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Correo
+            <input type="text" placeholder="Por confirmar" value="{{ contactForm.email }}" onChange="{{ onContactEmail }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Teléfono
+            <input type="text" placeholder="Por confirmar" value="{{ contactForm.phone }}" onChange="{{ onContactPhone }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Estado actual
+            <input type="text" placeholder="Por confirmar" value="{{ contactForm.status }}" onChange="{{ onContactStatus }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+        </div>
+        <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Próxima acción
+          <textarea placeholder="Por confirmar" value="{{ contactForm.action }}" onChange="{{ onContactAction }}" rows="3" style="border: 1px solid var(--color-neutral-300); border-radius: 16px; padding: 11px 12px; background: #fff; color: var(--color-text); resize: none"></textarea>
+        </label>
+        <div style="display: flex; gap: 10px; justify-content: flex-end">
+          <sc-if value="{{ isEditingContact }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ deleteCurrentContact }}" style="margin-right: auto; border: 1px solid #f0bcbc; background: #fdebeb; color: #a02525; border-radius: 999px; padding: 11px 16px; font-weight: 700; cursor: pointer">🗑️ Eliminar contacto</button>
+          </sc-if>
+          <button onClick="{{ closeContactModal }}" style="border: 1px solid var(--color-neutral-300); background: transparent; border-radius: 999px; padding: 11px 18px; font-weight: 700; cursor: pointer">Cancelar</button>
+          <button onClick="{{ saveContact }}" style="border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 11px 20px; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">Guardar contacto</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.55); display: flex; align-items: flex-start; justify-content: center; padding: 40px 18px; overflow: auto; z-index: 100" onClick="{{ closeModal }}">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Ficha del contacto" style="background: var(--color-bg); border-radius: 28px; width: 100%; max-width: 560px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; gap: 14px; align-items: center">
+          <div style="{{ modal.avatarStyle }}">{{ modal.emoji }}</div>
+          <div style="flex: 1; min-width: 0">
+            <div style="font-family: var(--font-heading); font-size: 23px; line-height: 1.15">{{ modal.name }}</div>
+            <div style="font-size: 12.5px; color: var(--color-neutral-700)">{{ modal.roleShort }} · {{ modal.affiliation }}</div>
+          </div>
+          <button aria-label="Cerrar ficha del contacto" onClick="{{ closeModal }}" style="border: none; background: var(--color-neutral-200); border-radius: 999px; width: 36px; height: 36px; font-size: 16px; cursor: pointer; flex: none">✕</button>
+        </div>
+
+        <div style="display: flex; gap: 8px">
+          <button onClick="{{ modal.editContact }}" style="border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 8px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer">✏️ Editar contacto</button>
+          <button onClick="{{ modal.deleteContact }}" style="border: 1px solid #f0bcbc; background: #fdebeb; color: #a02525; border-radius: 999px; padding: 8px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer">🗑️ Eliminar</button>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 12.5px">
+          <div style="background: #fff; border-radius: 999px; padding: 7px 13px">✉️ {{ modal.email }}</div>
+          <div style="background: #fff; border-radius: 999px; padding: 7px 13px">📱 {{ modal.phone }}</div>
+        </div>
+
+        <div style="background: var(--color-accent-2-100); border: 1px solid var(--color-accent-2-300); border-radius: 18px; padding: 12px 14px; display: grid; gap: 5px; font-size: 12.5px">
+          <div>📍 Estado actual: <strong>{{ modal.status }}</strong></div>
+          <div>➡️ Próxima acción: {{ modal.action }}</div>
+        </div>
+
+        <div style="background: #fff; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+          <div style="font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-600)">Historial</div>
+          <sc-for list="{{ modal.history }}" as="h" hint-placeholder-count="2">
+            <div style="display: flex; gap: 10px; font-size: 12.5px; border-top: 1px solid var(--color-neutral-200); padding-top: 8px">
+              <span style="font-size: 15px">{{ h.emoji }}</span>
+              <div style="flex: 1">
+                <div style="font-weight: 700">{{ h.head }}</div>
+                <div style="color: var(--color-neutral-700); text-wrap: pretty">{{ h.notes }}</div>
+              </div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ modal.noHistory }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size: 12.5px; color: var(--color-neutral-700)">Sin interacciones registradas todavía.</div>
+          </sc-if>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <div style="font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-600)">Registrar interacción</div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <button onClick="{{ pickMeeting }}" style="{{ typeStyles.meeting }}">🤝 Reunión</button>
+            <button onClick="{{ pickCall }}" style="{{ typeStyles.call }}">📞 Llamada</button>
+            <button onClick="{{ pickMail }}" style="{{ typeStyles.mail }}">✉️ Correo</button>
+          </div>
+          <textarea aria-label="Notas de la interacción" placeholder="Notas de la interacción…" value="{{ form.notes }}" onChange="{{ onNotes }}" rows="3" style="border: 1px solid var(--color-neutral-300); border-radius: 18px; padding: 12px 14px; font-size: 13.5px; resize: none; outline: none; background: #fff; color: var(--color-text)"></textarea>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+            <label style="font-size: 13px; font-weight: 700">📅 Fecha</label>
+            <input type="date" value="{{ form.date }}" onChange="{{ onDate }}" style="border: 1px solid var(--color-neutral-300); border-radius: 999px; padding: 9px 14px; font-size: 13px; background: #fff; color: var(--color-text)" />
+            <label style="font-size: 13px; font-weight: 700">⏰ Seguimiento</label>
+            <input type="date" value="{{ form.follow }}" onChange="{{ onFollow }}" style="border: 1px solid var(--color-neutral-300); border-radius: 999px; padding: 9px 14px; font-size: 13px; background: #fff; color: var(--color-text)" />
+          </div>
+          <div style="display: flex; gap: 10px; justify-content: flex-end">
+            <button onClick="{{ closeModal }}" style="border: 1px solid var(--color-neutral-300); background: transparent; border-radius: 999px; padding: 11px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer">Cancelar</button>
+            <button onClick="{{ saveInteraction }}" style="border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 11px 20px; font-size: 13.5px; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">Guardar interacción</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ volunteerModalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.58); display: flex; align-items: flex-start; justify-content: center; padding: 34px 16px; overflow: auto; z-index: 112" onClick="{{ closeVolunteerModal }}">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Editar voluntario" style="background: var(--color-bg); border-radius: 28px; width: 100%; max-width: 620px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 15px">
+        <div style="display: flex; gap: 12px; align-items: center">
+          <div style="width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: var(--color-accent-100); font-size: 21px">🙋</div>
+          <div style="min-width: 0; flex: 1">
+            <div style="font-family: var(--font-heading); font-size: 23px">{{ volunteerModalTitle }}</div>
+            <div style="font-size: 12.5px; color: var(--color-neutral-700)">Registra sus datos de contacto y marca los días en que puede colaborar.</div>
+          </div>
+          <button aria-label="Cerrar editor de voluntario" onClick="{{ closeVolunteerModal }}" style="border: none; background: var(--color-neutral-200); border-radius: 999px; width: 36px; height: 36px; font-size: 16px; cursor: pointer">✕</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px">
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px; grid-column: 1 / -1">Nombre
+            <input type="text" value="{{ volunteerForm.name }}" onChange="{{ onVolunteerName }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Teléfono
+            <input type="text" placeholder="Por confirmar" value="{{ volunteerForm.phone }}" onChange="{{ onVolunteerPhone }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Correo
+            <input type="text" placeholder="Por confirmar" value="{{ volunteerForm.email }}" onChange="{{ onVolunteerEmail }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px; grid-column: 1 / -1">Habilidad o rol de apoyo
+            <input type="text" placeholder="Por confirmar" value="{{ volunteerForm.skill }}" onChange="{{ onVolunteerSkill }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+        </div>
+
+        <div style="background: var(--color-accent-2-100); border: 1px solid var(--color-accent-2-300); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+          <div>
+            <div style="font-family: var(--font-heading); font-size: 16px">Disponibilidad</div>
+            <div style="font-size: 11.5px; color: var(--color-neutral-700)">Toca los días en el calendario en los que puede colaborar. El punto ● marca días con un evento agendado.</div>
+          </div>
+          <div style="background: #fff; border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center; gap: 8px">
+              <button type="button" aria-label="Mes anterior" onClick="{{ prevVolunteerMonth }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); width: 30px; height: 30px; border-radius: 999px; cursor: pointer; font-size: 15px">‹</button>
+              <div style="font-family: var(--font-heading); font-size: 15px; flex: 1; text-align: center; text-transform: capitalize">{{ volunteerCalendarLabel }}</div>
+              <button type="button" aria-label="Mes siguiente" onClick="{{ nextVolunteerMonth }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); width: 30px; height: 30px; border-radius: 999px; cursor: pointer; font-size: 15px">›</button>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px">
+              <sc-for list="{{ weekDays }}" as="d" hint-placeholder-count="7">
+                <div style="font-size: 9.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--color-neutral-600); font-weight: 700; text-align: center">{{ d }}</div>
+              </sc-for>
+              <sc-for list="{{ availCalendarCells }}" as="cell" hint-placeholder-count="35">
+                <sc-if value="{{ cell.blank }}" hint-placeholder-val="{{ false }}"><div></div></sc-if>
+                <sc-if value="{{ cell.day }}" hint-placeholder-val="{{ true }}">
+                  <button type="button" onClick="{{ cell.toggle }}" style="{{ cell.style }}">
+                    <span>{{ cell.number }}</span>
+                    <sc-if value="{{ cell.hasEvent }}" hint-placeholder-val="{{ false }}"><span style="{{ cell.dotStyle }}">●</span></sc-if>
+                  </button>
+                </sc-if>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px">
+            <sc-for list="{{ volunteerAvailChips }}" as="a" hint-placeholder-count="2">
+              <span style="display: inline-flex; align-items: center; gap: 5px; background: rgba(255,255,255,.82); border-radius: 999px; padding: 5px 6px 5px 11px; font-size: 12px; font-weight: 700">{{ a.label }}<button aria-label="Quitar fecha" onClick="{{ a.remove }}" style="border: none; background: transparent; cursor: pointer; font-size: 11px; padding: 0 3px">✕</button></span>
+            </sc-for>
+            <sc-if value="{{ volunteerAvailEmpty }}" hint-placeholder-val="{{ true }}">
+              <span style="font-size: 11.5px; color: var(--color-neutral-700)">Sin fechas marcadas todavía.</span>
+            </sc-if>
+          </div>
+        </div>
+
+        <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Notas
+          <textarea value="{{ volunteerForm.notes }}" onChange="{{ onVolunteerNotes }}" rows="2" style="border: 1px solid var(--color-neutral-300); border-radius: 16px; padding: 11px 12px; background: #fff; color: var(--color-text); resize: none"></textarea>
+        </label>
+        <div style="display: flex; gap: 10px; justify-content: flex-end">
+          <sc-if value="{{ isEditingVolunteer }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ deleteCurrentVolunteer }}" style="margin-right: auto; border: 1px solid #f0bcbc; background: #fdebeb; color: #a02525; border-radius: 999px; padding: 11px 16px; font-weight: 700; cursor: pointer">🗑️ Eliminar voluntario</button>
+          </sc-if>
+          <button onClick="{{ closeVolunteerModal }}" style="border: 1px solid var(--color-neutral-300); background: transparent; border-radius: 999px; padding: 11px 18px; font-weight: 700; cursor: pointer">Cancelar</button>
+          <button onClick="{{ saveVolunteer }}" style="border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 11px 20px; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">Guardar voluntario</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ assignModalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.58); display: flex; align-items: flex-start; justify-content: center; padding: 34px 16px; overflow: auto; z-index: 118" onClick="{{ closeAssign }}">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Asignar voluntarios" style="background: var(--color-bg); border-radius: 28px; width: 100%; max-width: 560px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; gap: 12px; align-items: center">
+          <div style="width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: var(--color-accent-100); font-size: 21px">🤝</div>
+          <div style="min-width: 0; flex: 1">
+            <div style="font-family: var(--font-heading); font-size: 21px">{{ assignJourneyTitle }}</div>
+            <div style="font-size: 12.5px; color: var(--color-neutral-700)">{{ assignJourneyDate }} · elige a mano quién asiste, aunque no tenga la disponibilidad marcada.</div>
+          </div>
+          <button aria-label="Cerrar asignación de voluntarios" onClick="{{ closeAssign }}" style="border: none; background: var(--color-neutral-200); border-radius: 999px; width: 36px; height: 36px; font-size: 16px; cursor: pointer">✕</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <sc-for list="{{ assignCandidates }}" as="c" hint-placeholder-count="3">
+            <div style="{{ c.rowStyle }}">
+              <div style="min-width: 0; flex: 1">
+                <div style="font-size: 13.5px; font-weight: 700">{{ c.name }}</div>
+                <div style="font-size: 11px; color: var(--color-neutral-700)">{{ c.skill }}</div>
+                <div style="font-size: 11px; margin-top: 2px">{{ c.availableLabel }}</div>
+              </div>
+              <button type="button" onClick="{{ c.toggle }}" style="{{ c.buttonStyle }}">{{ c.buttonLabel }}</button>
+            </div>
+          </sc-for>
+          <sc-if value="{{ assignCandidatesEmpty }}" hint-placeholder-val="{{ true }}">
+            <div style="border: 1px dashed var(--color-neutral-400); border-radius: 16px; padding: 18px; text-align: center; font-size: 12.5px; color: var(--color-neutral-600)">Todavía no hay voluntarios registrados. Cierra esta ventana y usa “Agregar voluntario”.</div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ availabilityDayModalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.55); display: flex; align-items: flex-start; justify-content: center; padding: 50px 18px; overflow: auto; z-index: 106" onClick="{{ closeAvailabilityDay }}">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Disponibilidad del día" style="background: var(--color-bg); border-radius: 28px; width: 100%; max-width: 560px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; gap: 12px; align-items: center">
+          <div style="width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: var(--color-accent-100); font-size: 21px">🙋</div>
+          <div style="min-width: 0; flex: 1">
+            <div style="font-family: var(--font-heading); font-size: 21px">{{ availabilityDayTitle }}</div>
+            <div style="font-size: 12.5px; color: var(--color-neutral-700)">Voluntarios disponibles y eventos de este día.</div>
+          </div>
+          <button aria-label="Cerrar detalle del día" onClick="{{ closeAvailabilityDay }}" style="border: none; background: var(--color-neutral-200); border-radius: 999px; width: 36px; height: 36px; font-size: 16px; cursor: pointer">✕</button>
+        </div>
+
+        <div>
+          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--color-neutral-600); margin-bottom: 6px">Voluntarios disponibles</div>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <sc-for list="{{ availabilityDayVolunteers }}" as="v" hint-placeholder-count="2">
+              <div style="background: #fff; border-radius: 14px; padding: 9px 12px; display: flex; align-items: center; gap: 8px; box-shadow: var(--shadow-sm)">
+                <span style="font-size: 15px">🙋</span>
+                <div style="min-width: 0; flex: 1">
+                  <div style="font-size: 13px; font-weight: 700">{{ v.name }}</div>
+                  <div style="font-size: 11px; color: var(--color-neutral-700)">{{ v.skill }}</div>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ availabilityDayVolunteersEmpty }}" hint-placeholder-val="{{ true }}">
+              <div style="border: 1px dashed var(--color-neutral-400); border-radius: 14px; padding: 14px; text-align: center; font-size: 12px; color: var(--color-neutral-600)">Nadie marcó disponibilidad para este día.</div>
+            </sc-if>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--color-neutral-600); margin-bottom: 6px">Eventos del día</div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <sc-for list="{{ availabilityDayJourneys }}" as="j" hint-placeholder-count="1">
+              <div style="background: #fff; border-radius: 14px; padding: 10px 12px; border-left: 4px solid {{ j.color }}; box-shadow: var(--shadow-sm)">
+                <div style="display: flex; gap: 8px; align-items: center">
+                  <strong style="font-size: 13px; flex: 1; min-width: 0">{{ j.title }}</strong>
+                  <span style="font-size: 10.5px; color: {{ j.color }}; font-weight: 700">{{ j.statusLabel }}</span>
+                </div>
+                <div style="font-size: 11.5px; color: var(--color-neutral-700); margin-top: 4px">Asignados: {{ j.assignedVolunteersLabel }}</div>
+                <button onClick="{{ j.openAssign }}" style="margin-top: 6px; border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 7px 12px; font-size: 11.5px; font-weight: 700; cursor: pointer">＋ Asignar voluntario</button>
+              </div>
+            </sc-for>
+            <sc-if value="{{ availabilityDayJourneysEmpty }}" hint-placeholder-val="{{ true }}">
+              <div style="border: 1px dashed var(--color-neutral-400); border-radius: 14px; padding: 14px; text-align: center; font-size: 12px; color: var(--color-neutral-600)">No hay eventos agendados este día.</div>
+            </sc-if>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--color-neutral-200); padding-top: 14px">
+          <button onClick="{{ addEventForDay }}" style="border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 10px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">＋ Agregar evento este día</button>
+          <button onClick="{{ addVolunteerForDay }}" style="border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 10px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer">＋ Agregar voluntario disponible</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ doneCaptureOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.4); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px" onClick="{{ closeDoneCapture }}">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Objetivo alcanzado" style="background: #fff; border: 3px solid #2f9e56; border-radius: 22px; padding: 20px 24px; box-shadow: var(--shadow-lg); max-width: 420px; width: 100%; display: flex; flex-direction: column; gap: 14px">
+        <sc-if value="{{ !doneCaptureSubmitted }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; gap: 10px; align-items: center">
+            <span style="font-size: 26px">✅</span>
+            <div>
+              <div style="font-family: var(--font-heading); font-size: 16px; color: #1f7a3d">¡Tarea completada!</div>
+              <div style="font-size: 12px; color: var(--color-neutral-700)">{{ doneCaptureTitle }}</div>
+            </div>
+          </div>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">¿Cuál fue el objetivo alcanzado?
+            <textarea value="{{ doneCaptureText }}" onChange="{{ onDoneCaptureText }}" rows="3" placeholder="Escribe el resultado o logro obtenido…" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: var(--color-neutral-100); color: var(--color-text); resize: none"></textarea>
+          </label>
+          <div style="display: flex; gap: 10px; justify-content: flex-end">
+            <button onClick="{{ skipDoneCapture }}" style="border: 1px solid var(--color-neutral-300); background: transparent; border-radius: 999px; padding: 9px 16px; font-weight: 700; cursor: pointer">Omitir</button>
+            <button onClick="{{ submitDoneCapture }}" style="border: none; background: #2f9e56; color: #fff; border-radius: 999px; padding: 9px 18px; font-weight: 700; cursor: pointer">Guardar</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ doneCaptureSubmitted }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; gap: 10px; align-items: flex-start">
+            <span style="font-size: 28px">🎯</span>
+            <div>
+              <div style="font-family: var(--font-heading); font-size: 16px; color: #1f7a3d">¡Objetivo alcanzado!</div>
+              <div style="font-size: 13px; color: var(--color-neutral-800); margin-top: 4px; text-wrap: pretty">{{ doneCaptureDisplayText }}</div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1000}}">
+const TODAY = '2026-08-20';
+
+const ROLE = {
+  'Coordinador': { emoji: '🧭', short: 'Coordinador', bg: '#efe7ff', fg: '#4a2f9c' },
+  'Enlace': { emoji: '🔗', short: 'Enlace', bg: '#e3f6f2', fg: '#1c6f65' },
+  'Profesional del Área': { emoji: '🩺', short: 'Profesional del Área', bg: '#ffe9d6', fg: '#9a4a12' },
+  'Por confirmar': { emoji: '❔', short: 'Rol por confirmar', bg: '#f1ede6', fg: '#645c50' }
+};
+
+const TYPES = {
+  meeting: { emoji: '🤝', label: 'Reunión' },
+  call: { emoji: '📞', label: 'Llamada' },
+  mail: { emoji: '✉️', label: 'Correo electrónico' }
+};
+
+const ADMIN = [
+  { id: 'vac', name: 'Vicerrectorado Académico', emoji: '🎓', color: '#2fa89b' },
+  { id: 'sc', name: 'Servicios Comunitarios · bajo Vicerrectorado', emoji: '🤝', color: '#4f8f68' },
+  { id: 'op', name: 'Coordinación operativa UCV', emoji: '🧩', color: '#c67139' },
+  { id: 'vad', name: 'Vicerrectorado Administrativo', emoji: '💼', color: '#ef8b2c' },
+  { id: 'sg', name: 'Secretaría General', emoji: '🗂️', color: '#6b5bd6' }
+];
+
+const FACULTIES = [
+  {
+    id: 'med', num: '1', name: 'Facultad de Medicina', color: '#3b2f8f', soft: '#efecfb', wide: true,
+    cols: [
+      {
+        title: 'Medicina', note: 'Medicina se maneja como un área operativa única para CONEKTADOS, organizada por especialidad clínica.',
+        units: [
+          { id: 'sp-mi', name: 'Medicina interna', emoji: '🩻' },
+          { id: 'sp-ped', name: 'Pediatría', emoji: '🧒' },
+          { id: 'sp-tra', name: 'Traumatología', emoji: '🦴' },
+          { id: 'sp-psi', name: 'Psiquiatría', emoji: '🧠' },
+          { id: 'sp-oto', name: 'Otorrinolaringología', emoji: '👂' },
+          { id: 'sp-neu', name: 'Neurología', emoji: '⚡' },
+          { id: 'sp-gas', name: 'Gastroenterología', emoji: '🫀' },
+          { id: 'sp-car', name: 'Cardiología', emoji: '❤️' },
+          { id: 'sp-gin', name: 'Ginecología y Obstetricia', emoji: '🤰' },
+          { id: 'sp-end', name: 'Endocrinología', emoji: '🧪' },
+          { id: 'sp-der', name: 'Dermatología', emoji: '🧴' },
+          { id: 'sp-oft', name: 'Oftalmología', emoji: '👁️' },
+          { id: 'sp-uro', name: 'Urología', emoji: '💧' }
+        ]
+      },
+      {
+        units: [
+          { id: 'bio', name: 'Escuela de Bioanálisis', emoji: '🔬', note: 'Bioanalistas' },
+          { id: 'nut', name: 'Escuela de Nutrición y Dietética', emoji: '🍎', note: 'Nutricionistas y dietistas' },
+          { id: 'sal-fis', name: 'Escuela de Salud Pública · Fisioterapia', emoji: '🧘' },
+          { id: 'sal-to', name: 'Escuela de Salud Pública · Terapia ocupacional', emoji: '🖐️' },
+          { id: 'enf', name: 'Escuela de Enfermería', emoji: '➕', note: 'No participa actualmente en estos eventos' }
+        ]
+      }
+    ]
+  },
+  { id: 'odo', num: '2', name: 'Facultad de Odontología', color: '#2fa89b', soft: '#e6f6f3',
+    cols: [{ units: [{ id: 'odo-e', name: 'Escuela de Odontología', emoji: '🦷', note: 'Odontólogos' }] }] },
+  { id: 'far', num: '3', name: 'Facultad de Farmacia', color: '#ef8b2c', soft: '#fdf0e2',
+    cols: [{ units: [{ id: 'far-e', name: 'Escuela de Farmacia', emoji: '⚗️', note: 'Farmacéuticos' }] }] },
+  { id: 'hum', num: '4', name: 'Facultad de Humanidades y Educación', color: '#7b6bd6', soft: '#f0edfc',
+    cols: [{ units: [
+      { id: 'psi', name: 'Escuela de Psicología', emoji: '🧠', note: 'Psicólogos' },
+      { id: 'edu', name: 'Escuela de Educación', emoji: '📚', note: 'Educadores' }
+    ] }] },
+  { id: 'ces', num: '5', name: 'Facultad de Ciencias Económicas y Sociales', color: '#e14b4b', soft: '#fdebeb',
+    cols: [{ units: [{ id: 'ts', name: 'Escuela de Trabajo Social', emoji: '📈', note: 'Trabajadores sociales' }] }] },
+  { id: 'arq', num: '6', name: 'Facultad de Arquitectura y Urbanismo', color: '#e0a423', soft: '#fdf4de',
+    cols: [{ units: [{ id: 'arq-e', name: 'Escuela de Arquitectura', emoji: '📐', note: 'Arquitectos' }] }] },
+  { id: 'ing', num: '7', name: 'Facultad de Ingeniería', color: '#4a7fd4', soft: '#eaf1fc',
+    cols: [{ units: [{ id: 'civ', name: 'Escuela de Ingeniería Civil', emoji: '🌉', note: 'Ingenieros civiles' }] }] }
+];
+
+function C(id, n, r, u, e, t, status, action) {
+  return { id: id, name: n, role: r, unit: u, email: e, phone: t, status: status, action: action };
+}
+
+const CONTACTS = [
+  C('c01', 'Fátima', 'Enlace', 'vac', 'Por confirmar', 'Por confirmar', 'Identificada', 'Confirmar cargo, datos de contacto y alcance desde Vicerrectorado Académico.'),
+  C('c02', 'Dr. Pedro Franz', 'Coordinador', 'sc', 'Por confirmar', 'Por confirmar', 'Por contactar', 'Solicitar cronograma UCV y validar la relación con Arquitectura.'),
+  C('c03', 'Prof. José', 'Enlace', 'arq-e', 'Por confirmar', 'Por confirmar', 'Por coordinar', 'Aclarar responsables y cronograma de Arquitectura junto con Pedro.'),
+  C('c04', 'Andrea', 'Enlace', 'sp-mi', 'Por confirmar', 'Por confirmar', 'Respondió', 'Recibir el audio pendiente para optimizar el triaje de Medicina Interna.'),
+  C('c05', 'Majo', 'Por confirmar', 'op', 'Por confirmar', 'Por confirmar', 'Respondió', 'Confirmar su rol, unidad y responsabilidad para registrarla correctamente.'),
+  C('c06', 'Responsable de Odontología', 'Por confirmar', 'odo-e', 'Por confirmar', 'Por confirmar', 'Información disponible', 'Verificar qué data fue cargada y qué continúa pendiente.'),
+  C('c07', 'Doctor o fisioterapeuta pendiente', 'Profesional del Área', 'sal-fis', 'Por confirmar', 'Por confirmar', 'Esperando información', 'Recuperar los datos prometidos durante el evento del lunes.')
+];
+
+const SEED = [
+  { id: 'i1', contact: 'c04', type: 'call', date: '2026-08-20', notes: 'Andrea respondió. Queda pendiente su audio para optimizar el triaje de Medicina Interna.', follow: '2026-08-21' },
+  { id: 'i2', contact: 'c05', type: 'call', date: '2026-08-20', notes: 'Majo respondió al contacto facilitado por Carla. Falta confirmar su rol.', follow: '2026-08-21' }
+];
+
+const BOARD_STATUS = [
+  { id: 'todo', label: 'Por iniciar', emoji: '○', color: '#82796a' },
+  { id: 'waiting', label: 'En espera', emoji: '◷', color: '#c67139' },
+  { id: 'doing', label: 'En curso', emoji: '↻', color: '#4a7fd4' },
+  { id: 'done', label: 'Listo', emoji: '✓', color: '#4f8f68' }
+];
+
+const AREA_COLORS = { Estructura: '#6b5bd6', Contactos: '#c67139', Cronograma: '#4a7fd4', Datos: '#2fa89b', Evento: '#e0a423', Jornada: '#e0a423', Florangel: '#7a8a5e' };
+
+const TASKS = [
+  { id: 't01', title: 'Solicitar el cronograma de actividades UCV', area: 'Cronograma', status: 'waiting', priority: 'high', owner: 'Dr. Pedro Franz', horizon: 'Hoy', detail: 'Obtener fechas, facultades, responsables y tipo de actividad para llevarlas a una vista semanal.', nextAction: 'Contactar a Pedro y pedir el cronograma consolidado.' },
+  { id: 't02', title: 'Aclarar Servicios Comunitarios ↔ Arquitectura', area: 'Estructura', status: 'todo', priority: 'high', owner: 'Pedro + José', horizon: 'Esta semana', detail: 'Resolver quién coordina Arquitectura, quién entrega su cronograma y cómo se conecta con Servicios Comunitarios.', nextAction: 'Acordar una llamada conjunta o identificar al responsable final.' },
+  { id: 't03', title: 'Incorporar Servicios Comunitarios bajo Vicerrectorado', area: 'Estructura', status: 'doing', priority: 'medium', owner: 'Equipo CONEKTADOS', horizon: 'Hoy', detail: 'Representar la capa operativa coordinada por el Dr. Pedro Franz dentro del mapa jerárquico.', nextAction: 'Validar que la ubicación y dependencia institucional sean correctas.' },
+  { id: 't04', title: 'Confirmar el rol de Majo', area: 'Contactos', status: 'waiting', priority: 'medium', owner: 'Majo / Carla', horizon: 'Mañana', detail: 'Majo ya respondió, pero falta ubicar su unidad, cargo y responsabilidad dentro de la operación.', nextAction: 'Pedir cargo, área, teléfono y responsabilidad concreta.' },
+  { id: 't05', title: 'Recibir audio de Andrea sobre triaje', area: 'Datos', status: 'waiting', priority: 'high', owner: 'Andrea', horizon: 'Mañana', detail: 'Andrea apoya Medicina Interna y quedó en enviar un audio para optimizar el flujo de triaje.', nextAction: 'Dar seguimiento al audio y convertirlo en requerimientos claros.' },
+  { id: 't06', title: 'Verificar data cargada por Odontología', area: 'Datos', status: 'todo', priority: 'high', owner: 'Responsable de Odontología', horizon: 'Esta semana', detail: 'La responsable dispone de información, pero no hay visibilidad sobre lo subido y lo pendiente.', nextAction: 'Solicitar estatus: recibido, cargado, pendiente y formato de la data.' },
+  { id: 't07', title: 'Recuperar información del doctor o fisioterapeuta', area: 'Contactos', status: 'waiting', priority: 'medium', owner: 'Por confirmar', horizon: 'Esta semana', detail: 'Durante el evento del lunes quedó pendiente el envío de información de este contacto.', nextAction: 'Identificar nombre y canal de contacto; solicitar nuevamente los datos.' },
+  { id: 't08', title: 'Construir la vista semanal de eventos', area: 'Cronograma', status: 'doing', priority: 'high', owner: 'Equipo CONEKTADOS', horizon: 'Esta semana', detail: 'Mostrar qué sucede hoy, mañana y la semana siguiente, con responsables y necesidades por día.', nextAction: 'Cargar el cronograma en cuanto Pedro lo comparta.' },
+  { id: 't09', title: 'Unificar UCV + Florangel en el mapa operativo', area: 'Florangel', status: 'todo', priority: 'medium', owner: 'Equipo CONEKTADOS', horizon: 'Próxima semana', detail: 'Vincular tareas y coordinación externa sin presentar a Florangel como parte de la estructura UCV.', nextAction: 'Crear una capa de coordinación externa y registrar sus pendientes.' },
+  { id: 't10', title: 'Definir ficha de auditoría por evento', area: 'Evento', status: 'todo', priority: 'high', owner: 'Equipo CONEKTADOS', horizon: 'Esta semana', detail: 'Cada evento debe completar cinco controles internos de información antes de confirmarse.', nextAction: 'Crear una ficha por fecha con comunicación, equipo, materiales, voluntariado y data.' },
+  { id: 't11', title: 'Completar directorio con datos confirmados', area: 'Contactos', status: 'doing', priority: 'medium', owner: 'Equipo CONEKTADOS', horizon: 'Esta semana', detail: 'El borrador debe contener solo nombres y datos verificados, marcando lo desconocido como Por confirmar.', nextAction: 'Completar teléfonos, correos, cargos y unidades de los siete contactos identificados.' }
+];
+
+const JOURNEY_QUESTIONS = [
+  { key: 'communication', emoji: '💬', label: 'Comunicación confirmada' },
+  { key: 'team', emoji: '👥', label: 'Asistencia del equipo definida' },
+  { key: 'materials', emoji: '🎒', label: 'Materiales por llevar definidos' },
+  { key: 'volunteers', emoji: '🙋', label: 'Voluntariado o capacitación resuelto' },
+  { key: 'data', emoji: '🗂️', label: 'Carga o procesamiento previo de data resuelto' }
+];
+
+const EVENT_TYPES = [
+  { id: 'health', label: 'Evento de salud' },
+  { id: 'meeting', label: 'Reunión de coordinación' },
+  { id: 'training', label: 'Capacitación' },
+  { id: 'institutional', label: 'Visita institucional' },
+  { id: 'operation', label: 'Operativo especial' },
+  { id: 'other', label: 'Otro tipo de evento' }
+];
+
+const APP_STATUS = {
+  developing: { label: 'En desarrollo', color: '#315a9d', soft: '#eaf1fc' },
+  resolved: { label: 'Desarrollo de la app resuelto', color: '#14584f', soft: '#e6f6f3' },
+  not_started: { label: 'Sin desarrollar aún', color: '#8c491a', soft: '#fff0e6' }
+};
+
+const JOURNEY_STATUS = {
+  draft: { label: 'Por confirmar', color: '#c67139', soft: '#fff0e6' },
+  preparing: { label: 'En preparación', color: '#4a7fd4', soft: '#eaf1fc' },
+  confirmed: { label: 'Confirmada', color: '#2fa89b', soft: '#e6f6f3' },
+  completed: { label: 'Completada', color: '#4f8f68', soft: '#edf6ef' }
+};
+
+const JOURNEYS = [];
+
+const VOLUNTEERS = [];
+
+const DEFAULT_UI = {
+  pageTitle: 'Control operativo de Relaciones UCV',
+  pageSubtitle: 'Mapa de responsables, comunicaciones, cronograma y acciones pendientes para coordinar los eventos de la UCV con CONEKTADOS.',
+  boardIntro: 'De contactos dispersos a una agenda semanal accionable.',
+  questionsTitle: 'Checklist de auditoría interna por evento',
+  upcomingTitle: 'Próximos eventos',
+  calendarTitle: 'Calendario de eventos',
+  bubbleSize: 'normal', titleSize: '40',
+  tabOrder: ['board', 'calendar', 'hierarchy', 'list', 'timeline', 'volunteers'],
+  boardOrder: ['intro', 'upcoming', 'kanban']
+};
+
+const NAV_ITEMS = {
+  board: { emoji: '🧩', label: 'Tablero operativo' },
+  calendar: { emoji: '📅', label: 'Calendario' },
+  hierarchy: { emoji: '🗺️', label: 'Jerarquía' },
+  list: { emoji: '👥', label: 'Contactos' },
+  timeline: { emoji: '🕒', label: 'Interacciones' },
+  volunteers: { emoji: '🙋', label: 'Voluntariado' }
+};
+
+const BOARD_ITEMS = {
+  intro: { emoji: '🧭', label: 'Presentación y preparación' },
+  upcoming: { emoji: '🗓️', label: 'Próximos eventos' },
+  kanban: { emoji: '🧩', label: 'Tablero Kanban' }
+};
+
+function readStore(key, fallback) {
+  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch (e) { return fallback; }
+}
+
+function writeStore(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* El tablero sigue funcionando sin persistencia. */ }
+}
+
+function normalizeJourney(j) {
+  if (Array.isArray(j.dates) && j.dates.length) return j;
+  return Object.assign({}, j, { dates: j.date ? [j.date] : [] });
+}
+
+function normalizeUI(value) {
+  const v = value || {};
+  const tabs = Array.isArray(v.tabOrder) && v.tabOrder.length === 6 ? v.tabOrder.filter(x => NAV_ITEMS[x]) : DEFAULT_UI.tabOrder.slice();
+  const sections = Array.isArray(v.boardOrder) && v.boardOrder.length === 3 ? v.boardOrder.filter(x => BOARD_ITEMS[x]) : DEFAULT_UI.boardOrder.slice();
+  const merged = Object.assign({}, DEFAULT_UI, v, {
+    tabOrder: tabs.length === 6 ? tabs : DEFAULT_UI.tabOrder.slice(),
+    boardOrder: sections.length === 3 ? sections : DEFAULT_UI.boardOrder.slice()
+  });
+  if (merged.pageSubtitle === 'Mapa de responsables, comunicaciones, cronograma y acciones pendientes para coordinar las jornadas de la UCV con CONEKTADOS.') merged.pageSubtitle = DEFAULT_UI.pageSubtitle;
+  if (merged.questionsTitle === 'Preguntas obligatorias por jornada') merged.questionsTitle = DEFAULT_UI.questionsTitle;
+  if (merged.upcomingTitle === 'Próximas jornadas') merged.upcomingTitle = DEFAULT_UI.upcomingTitle;
+  if (merged.calendarTitle === 'Calendario de jornadas') merged.calendarTitle = DEFAULT_UI.calendarTitle;
+  return merged;
+}
+
+function cloneUI(value) {
+  const v = normalizeUI(value);
+  return Object.assign({}, v, { tabOrder: v.tabOrder.slice(), boardOrder: v.boardOrder.slice() });
+}
+
+const SAVED_UI = normalizeUI(readStore('ucv-ui-v1', DEFAULT_UI));
+
+const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const WEEK_DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+function fmt(d) {
+  if (!d) return '—';
+  const p = d.split('-');
+  return p[2] + ' ' + MONTHS[Number(p[1]) - 1] + ' ' + p[0];
+}
+
+class Component extends DCLogic {
+  state = {
+    view: 'board', query: '', faculty: 'all', role: 'all', onlyFollow: false,
+    dragTaskId: null, dragOverCol: null, dragOverIndex: null, doneCapture: null,
+    contacts: readStore('ucv-contacts-v1', CONTACTS),
+    interactions: readStore('ucv-interactions-v2', SEED),
+    tasks: readStore('ucv-tasks-v2', TASKS),
+    journeys: readStore('ucv-journeys-v3', JOURNEYS).map(normalizeJourney),
+    volunteers: readStore('ucv-volunteers-v1', VOLUNTEERS),
+    volunteerModal: null,
+    volunteerForm: { name: '', phone: '', email: '', skill: '', notes: '', availability: [] },
+    volunteerCalendarMonth: TODAY.slice(0, 7),
+    availabilityMonth: TODAY.slice(0, 7),
+    availabilityDayModal: null,
+    volunteersPanelOpen: false,
+    assignJourneyId: null,
+    appStatuses: readStore('ucv-app-status-v1', {}),
+    unitInfo: readStore('ucv-unit-info-v1', {}),
+    unitModal: null,
+    unitForm: {
+      responsibleName: '', responsiblePhone: '', responsibleEmail: '',
+      supportName: '', supportPhone: '', supportEmail: '',
+      triageStatus: 'pending', attachmentName: '', attachmentData: '', attachmentText: ''
+    },
+    ui: cloneUI(SAVED_UI), customizeOpen: false, customizeForm: cloneUI(SAVED_UI),
+    calendarMonth: TODAY.slice(0, 7), dayModal: null, journeyModal: null,
+    journeyCalendarMonth: TODAY.slice(0, 7),
+    journeyForm: { title: '', eventType: 'health', dates: [TODAY], time: '', location: '', area: '', owner: '', status: 'draft', notes: '', checks: {} },
+    modal: null, type: 'meeting', notes: '', date: TODAY, follow: '',
+    taskModal: null,
+    taskForm: { title: '', owner: 'Por confirmar', area: 'Contactos', status: 'todo', priority: 'medium', horizon: 'Por definir', detail: '', nextAction: '' },
+    contactModal: null,
+    contactForm: { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar' }
+  };
+
+  unitIndex() {
+    if (this._ui) return this._ui;
+    const map = {};
+    ADMIN.forEach(a => { map[a.id] = { unitName: a.name, facultyName: 'Rectorado y autoridades', facultyId: a.id, color: a.color, soft: '#f4f1ea' }; });
+    FACULTIES.forEach(f => f.cols.forEach(col => col.units.forEach(u => {
+      map[u.id] = { unitName: u.name, facultyName: f.name, facultyId: f.id, color: f.color, soft: f.soft };
+    })));
+    this._ui = map;
+    return map;
+  }
+
+  unitOptionsList() {
+    if (this._unitOptions) return this._unitOptions;
+    const list = ADMIN.map(a => ({ id: a.id, label: a.emoji + ' ' + a.name }));
+    FACULTIES.forEach(f => f.cols.forEach(col => col.units.forEach(u => {
+      list.push({ id: u.id, label: f.name + ' · ' + u.name });
+    })));
+    this._unitOptions = list;
+    return list;
+  }
+
+  enrich() {
+    const idx = this.unitIndex();
+    const byContact = {};
+    this.state.interactions.forEach(i => { (byContact[i.contact] = byContact[i.contact] || []).push(i); });
+    return this.state.contacts.map(c => {
+      const meta = idx[c.unit] || { unitName: '—', facultyName: '—', facultyId: '', color: '#82796a', soft: '#f4f1ea' };
+      const hist = (byContact[c.id] || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+      const last = hist[0] || null;
+      const follows = hist.map(h => h.follow).filter(Boolean).sort();
+      const nextFollow = follows.filter(f => f >= TODAY)[0] || (follows.length ? follows[follows.length - 1] : '');
+      const overdue = !!nextFollow && nextFollow < TODAY;
+      return Object.assign({}, c, {
+        meta: meta, hist: hist, last: last, nextFollow: nextFollow, overdue: overdue,
+        needsFollow: !last || overdue || !nextFollow
+      });
+    });
+  }
+
+  matches(c) {
+    const s = this.state;
+    if (s.faculty !== 'all' && c.meta.facultyId !== s.faculty) return false;
+    if (s.role !== 'all' && c.role !== s.role) return false;
+    if (s.onlyFollow && !c.needsFollow) return false;
+    const q = s.query.trim().toLowerCase();
+    if (!q) return true;
+    return (c.name + ' ' + c.role + ' ' + c.meta.unitName + ' ' + c.meta.facultyName + ' ' + c.email).toLowerCase().indexOf(q) > -1;
+  }
+
+  chip(c) {
+    const r = ROLE[c.role];
+    const size = this.state.ui.bubbleSize;
+    const metrics = size === 'compact' ? { padding: '6px 8px', radius: 10, gap: 7 } : size === 'large' ? { padding: '11px 13px', radius: 17, gap: 11 } : { padding: '8px 10px', radius: 14, gap: 9 };
+    return {
+      id: c.id, name: c.name, emoji: r.emoji, roleShort: r.short,
+      flag: c.overdue ? '🔴' : (c.nextFollow ? '🟢' : '⚪'),
+      open: () => this.openModal(c.id),
+      chipStyle: { cursor: 'pointer', textAlign: 'left', border: '1px solid var(--color-neutral-200)', background: 'var(--color-neutral-100)', borderRadius: metrics.radius, padding: metrics.padding, display: 'flex', alignItems: 'center', gap: metrics.gap, width: '100%' }
+    };
+  }
+
+  openModal(id) { this.setState({ modal: id, type: 'meeting', notes: '', date: TODAY, follow: '' }); }
+  closeModal = () => this.setState({ modal: null });
+
+  saveInteraction = () => {
+    const s = this.state;
+    if (!s.modal) return;
+    const list = s.interactions.concat([{
+      id: 'i' + Date.now(), contact: s.modal, type: s.type,
+      date: s.date || TODAY, notes: s.notes.trim() || 'Interacción registrada sin notas.', follow: s.follow
+    }]);
+    writeStore('ucv-interactions-v2', list);
+    this.setState({ interactions: list, modal: null, notes: '', follow: '' });
+  };
+
+  blankContact() {
+    return { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar' };
+  }
+
+  newContact = () => this.setState({ contactModal: 'new', contactForm: this.blankContact() });
+
+  openContactEdit(id) {
+    const c = this.state.contacts.find(x => x.id === id);
+    if (!c) return;
+    this.setState({ modal: null, contactModal: id, contactForm: Object.assign(this.blankContact(), c) });
+  }
+
+  closeContactModal = () => this.setState({ contactModal: null });
+
+  saveContact = () => {
+    const s = this.state;
+    const clean = Object.assign({}, s.contactForm, {
+      name: s.contactForm.name.trim() || 'Contacto sin nombre',
+      email: s.contactForm.email.trim() || 'Por confirmar',
+      phone: s.contactForm.phone.trim() || 'Por confirmar',
+      status: s.contactForm.status.trim() || 'Por confirmar',
+      action: s.contactForm.action.trim() || 'Por confirmar'
+    });
+    let list;
+    if (s.contactModal === 'new') list = s.contacts.concat([Object.assign({}, clean, { id: 'c' + Date.now() })]);
+    else list = s.contacts.map(c => c.id === s.contactModal ? Object.assign({}, clean, { id: c.id }) : c);
+    writeStore('ucv-contacts-v1', list);
+    this.setState({ contacts: list, contactModal: null });
+  };
+
+  deleteContact = (id) => {
+    if (!id) return;
+    if (typeof window !== 'undefined' && window.confirm && !window.confirm('¿Eliminar este contacto de forma permanente?')) return;
+    const contacts = this.state.contacts.filter(c => c.id !== id);
+    const interactions = this.state.interactions.filter(i => i.contact !== id);
+    writeStore('ucv-contacts-v1', contacts);
+    writeStore('ucv-interactions-v2', interactions);
+    this.setState({ contacts: contacts, interactions: interactions, contactModal: null, modal: null });
+  };
+
+  newTask = () => this.setState({
+    taskModal: 'new',
+    taskForm: { title: '', owner: 'Por confirmar', area: 'Contactos', status: 'todo', priority: 'medium', horizon: 'Por definir', detail: '', nextAction: '' }
+  });
+
+  openTask(id) {
+    const task = this.state.tasks.find(t => t.id === id);
+    if (!task) return;
+    this.setState({ taskModal: id, taskForm: Object.assign({}, task) });
+  }
+
+  closeTaskModal = () => this.setState({ taskModal: null });
+
+  promptDoneCapture(taskId, title) {
+    if (this._doneCaptureTimer) clearTimeout(this._doneCaptureTimer);
+    this.setState({ doneCapture: { taskId: taskId, title: title, text: '', submitted: false } });
+  }
+
+  submitDoneCapture = () => {
+    const s = this.state;
+    if (!s.doneCapture) return;
+    const text = s.doneCapture.text.trim();
+    const list = s.tasks.map(t => t.id === s.doneCapture.taskId ? Object.assign({}, t, { achievement: text }) : t);
+    writeStore('ucv-tasks-v2', list);
+    this.setState({ tasks: list, doneCapture: Object.assign({}, s.doneCapture, { text: text, submitted: true }) });
+    if (this._doneCaptureTimer) clearTimeout(this._doneCaptureTimer);
+    this._doneCaptureTimer = setTimeout(() => this.setState({ doneCapture: null }), 3600);
+  };
+
+  skipDoneCapture = () => {
+    if (this._doneCaptureTimer) clearTimeout(this._doneCaptureTimer);
+    this.setState({ doneCapture: null });
+  };
+
+  closeDoneCapture = () => {
+    if (this._doneCaptureTimer) clearTimeout(this._doneCaptureTimer);
+    this.setState({ doneCapture: null });
+  };
+
+  saveTask = () => {
+    const s = this.state;
+    const prevTask = s.taskModal !== 'new' ? s.tasks.find(t => t.id === s.taskModal) : null;
+    const clean = Object.assign({}, s.taskForm, {
+      title: s.taskForm.title.trim() || 'Tarea sin título',
+      owner: s.taskForm.owner.trim() || 'Por confirmar',
+      detail: s.taskForm.detail.trim() || 'Sin detalle registrado.',
+      nextAction: s.taskForm.nextAction.trim() || 'Definir próxima acción.'
+    });
+    let list;
+    if (s.taskModal === 'new') list = s.tasks.concat([Object.assign({}, clean, { id: 't' + Date.now() })]);
+    else list = s.tasks.map(t => t.id === s.taskModal ? Object.assign({}, clean, { id: t.id }) : t);
+    writeStore('ucv-tasks-v2', list);
+    this.setState({ tasks: list, taskModal: null });
+    if (clean.status === 'done' && (!prevTask || prevTask.status !== 'done')) this.promptDoneCapture(s.taskModal === 'new' ? list[list.length - 1].id : s.taskModal, clean.title);
+  };
+
+  moveTask(id, direction) {
+    const order = BOARD_STATUS.map(x => x.id);
+    let celebrated = null;
+    const list = this.state.tasks.map(t => {
+      if (t.id !== id) return t;
+      const current = order.indexOf(t.status);
+      const next = Math.max(0, Math.min(order.length - 1, current + direction));
+      const nextStatus = order[next];
+      if (nextStatus === 'done' && t.status !== 'done') celebrated = t.title || 'La tarea';
+      return Object.assign({}, t, { status: nextStatus });
+    });
+    writeStore('ucv-tasks-v2', list);
+    this.setState({ tasks: list });
+    if (celebrated) this.promptDoneCapture(id, celebrated);
+  }
+
+  reorderTask(id, targetStatus, targetIndex) {
+    const tasks = this.state.tasks.slice();
+    const fromIdx = tasks.findIndex(t => t.id === id);
+    if (fromIdx === -1) return;
+    const original = tasks[fromIdx];
+    const moved = Object.assign({}, original, { status: targetStatus });
+    tasks.splice(fromIdx, 1);
+    const colTasks = tasks.filter(t => t.status === targetStatus);
+    let insertAt;
+    if (targetIndex < colTasks.length) insertAt = tasks.indexOf(colTasks[targetIndex]);
+    else if (colTasks.length) insertAt = tasks.indexOf(colTasks[colTasks.length - 1]) + 1;
+    else insertAt = tasks.length;
+    tasks.splice(insertAt, 0, moved);
+    writeStore('ucv-tasks-v2', tasks);
+    this.setState({ tasks: tasks, dragTaskId: null, dragOverCol: null, dragOverIndex: null });
+    if (targetStatus === 'done' && original.status !== 'done') this.promptDoneCapture(id, original.title || 'La tarea');
+  }
+
+  blankJourney(date) {
+    return { title: '', eventType: 'health', dates: date ? [date] : [], time: '', location: '', area: '', owner: '', status: 'draft', notes: '', checks: {}, assignedVolunteers: [] };
+  }
+
+  blankVolunteer() {
+    return { name: '', phone: '', email: '', skill: '', notes: '', availability: [] };
+  }
+
+  newVolunteer = () => this.setState({ volunteerModal: 'new', volunteerForm: this.blankVolunteer() });
+
+  openVolunteer(id) {
+    const v = this.state.volunteers.find(x => x.id === id);
+    if (!v) return;
+    this.setState({ volunteerModal: id, volunteerForm: Object.assign(this.blankVolunteer(), v, { availability: (v.availability || []).slice() }) });
+  }
+
+  closeVolunteerModal = () => this.setState({ volunteerModal: null });
+
+  saveVolunteer = () => {
+    const s = this.state;
+    const clean = {
+      name: s.volunteerForm.name.trim() || 'Voluntario sin nombre',
+      phone: s.volunteerForm.phone.trim() || 'Por confirmar',
+      email: s.volunteerForm.email.trim() || 'Por confirmar',
+      skill: s.volunteerForm.skill.trim() || 'Por confirmar',
+      notes: s.volunteerForm.notes.trim(),
+      availability: Array.isArray(s.volunteerForm.availability) ? s.volunteerForm.availability.slice().sort() : []
+    };
+    let list;
+    if (s.volunteerModal === 'new') list = s.volunteers.concat([Object.assign({}, clean, { id: 'v' + Date.now() })]);
+    else list = s.volunteers.map(v => v.id === s.volunteerModal ? Object.assign({}, clean, { id: v.id }) : v);
+    writeStore('ucv-volunteers-v1', list);
+    this.setState({ volunteers: list, volunteerModal: null });
+  };
+
+  deleteVolunteer(id) {
+    const list = this.state.volunteers.filter(v => v.id !== id);
+    const journeys = this.state.journeys.map(j => (j.assignedVolunteers || []).indexOf(id) > -1
+      ? Object.assign({}, j, { assignedVolunteers: j.assignedVolunteers.filter(x => x !== id) })
+      : j);
+    writeStore('ucv-volunteers-v1', list);
+    writeStore('ucv-journeys-v3', journeys);
+    this.setState({ volunteers: list, journeys: journeys, volunteerModal: null });
+  }
+
+  moveVolunteerCalendar(delta) {
+    const p = this.state.volunteerCalendarMonth.split('-');
+    const d = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1 + delta, 1));
+    const month = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+    this.setState({ volunteerCalendarMonth: month });
+  }
+
+  openAssign(journeyId) { this.setState({ assignJourneyId: journeyId }); }
+  closeAssign = () => this.setState({ assignJourneyId: null });
+
+  moveAvailabilityMonth(delta) {
+    const p = this.state.availabilityMonth.split('-');
+    const d = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1 + delta, 1));
+    const month = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+    this.setState({ availabilityMonth: month });
+  }
+
+  openAvailabilityDay(date) { this.setState({ availabilityDayModal: date }); }
+  closeAvailabilityDay = () => this.setState({ availabilityDayModal: null });
+
+  toggleVolunteersPanel = () => this.setState({ volunteersPanelOpen: !this.state.volunteersPanelOpen });
+
+  addEventForDay = (date) => {
+    this.setState({ availabilityDayModal: null });
+    this.newJourney(date);
+  };
+
+  newVolunteerForDate(date) {
+    this.setState({
+      availabilityDayModal: null,
+      volunteerModal: 'new',
+      volunteerForm: Object.assign(this.blankVolunteer(), { availability: date ? [date] : [] })
+    });
+  }
+
+  toggleAssignVolunteer(journeyId, volunteerId) {
+    const journeys = this.state.journeys.map(j => {
+      if (j.id !== journeyId) return j;
+      const current = j.assignedVolunteers || [];
+      const next = current.indexOf(volunteerId) > -1 ? current.filter(x => x !== volunteerId) : current.concat([volunteerId]);
+      return Object.assign({}, j, { assignedVolunteers: next });
+    });
+    writeStore('ucv-journeys-v3', journeys);
+    this.setState({ journeys: journeys });
+  }
+
+  newJourney = (date) => this.setState({
+    dayModal: null,
+    journeyModal: 'new',
+    journeyCalendarMonth: (typeof date === 'string' ? date : TODAY).slice(0, 7),
+    journeyForm: this.blankJourney(typeof date === 'string' ? date : TODAY)
+  });
+
+  openJourney(id) {
+    const journey = this.state.journeys.find(j => j.id === id);
+    if (!journey) return;
+    const firstDate = (journey.dates && journey.dates[0]) || TODAY;
+    this.setState({
+      dayModal: null, journeyModal: id,
+      journeyCalendarMonth: firstDate.slice(0, 7),
+      journeyForm: Object.assign(this.blankJourney(), journey, { dates: (journey.dates || []).slice(), checks: Object.assign({}, journey.checks || {}) })
+    });
+  }
+
+  closeJourneyModal = () => this.setState({ journeyModal: null });
+  openCalendarDay(date) { this.setState({ dayModal: date }); }
+  closeDayModal = () => this.setState({ dayModal: null });
+
+  moveJourneyCalendar(delta) {
+    const p = this.state.journeyCalendarMonth.split('-');
+    const d = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1 + delta, 1));
+    const month = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+    this.setState({ journeyCalendarMonth: month });
+  }
+
+  toggleJourneyDate(date) {
+    const form = this.state.journeyForm;
+    const current = form.dates || [];
+    const next = current.indexOf(date) > -1 ? current.filter(d => d !== date) : current.concat([date]).sort();
+    this.setState({ journeyForm: Object.assign({}, form, { dates: next }) });
+  }
+
+  saveJourney = () => {
+    const s = this.state;
+    const dates = Array.isArray(s.journeyForm.dates) && s.journeyForm.dates.length ? s.journeyForm.dates.slice().sort() : [TODAY];
+    const clean = Object.assign({}, s.journeyForm, {
+      title: s.journeyForm.title.trim() || 'Evento por confirmar',
+      eventType: EVENT_TYPES.some(t => t.id === s.journeyForm.eventType) ? s.journeyForm.eventType : 'other',
+      dates: dates,
+      time: s.journeyForm.time || '',
+      location: s.journeyForm.location.trim() || 'Por confirmar',
+      area: s.journeyForm.area.trim() || 'Por confirmar',
+      owner: s.journeyForm.owner.trim() || 'Por confirmar',
+      notes: s.journeyForm.notes.trim(),
+      checks: Object.assign({}, s.journeyForm.checks || {})
+    });
+    let list;
+    if (s.journeyModal === 'new') list = s.journeys.concat([Object.assign({}, clean, { id: 'j' + Date.now() })]);
+    else list = s.journeys.map(j => j.id === s.journeyModal ? Object.assign({}, clean, { id: j.id }) : j);
+    writeStore('ucv-journeys-v3', list);
+    this.setState({ journeys: list, journeyModal: null, calendarMonth: dates[0].slice(0, 7) });
+  };
+
+  moveCalendar(delta) {
+    const p = this.state.calendarMonth.split('-');
+    const d = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1 + delta, 1));
+    const month = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+    this.setState({ calendarMonth: month });
+  }
+
+  toggleJourneyCheck(key) {
+    const current = this.state.journeyForm;
+    const checks = Object.assign({}, current.checks || {}, { [key]: !(current.checks || {})[key] });
+    this.setState({ journeyForm: Object.assign({}, current, { checks: checks }) });
+  }
+
+  setAppStatus(unitId, value) {
+    if (!APP_STATUS[value]) return;
+    const statuses = Object.assign({}, this.state.appStatuses, { [unitId]: value });
+    writeStore('ucv-app-status-v1', statuses);
+    this.setState({ appStatuses: statuses });
+  }
+
+  openUnitModal(unitId, unitName) {
+    const info = this.state.unitInfo[unitId] || {};
+    this.setState({
+      unitModal: unitId,
+      unitModalName: unitName,
+      unitForm: {
+        responsibleName: info.responsibleName || '', responsiblePhone: info.responsiblePhone || '', responsibleEmail: info.responsibleEmail || '',
+        supportName: info.supportName || '', supportPhone: info.supportPhone || '', supportEmail: info.supportEmail || '',
+        triageStatus: info.triageStatus || 'pending',
+        attachmentName: info.attachmentName || '',
+        attachmentData: info.attachmentData || '',
+        attachmentText: info.attachmentText || ''
+      }
+    });
+  }
+
+  closeUnitModal = () => this.setState({ unitModal: null });
+
+  saveUnitInfo = () => {
+    const s = this.state;
+    if (!s.unitModal) return;
+    const info = Object.assign({}, s.unitInfo, {
+      [s.unitModal]: {
+        responsibleName: s.unitForm.responsibleName.trim(), responsiblePhone: s.unitForm.responsiblePhone.trim(), responsibleEmail: s.unitForm.responsibleEmail.trim(),
+        supportName: s.unitForm.supportName.trim(), supportPhone: s.unitForm.supportPhone.trim(), supportEmail: s.unitForm.supportEmail.trim(),
+        triageStatus: s.unitForm.triageStatus === 'sent' ? 'sent' : 'pending',
+        attachmentName: s.unitForm.attachmentName,
+        attachmentData: s.unitForm.attachmentData,
+        attachmentText: s.unitForm.attachmentText.trim()
+      }
+    });
+    writeStore('ucv-unit-info-v1', info);
+    this.setState({ unitInfo: info, unitModal: null });
+  };
+
+  onUnitAttachment(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.setState({ unitForm: Object.assign({}, this.state.unitForm, { attachmentName: file.name, attachmentData: String(reader.result || '') }) });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  removeUnitAttachment = () => this.setState({ unitForm: Object.assign({}, this.state.unitForm, { attachmentName: '', attachmentData: '' }) });
+
+  openCustomize = () => this.setState({ customizeOpen: true, customizeForm: cloneUI(this.state.ui) });
+  closeCustomize = () => this.setState({ customizeOpen: false, customizeForm: cloneUI(this.state.ui) });
+  resetCustomize = () => this.setState({ customizeForm: cloneUI(DEFAULT_UI) });
+
+  saveCustomize = () => {
+    const draft = cloneUI(this.state.customizeForm);
+    const clean = Object.assign({}, draft, {
+      pageTitle: draft.pageTitle.trim() || DEFAULT_UI.pageTitle,
+      pageSubtitle: draft.pageSubtitle.trim() || DEFAULT_UI.pageSubtitle,
+      boardIntro: draft.boardIntro.trim() || DEFAULT_UI.boardIntro,
+      questionsTitle: draft.questionsTitle.trim() || DEFAULT_UI.questionsTitle,
+      upcomingTitle: draft.upcomingTitle.trim() || DEFAULT_UI.upcomingTitle,
+      calendarTitle: draft.calendarTitle.trim() || DEFAULT_UI.calendarTitle
+    });
+    writeStore('ucv-ui-v1', clean);
+    this.setState({ ui: cloneUI(clean), customizeForm: cloneUI(clean), customizeOpen: false });
+  };
+
+  moveCustomize(kind, index, delta) {
+    const form = cloneUI(this.state.customizeForm);
+    const key = kind === 'tabs' ? 'tabOrder' : 'boardOrder';
+    const next = index + delta;
+    if (next < 0 || next >= form[key].length) return;
+    const list = form[key].slice();
+    const hold = list[index]; list[index] = list[next]; list[next] = hold;
+    form[key] = list;
+    this.setState({ customizeForm: form });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const ui = normalizeUI(s.ui);
+    const bubble = ui.bubbleSize === 'compact'
+      ? { padding: 10, radius: 15, minCard: 190, eventPadding: '3px 4px', eventFont: 9.5 }
+      : ui.bubbleSize === 'large'
+        ? { padding: 18, radius: 22, minCard: 260, eventPadding: '6px 7px', eventFont: 11.5 }
+        : { padding: 14, radius: 18, minCard: 220, eventPadding: '4px 5px', eventFont: 10.5 };
+    const all = this.enrich();
+    const shown = all.filter(c => this.matches(c));
+    const shownIds = {};
+    shown.forEach(c => { shownIds[c.id] = true; });
+
+    const readinessCount = j => JOURNEY_QUESTIONS.filter(q => !!(j.checks || {})[q.key]).length;
+    const primaryDate = j => (j.dates && j.dates[0]) || '';
+    const journeyCard = j => {
+      const meta = JOURNEY_STATUS[j.status] || JOURNEY_STATUS.draft;
+      const type = EVENT_TYPES.find(t => t.id === j.eventType) || EVENT_TYPES[EVENT_TYPES.length - 1];
+      const dates = j.dates || [];
+      const dateLabel = dates.length > 1
+        ? fmt(dates[0]) + ' (+' + (dates.length - 1) + (dates.length - 1 === 1 ? ' fecha más)' : ' fechas más)')
+        : fmt(dates[0]);
+      return Object.assign({}, j, {
+        title: j.title || 'Evento por confirmar',
+        eventTypeLabel: type.label,
+        location: j.location || 'Por confirmar',
+        timeLabel: j.time || 'Sin hora definida',
+        dateLabel: dateLabel,
+        statusLabel: meta.label,
+        color: meta.color,
+        soft: meta.soft,
+        readiness: readinessCount(j) + '/' + JOURNEY_QUESTIONS.length,
+        cardStyle: { textAlign: 'left', minWidth: bubble.minCard, flex: '1 0 ' + bubble.minCard + 'px', border: '1px solid var(--color-neutral-200)', borderLeft: '5px solid ' + meta.color, borderRadius: bubble.radius, background: 'var(--color-neutral-100)', padding: bubble.padding + 'px', cursor: 'pointer' },
+        edit: () => this.openJourney(j.id)
+      });
+    };
+    const sortedJourneys = s.journeys.slice().sort((a, b) => (primaryDate(a) + (a.time || '')).localeCompare(primaryDate(b) + (b.time || '')));
+    const upcomingJourneys = sortedJourneys.filter(j => (j.dates || []).some(d => d >= TODAY) && j.status !== 'completed').slice(0, 6).map(journeyCard);
+
+    const monthParts = s.calendarMonth.split('-');
+    const calendarYear = Number(monthParts[0]);
+    const calendarMonthNum = Number(monthParts[1]) - 1;
+    const firstDay = new Date(Date.UTC(calendarYear, calendarMonthNum, 1));
+    const lastDate = new Date(Date.UTC(calendarYear, calendarMonthNum + 1, 0)).getUTCDate();
+    const mondayOffset = (firstDay.getUTCDay() + 6) % 7;
+    const calendarCells = [];
+    for (let blank = 0; blank < mondayOffset; blank += 1) calendarCells.push({ blank: true, day: false });
+    for (let day = 1; day <= lastDate; day += 1) {
+      const iso = s.calendarMonth + '-' + String(day).padStart(2, '0');
+      const dayJourneys = sortedJourneys.filter(j => (j.dates || []).indexOf(iso) > -1);
+      const isToday = iso === TODAY;
+      const assignedIdsForDay = {};
+      dayJourneys.forEach(j => (j.assignedVolunteers || []).forEach(id => { assignedIdsForDay[id] = true; }));
+      const volunteerAssignedCount = Object.keys(assignedIdsForDay).length;
+      const volunteerAvailableCount = s.volunteers.filter(v => (v.availability || []).indexOf(iso) > -1 && !assignedIdsForDay[v.id]).length;
+      calendarCells.push({
+        blank: false, day: true, number: day,
+        countLabel: dayJourneys.length ? dayJourneys.length + (dayJourneys.length === 1 ? ' evento' : ' eventos') : '',
+        events: dayJourneys.slice(0, 3).map(j => {
+          const meta = JOURNEY_STATUS[j.status] || JOURNEY_STATUS.draft;
+          const brief = (j.title || 'Evento por confirmar') + (j.owner ? ' de ' + j.owner : '') + (j.location ? ' en ' + j.location : '');
+          return { color: meta.color, soft: meta.soft, time: j.time ? j.time + ' · ' : '', title: brief, style: { display: 'block', textAlign: 'left', borderLeft: '3px solid ' + meta.color, background: meta.soft, borderRadius: Math.max(6, bubble.radius - 8), padding: bubble.eventPadding, fontSize: bubble.eventFont, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } };
+        }),
+        hasMore: dayJourneys.length > 3,
+        moreCount: Math.max(0, dayJourneys.length - 3),
+        showAvailable: volunteerAvailableCount > 0,
+        showAssigned: volunteerAssignedCount > 0,
+        hasVolunteerInfo: volunteerAvailableCount > 0 || volunteerAssignedCount > 0,
+        volunteerAvailableCount: volunteerAvailableCount,
+        volunteerAssignedCount: volunteerAssignedCount,
+        open: () => this.openCalendarDay(iso),
+        style: { minHeight: 108, border: isToday ? '2px solid var(--color-accent-500)' : '1px solid var(--color-neutral-200)', borderRadius: 15, background: isToday ? 'var(--color-accent-100)' : '#fff', padding: 8, cursor: 'pointer', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: 'var(--color-text)' },
+        numberStyle: isToday ? { width: 25, height: 25, display: 'grid', placeItems: 'center', borderRadius: 999, background: 'var(--color-accent-500)', color: '#fff' } : {}
+      });
+    }
+    while (calendarCells.length % 7) calendarCells.push({ blank: true, day: false });
+
+    const selectedDayJourneys = s.dayModal ? sortedJourneys.filter(j => (j.dates || []).indexOf(s.dayModal) > -1).map(journeyCard) : [];
+    const formChecks = s.journeyForm.checks || {};
+    const journeyChecks = JOURNEY_QUESTIONS.map(q => ({
+      emoji: q.emoji, label: q.label, checked: !!formChecks[q.key], toggle: () => this.toggleJourneyCheck(q.key)
+    }));
+
+    const count = r => all.filter(c => c.role === r).length;
+    const kpiBase = { borderRadius: bubble.radius + 4, padding: (bubble.padding + 2) + 'px ' + (bubble.padding + 4) + 'px', display: 'flex', flexDirection: 'column', gap: 4, boxShadow: 'var(--shadow-sm)' };
+    const kpi = (bg, fg) => Object.assign({}, kpiBase, { background: bg, color: fg });
+    const kpis = s.view === 'board' ? [
+      { emoji: '🧩', value: s.tasks.length, label: 'Tareas operativas', style: kpi('#fff', 'var(--color-text)') },
+      { emoji: '◷', value: s.tasks.filter(t => t.status === 'waiting').length, label: 'En espera', style: kpi('#fff2eb', '#8c491a') },
+      { emoji: '↻', value: s.tasks.filter(t => t.status === 'doing').length, label: 'En curso', style: kpi('#eaf1fc', '#315a9d') },
+      { emoji: '✓', value: s.tasks.filter(t => t.status === 'done').length, label: 'Listas', style: kpi('#e6f6f3', '#14584f') },
+      { emoji: '⚑', value: s.tasks.filter(t => t.priority === 'high' && t.status !== 'done').length, label: 'Prioridad alta', style: kpi('#fdebeb', '#a02525') }
+    ] : s.view === 'calendar' ? [
+      { emoji: '🗓️', value: s.journeys.length, label: 'Eventos registrados', style: kpi('#fff', 'var(--color-text)') },
+      { emoji: '📍', value: s.journeys.filter(j => (j.dates || []).some(d => d.slice(0, 7) === s.calendarMonth)).length, label: 'En este mes', style: kpi('#fff0e6', '#8c491a') },
+      { emoji: '↻', value: s.journeys.filter(j => j.status === 'preparing').length, label: 'En preparación', style: kpi('#eaf1fc', '#315a9d') },
+      { emoji: '✓', value: s.journeys.filter(j => j.status === 'confirmed').length, label: 'Confirmadas', style: kpi('#e6f6f3', '#14584f') },
+      { emoji: '◷', value: s.journeys.filter(j => readinessCount(j) < JOURNEY_QUESTIONS.length && j.status !== 'completed').length, label: 'Auditoría pendiente', style: kpi('#fdf4de', '#855d09') }
+    ] : s.view === 'volunteers' ? [
+      { emoji: '🙋', value: s.volunteers.length, label: 'Voluntarios registrados', style: kpi('#fff', 'var(--color-text)') },
+      { emoji: '🗓️', value: s.journeys.filter(j => (j.dates || []).some(d => d >= TODAY) && j.status !== 'completed').length, label: 'Eventos próximos', style: kpi('#fff0e6', '#8c491a') },
+      { emoji: '🤝', value: s.journeys.reduce((sum, j) => sum + (j.assignedVolunteers || []).length, 0), label: 'Asignaciones totales', style: kpi('#e6f6f3', '#14584f') },
+      { emoji: '⚠️', value: s.journeys.filter(j => (j.dates || []).some(d => d >= TODAY) && j.status !== 'completed' && (j.assignedVolunteers || []).length === 0).length, label: 'Eventos sin voluntarios', style: kpi('#fdebeb', '#a02525') }
+    ] : [
+      { emoji: '👥', value: all.length, label: 'Contactos identificados', style: kpi('#fff', 'var(--color-text)') },
+      { emoji: '🧭', value: count('Coordinador'), label: 'Coordinadores', style: kpi('#efe7ff', '#3a2482') },
+      { emoji: '🔗', value: count('Enlace'), label: 'Enlaces', style: kpi('#e3f6f2', '#14584f') },
+      { emoji: '❔', value: count('Por confirmar'), label: 'Roles por confirmar', style: kpi('#ffe9d6', '#8c491a') },
+      { emoji: '⏰', value: all.filter(c => c.needsFollow).length, label: 'Requieren seguimiento', style: kpi('#fdebeb', '#a02525') }
+    ];
+
+    const volunteerById = {};
+    s.volunteers.forEach(v => { volunteerById[v.id] = v; });
+
+    const volunteerCards = s.volunteers.map(v => {
+      const assigned = sortedJourneys.filter(j => (j.assignedVolunteers || []).indexOf(v.id) > -1);
+      return Object.assign({}, v, {
+        availabilityChips: (v.availability || []).map(d => ({ label: fmt(d) })),
+        noAvailability: !(v.availability || []).length,
+        assignedEvents: assigned.map(j => ({ title: j.title || 'Evento por confirmar', dateLabel: fmt(primaryDate(j)) })),
+        noAssigned: assigned.length === 0,
+        edit: () => this.openVolunteer(v.id),
+        remove: () => this.deleteVolunteer(v.id)
+      });
+    });
+    const volunteersEmpty = volunteerCards.length === 0;
+
+    const volunteerJourneys = sortedJourneys.map(j => {
+      const assignedIds = j.assignedVolunteers || [];
+      const meta = JOURNEY_STATUS[j.status] || JOURNEY_STATUS.draft;
+      return {
+        id: j.id,
+        title: j.title || 'Evento por confirmar',
+        dateLabel: (j.dates || []).length > 1 ? (j.dates.length + ' fechas') : fmt(primaryDate(j)),
+        statusLabel: meta.label,
+        color: meta.color,
+        assignedVolunteers: assignedIds.map(id => ({
+          id: id,
+          name: volunteerById[id] ? volunteerById[id].name : 'Voluntario eliminado',
+          remove: () => this.toggleAssignVolunteer(j.id, id)
+        })),
+        noneAssigned: assignedIds.length === 0,
+        openAssign: () => this.openAssign(j.id)
+      };
+    });
+    const volunteerJourneysEmpty = volunteerJourneys.length === 0;
+
+    const journeyDatesSet = {};
+    s.journeys.forEach(j => (j.dates || []).forEach(d => { journeyDatesSet[d] = (journeyDatesSet[d] || 0) + 1; }));
+    const vMonthParts = s.volunteerCalendarMonth.split('-');
+    const vCalendarYear = Number(vMonthParts[0]);
+    const vCalendarMonthNum = Number(vMonthParts[1]) - 1;
+    const vFirstDay = new Date(Date.UTC(vCalendarYear, vCalendarMonthNum, 1));
+    const vLastDate = new Date(Date.UTC(vCalendarYear, vCalendarMonthNum + 1, 0)).getUTCDate();
+    const vMondayOffset = (vFirstDay.getUTCDay() + 6) % 7;
+    const volunteerAvailSet = s.volunteerForm.availability || [];
+    const availCalendarCells = [];
+    for (let blank = 0; blank < vMondayOffset; blank += 1) availCalendarCells.push({ blank: true, day: false });
+    for (let day = 1; day <= vLastDate; day += 1) {
+      const iso = s.volunteerCalendarMonth + '-' + String(day).padStart(2, '0');
+      const isToday = iso === TODAY;
+      const isAvailable = volunteerAvailSet.indexOf(iso) > -1;
+      const hasEvent = !!journeyDatesSet[iso];
+      availCalendarCells.push({
+        blank: false, day: true, number: day, hasEvent: hasEvent,
+        toggle: () => {
+          const avail = s.volunteerForm.availability || [];
+          const next = isAvailable ? avail.filter(x => x !== iso) : avail.concat([iso]).sort();
+          this.setState({ volunteerForm: Object.assign({}, s.volunteerForm, { availability: next }) });
+        },
+        style: {
+          minHeight: 40, borderRadius: 12, cursor: 'pointer', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 1, fontSize: 12.5, fontWeight: 700,
+          border: isToday ? '2px solid var(--color-accent-500)' : '1px solid var(--color-neutral-200)',
+          background: isAvailable ? 'var(--color-accent-500)' : '#fff',
+          color: isAvailable ? '#fff' : 'var(--color-text)'
+        },
+        dotStyle: { fontSize: 7, lineHeight: 1, color: isAvailable ? '#fff' : 'var(--color-accent-600)' }
+      });
+    }
+    while (availCalendarCells.length % 7) availCalendarCells.push({ blank: true, day: false });
+    const volunteerCalendarLabel = MONTH_NAMES[vCalendarMonthNum] + ' ' + vCalendarYear;
+
+    const jMonthParts = s.journeyCalendarMonth.split('-');
+    const jCalendarYear = Number(jMonthParts[0]);
+    const jCalendarMonthNum = Number(jMonthParts[1]) - 1;
+    const jFirstDay = new Date(Date.UTC(jCalendarYear, jCalendarMonthNum, 1));
+    const jLastDate = new Date(Date.UTC(jCalendarYear, jCalendarMonthNum + 1, 0)).getUTCDate();
+    const jMondayOffset = (jFirstDay.getUTCDay() + 6) % 7;
+    const journeySelectedDates = s.journeyForm.dates || [];
+    const journeyDateCells = [];
+    for (let blank = 0; blank < jMondayOffset; blank += 1) journeyDateCells.push({ blank: true, day: false });
+    for (let day = 1; day <= jLastDate; day += 1) {
+      const iso = s.journeyCalendarMonth + '-' + String(day).padStart(2, '0');
+      const isToday = iso === TODAY;
+      const isSelected = journeySelectedDates.indexOf(iso) > -1;
+      journeyDateCells.push({
+        blank: false, day: true, number: day,
+        toggle: () => this.toggleJourneyDate(iso),
+        style: {
+          minHeight: 38, borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 12.5, fontWeight: 700,
+          border: isToday ? '2px solid var(--color-accent-500)' : '1px solid var(--color-neutral-200)',
+          background: isSelected ? 'var(--color-accent-500)' : '#fff',
+          color: isSelected ? '#fff' : 'var(--color-text)'
+        }
+      });
+    }
+    while (journeyDateCells.length % 7) journeyDateCells.push({ blank: true, day: false });
+    const journeyCalendarLabel = MONTH_NAMES[jCalendarMonthNum] + ' ' + jCalendarYear;
+    const journeyDateChips = journeySelectedDates.map(d => ({ label: fmt(d), remove: () => this.toggleJourneyDate(d) }));
+    const journeyDateChipsEmpty = journeyDateChips.length === 0;
+
+    const volunteerAvailChips = (s.volunteerForm.availability || []).map(d => ({
+      label: fmt(d),
+      remove: () => {
+        const avail = (s.volunteerForm.availability || []).filter(x => x !== d);
+        this.setState({ volunteerForm: Object.assign({}, s.volunteerForm, { availability: avail }) });
+      }
+    }));
+    const volunteerAvailEmpty = volunteerAvailChips.length === 0;
+
+    const assignJourney = s.assignJourneyId ? s.journeys.find(j => j.id === s.assignJourneyId) : null;
+    const assignedSet = assignJourney ? (assignJourney.assignedVolunteers || []) : [];
+    const assignCandidates = assignJourney ? s.volunteers.map(v => {
+      const available = (v.availability || []).some(d => (assignJourney.dates || []).indexOf(d) > -1);
+      const isAssigned = assignedSet.indexOf(v.id) > -1;
+      return {
+        id: v.id, name: v.name, skill: v.skill,
+        availableLabel: available ? '✓ Disponible alguna de las fechas' : '— Sin disponibilidad marcada',
+        isAssigned: isAssigned,
+        toggle: () => this.toggleAssignVolunteer(assignJourney.id, v.id),
+        rowStyle: {
+          display: 'flex', alignItems: 'center', gap: 10, borderRadius: 14, padding: '9px 11px',
+          background: isAssigned ? 'var(--color-accent-100)' : (available ? '#fff' : 'var(--color-neutral-100)'),
+          border: '1px solid ' + (isAssigned ? 'var(--color-accent-400)' : 'var(--color-neutral-300)')
+        },
+        buttonLabel: isAssigned ? 'Quitar' : 'Asignar',
+        buttonStyle: {
+          border: 'none', borderRadius: 999, padding: '7px 13px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+          background: isAssigned ? 'var(--color-neutral-300)' : 'var(--color-accent-500)',
+          color: isAssigned ? 'var(--color-neutral-800)' : '#fff'
+        }
+      };
+    }) : [];
+    const assignCandidatesEmpty = assignCandidates.length === 0;
+
+    const aMonthParts = s.availabilityMonth.split('-');
+    const aYear = Number(aMonthParts[0]);
+    const aMonthNum = Number(aMonthParts[1]) - 1;
+    const aFirstDay = new Date(Date.UTC(aYear, aMonthNum, 1));
+    const aLastDate = new Date(Date.UTC(aYear, aMonthNum + 1, 0)).getUTCDate();
+    const aMondayOffset = (aFirstDay.getUTCDay() + 6) % 7;
+    const availabilityCells = [];
+    for (let blank = 0; blank < aMondayOffset; blank += 1) availabilityCells.push({ blank: true, day: false });
+    for (let day = 1; day <= aLastDate; day += 1) {
+      const iso = s.availabilityMonth + '-' + String(day).padStart(2, '0');
+      const isToday = iso === TODAY;
+      const hasEvent = !!journeyDatesSet[iso];
+      const assignedIdsForDay = {};
+      s.journeys.forEach(j => {
+        if ((j.dates || []).indexOf(iso) > -1) (j.assignedVolunteers || []).forEach(id => { assignedIdsForDay[id] = true; });
+      });
+      const namesForDay = [];
+      s.volunteers.forEach(v => {
+        const isAssigned = !!assignedIdsForDay[v.id];
+        const isAvailable = (v.availability || []).indexOf(iso) > -1;
+        if (isAssigned || isAvailable) namesForDay.push({ name: v.name, style: { fontSize: 9.5, fontWeight: 700, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: isAssigned ? '#1f5aa3' : '#1f7a3d' } });
+      });
+      const shownNames = namesForDay.slice(0, 3);
+      const extraNamesCount = Math.max(0, namesForDay.length - 3);
+      availabilityCells.push({
+        blank: false, day: true, number: day,
+        hasEvent: hasEvent,
+        volunteerNames: shownNames,
+        hasExtraNames: extraNamesCount > 0,
+        extraNamesCount: extraNamesCount,
+        open: () => this.openAvailabilityDay(iso),
+        style: {
+          minHeight: 88, border: isToday ? '2px solid var(--color-accent-500)' : '1px solid var(--color-neutral-200)',
+          borderRadius: 15, background: isToday ? 'var(--color-accent-100)' : '#fff', padding: 8, cursor: 'pointer',
+          display: 'flex', flexDirection: 'column', gap: 3, color: 'var(--color-text)', overflow: 'hidden', textAlign: 'left'
+        },
+        numberStyle: isToday
+          ? { width: 22, height: 22, display: 'grid', placeItems: 'center', borderRadius: 999, background: 'var(--color-accent-500)', color: '#fff', fontSize: 11.5, fontWeight: 700 }
+          : { fontSize: 11.5, fontWeight: 700 }
+      });
+    }
+    while (availabilityCells.length % 7) availabilityCells.push({ blank: true, day: false });
+    const availabilityMonthLabel = MONTH_NAMES[aMonthNum] + ' ' + aYear;
+
+    const availabilityDayVolunteers = s.availabilityDayModal
+      ? s.volunteers.filter(v => (v.availability || []).indexOf(s.availabilityDayModal) > -1).map(v => ({ name: v.name, skill: v.skill }))
+      : [];
+    const availabilityDayJourneys = s.availabilityDayModal
+      ? sortedJourneys.filter(j => (j.dates || []).indexOf(s.availabilityDayModal) > -1).map(j => {
+        const meta = JOURNEY_STATUS[j.status] || JOURNEY_STATUS.draft;
+        const names = (j.assignedVolunteers || []).map(id => volunteerById[id] ? volunteerById[id].name : 'Voluntario eliminado');
+        return {
+          id: j.id, title: j.title || 'Evento por confirmar', statusLabel: meta.label, color: meta.color,
+          assignedVolunteersLabel: names.length ? names.join(', ') : 'Ninguno asignado aún',
+          openAssign: () => this.setState({ availabilityDayModal: null, assignJourneyId: j.id })
+        };
+      })
+      : [];
+
+    const priorityMeta = {
+      high: { label: 'Alta', bg: '#fdebeb', fg: '#a02525' },
+      medium: { label: 'Media', bg: '#fdf4de', fg: '#855d09' },
+      low: { label: 'Baja', bg: '#e6f6f3', fg: '#14584f' }
+    };
+    const statusOrder = BOARD_STATUS.map(x => x.id);
+    const placeholderStyle = { height: 64, borderRadius: bubble.radius, border: '2px dashed var(--color-accent-500)', background: 'var(--color-accent-100)', flex: 'none' };
+    const boardColumns = BOARD_STATUS.map(col => {
+      const isOver = s.dragOverCol === col.id;
+      const rawTasks = s.tasks.filter(t => t.status === col.id);
+      const tasks = rawTasks.map((t, i) => {
+        const p = priorityMeta[t.priority] || priorityMeta.medium;
+        const pos = statusOrder.indexOf(t.status);
+        const dragging = s.dragTaskId === t.id;
+        return Object.assign({}, t, {
+          areaColor: AREA_COLORS[t.area] || '#82796a',
+          priorityLabel: p.label,
+          priorityStyle: { background: p.bg, color: p.fg, borderRadius: 999, padding: '4px 8px', fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap' },
+          cardStyle: { background: '#fff', borderRadius: bubble.radius, padding: bubble.padding, boxShadow: 'var(--shadow-sm)', borderLeft: '5px solid ' + (AREA_COLORS[t.area] || '#82796a'), display: 'flex', flexDirection: 'column', gap: 9, cursor: 'grab', opacity: dragging ? 0.4 : 1 },
+          noPrev: pos === 0,
+          noNext: pos === statusOrder.length - 1,
+          movePrev: () => this.moveTask(t.id, -1),
+          moveNext: () => this.moveTask(t.id, 1),
+          edit: () => this.openTask(t.id),
+          draggable: true,
+          dragStart: (e) => {
+            this.setState({ dragTaskId: t.id });
+            if (e && e.dataTransfer) {
+              e.dataTransfer.effectAllowed = 'move';
+              try { e.dataTransfer.setData('text/plain', t.id); } catch (err) {}
+            }
+          },
+          dragEnd: () => this.setState({ dragTaskId: null, dragOverCol: null, dragOverIndex: null }),
+          onCardDragOver: (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = e.currentTarget.getBoundingClientRect();
+            const before = (e.clientY - rect.top) < rect.height / 2;
+            const idx = before ? i : i + 1;
+            if (s.dragOverCol !== col.id || s.dragOverIndex !== idx) this.setState({ dragOverCol: col.id, dragOverIndex: idx });
+          }
+        });
+      });
+      const dropIndex = isOver ? Math.max(0, Math.min(tasks.length, s.dragOverIndex == null ? tasks.length : s.dragOverIndex)) : -1;
+      const displayTasks = dropIndex === -1 ? tasks : tasks.slice(0, dropIndex).concat([{ isPlaceholder: true, id: '__placeholder_' + col.id, placeholderStyle: placeholderStyle }]).concat(tasks.slice(dropIndex));
+      return {
+        label: col.label, emoji: col.emoji, color: col.color, count: tasks.length, tasks: displayTasks, empty: tasks.length === 0 && !isOver,
+        sectionStyle: {
+          background: isOver ? 'var(--color-accent-100)' : 'var(--color-neutral-100)',
+          borderRadius: 26, padding: 12, minWidth: 292, flex: '1 0 292px',
+          borderTop: '6px solid ' + col.color,
+          outline: isOver ? '2px dashed var(--color-accent-500)' : 'none',
+          outlineOffset: -2,
+          boxShadow: 'var(--shadow-sm)'
+        },
+        onDragOver: (e) => {
+          e.preventDefault();
+          if (s.dragOverCol !== col.id || s.dragOverIndex !== tasks.length) this.setState({ dragOverCol: col.id, dragOverIndex: tasks.length });
+        },
+        onDragLeave: () => { if (s.dragOverCol === col.id) this.setState({ dragOverCol: null, dragOverIndex: null }); },
+        onDrop: (e) => {
+          e.preventDefault();
+          const id = s.dragTaskId || (e.dataTransfer && e.dataTransfer.getData('text/plain'));
+          const idx = s.dragOverIndex == null ? tasks.length : s.dragOverIndex;
+          if (id) this.reorderTask(id, col.id, idx);
+        }
+      };
+    });
+
+    const TASK_AREAS = ['Estructura', 'Contactos', 'Cronograma', 'Datos', 'Evento', 'Florangel'];
+    const tagChipStyle = (color, active) => ({
+      border: '1.5px solid ' + color, background: active ? color : '#fff', color: active ? '#fff' : color,
+      borderRadius: 999, padding: '7px 13px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer'
+    });
+    const taskAreaChips = TASK_AREAS.map(a => ({
+      id: a, label: a, style: tagChipStyle(AREA_COLORS[a] || '#82796a', s.taskForm.area === a),
+      onClick: () => this.setState({ taskForm: Object.assign({}, s.taskForm, { area: a }) })
+    }));
+    const taskStatusChips = BOARD_STATUS.map(st => ({
+      id: st.id, label: st.label, emoji: st.emoji, style: tagChipStyle(st.color, s.taskForm.status === st.id),
+      onClick: () => this.setState({ taskForm: Object.assign({}, s.taskForm, { status: st.id }) })
+    }));
+    const taskPriorityChips = Object.keys(priorityMeta).map(p => ({
+      id: p, label: priorityMeta[p].label, style: tagChipStyle(priorityMeta[p].fg, s.taskForm.priority === p),
+      onClick: () => this.setState({ taskForm: Object.assign({}, s.taskForm, { priority: p }) })
+    }));
+
+    const unitBox = { background: '#fff', borderRadius: 14, padding: '9px 10px', display: 'flex', flexDirection: 'column', gap: 6, borderWidth: 1.5, borderStyle: 'solid' };
+    const buildFacultyCard = f => {
+      const cols = f.cols.map(col => ({
+        hasTitle: !!col.title, title: col.title || '', note: col.note || '',
+        unitsStyle: { display: 'grid', gap: 8, alignItems: 'start', gridTemplateColumns: col.units.length > 3 ? 'repeat(auto-fit, minmax(140px, 1fr))' : '1fr' },
+        units: col.units.map(u => {
+          const appKey = s.appStatuses[u.id] || 'not_started';
+          const appMeta = APP_STATUS[appKey] || APP_STATUS.not_started;
+          const info = s.unitInfo[u.id] || {};
+          const triageSent = info.triageStatus === 'sent';
+          return {
+          name: u.name, emoji: u.emoji, note: u.note || '', appStatus: appKey,
+          appLabel: 'Estado del desarrollo de la app en ' + u.name,
+          onAppStatus: e => this.setAppStatus(u.id, e.target.value),
+          appStatusStyle: { maxWidth: '100%', minWidth: 0, border: '1px solid ' + appMeta.color + '55', borderRadius: 999, padding: '3px 7px', fontSize: 9.5, fontWeight: 700, background: appMeta.soft, color: appMeta.color, cursor: 'pointer' },
+          boxStyle: Object.assign({}, unitBox, { borderColor: f.color + '33' }),
+          titleStyle: { fontSize: 12.5, fontWeight: 700, lineHeight: 1.25, color: f.color },
+          editIconStyle: { border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, flex: 'none', opacity: .6 },
+          editUnit: () => this.openUnitModal(u.id, u.name),
+          hasUnitSummary: !!(info.responsibleName || info.supportName || triageSent || info.attachmentName || info.attachmentText),
+          unitSummaryLine: [
+            info.responsibleName ? '👤 ' + info.responsibleName : '',
+            info.supportName ? '🎓 ' + info.supportName : '',
+            triageSent ? '✅ Triaje' : '',
+            (info.attachmentName || info.attachmentText) ? '📎 Adjunto' : ''
+          ].filter(Boolean).join(' · '),
+          contacts: shown.filter(c => c.unit === u.id).map(c => this.chip(c))
+        }; })
+      }));
+      const total = shown.filter(c => c.meta.facultyId === f.id).length;
+      return {
+        num: f.num, name: f.name, count: total, cols: cols,
+        cardStyle: { borderRadius: 22, padding: 5, boxShadow: 'var(--shadow-md)', overflow: 'hidden', background: f.color, width: '100%' },
+        colsStyle: { display: 'grid', gap: 10, gridTemplateColumns: f.wide ? 'repeat(auto-fit, minmax(210px, 1fr))' : '1fr' }
+      };
+    };
+    const medFacultyRaw = FACULTIES.find(f => f.id === 'med');
+    const medCards = medFacultyRaw ? [buildFacultyCard(medFacultyRaw)] : [];
+    const otherCards = FACULTIES.filter(f => f.id !== 'med').map(buildFacultyCard);
+
+    const adminUnits = ADMIN.map(a => ({
+      name: a.name, emoji: a.emoji,
+      style: { background: '#fff', borderRadius: 20, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, boxShadow: 'var(--shadow-sm)', borderTop: '5px solid ' + a.color },
+      titleStyle: { fontWeight: 700, fontSize: 14.5, lineHeight: 1.2, color: a.color },
+      contacts: shown.filter(c => c.unit === a.id).map(c => this.chip(c))
+    }));
+
+    const listContacts = shown.map(c => {
+      const r = ROLE[c.role];
+      return {
+        name: c.name, emoji: r.emoji, roleShort: r.short, email: c.email, phone: c.phone, status: c.status, action: c.action,
+        affiliation: c.meta.facultyName + ' · ' + c.meta.unitName,
+        lastLabel: c.last ? TYPES[c.last.type].label + ' · ' + fmt(c.last.date) : 'Sin contacto aún',
+        followLabel: c.nextFollow ? fmt(c.nextFollow) + (c.overdue ? ' (vencido)' : '') : 'Por definir',
+        followStyle: { color: c.overdue ? '#a02525' : 'var(--color-neutral-800)', fontWeight: c.overdue ? 700 : 400 },
+        cardStyle: { background: '#fff', borderRadius: bubble.radius + 4, padding: bubble.padding + 2, display: 'flex', flexDirection: 'column', gap: 12, boxShadow: 'var(--shadow-sm)', borderLeft: '6px solid ' + c.meta.color },
+        avatarStyle: { width: 46, height: 46, borderRadius: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flex: 'none', background: c.meta.soft },
+        roleStyle: { borderRadius: 999, padding: '5px 11px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', background: r.bg, color: r.fg },
+        open: () => this.openModal(c.id)
+      };
+    });
+
+    const byId = {};
+    all.forEach(c => { byId[c.id] = c; });
+    const timeline = s.interactions
+      .filter(i => shownIds[i.contact])
+      .slice().sort((a, b) => (a.date < b.date ? 1 : -1))
+      .map(i => {
+        const c = byId[i.contact];
+        return {
+          emoji: TYPES[i.type].emoji, typeLabel: TYPES[i.type].label, notes: i.notes,
+          contactName: c ? c.name : '—',
+          affiliation: c ? c.meta.facultyName + ' · ' + c.meta.unitName : '',
+          dateLabel: fmt(i.date),
+          followLabel: i.follow ? '⏰ Seguimiento: ' + fmt(i.follow) : '⏰ Sin seguimiento fijado',
+          cardStyle: { background: '#fff', borderRadius: 20, padding: '14px 16px', display: 'flex', gap: 14, boxShadow: 'var(--shadow-sm)', borderLeft: '6px solid ' + (c ? c.meta.color : 'var(--color-neutral-400)') }
+        };
+      });
+
+    const m = s.modal ? byId[s.modal] : null;
+    const mr = m ? ROLE[m.role] : null;
+    const modal = m ? {
+      name: m.name, emoji: mr.emoji, roleShort: mr.short, email: m.email, phone: m.phone, status: m.status, action: m.action,
+      affiliation: m.meta.facultyName + ' · ' + m.meta.unitName,
+      avatarStyle: { width: 52, height: 52, borderRadius: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flex: 'none', background: m.meta.soft },
+      editContact: () => this.openContactEdit(m.id),
+      deleteContact: () => this.deleteContact(m.id),
+      noHistory: m.hist.length === 0,
+      history: m.hist.map(h => ({
+        emoji: TYPES[h.type].emoji,
+        head: TYPES[h.type].label + ' · ' + fmt(h.date) + (h.follow ? ' → seguimiento ' + fmt(h.follow) : ''),
+        notes: h.notes
+      }))
+    } : { history: [], noHistory: true, status: 'Por confirmar', action: 'Definir próxima acción.', editContact: () => {}, deleteContact: () => {} };
+
+    const pillBase = { border: '1px solid var(--color-neutral-300)', borderRadius: 999, padding: '9px 15px', fontSize: 13, fontWeight: 700, cursor: 'pointer' };
+    const tstyle = k => Object.assign({}, pillBase, s.type === k
+      ? { background: 'var(--color-accent-500)', color: '#fff', borderColor: 'var(--color-accent-500)' }
+      : { background: '#fff', color: 'var(--color-neutral-800)' });
+
+    const tabBase = { border: 'none', cursor: 'pointer', borderRadius: 999, padding: '10px 18px', fontSize: 13.5, fontWeight: 700 };
+    const tab = v => Object.assign({}, tabBase, s.view === v
+      ? { background: 'var(--color-neutral-900)', color: '#fff' }
+      : { background: 'var(--color-neutral-200)', color: 'var(--color-neutral-800)' });
+
+    const navigationTabs = ui.tabOrder.map(id => ({
+      id: id, emoji: NAV_ITEMS[id].emoji, label: NAV_ITEMS[id].label,
+      style: tab(id), open: () => this.setState({ view: id })
+    }));
+    const draftUI = normalizeUI(s.customizeForm);
+    const customizeTabs = draftUI.tabOrder.map((id, index) => ({
+      emoji: NAV_ITEMS[id].emoji, label: NAV_ITEMS[id].label,
+      noUp: index === 0, noDown: index === draftUI.tabOrder.length - 1,
+      up: () => this.moveCustomize('tabs', index, -1), down: () => this.moveCustomize('tabs', index, 1)
+    }));
+    const customizeSections = draftUI.boardOrder.map((id, index) => ({
+      emoji: BOARD_ITEMS[id].emoji, label: BOARD_ITEMS[id].label,
+      noUp: index === 0, noDown: index === draftUI.boardOrder.length - 1,
+      up: () => this.moveCustomize('sections', index, -1), down: () => this.moveCustomize('sections', index, 1)
+    }));
+    const boardSectionStyles = {
+      intro: { order: ui.boardOrder.indexOf('intro'), display: 'flex' },
+      upcoming: { order: ui.boardOrder.indexOf('upcoming'), background: '#fff', borderRadius: 22, padding: '14px 16px', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: 10 },
+      kanban: { order: ui.boardOrder.indexOf('kanban'), display: 'flex', gap: 12, overflowX: 'auto', padding: '2px 2px 14px', scrollbarGutter: 'stable' }
+    };
+
+    const TRIAGE_OPTIONS = [{ id: 'pending', label: '⏳ Pendiente' }, { id: 'sent', label: '✅ Enviado' }];
+    const unitTriageChips = TRIAGE_OPTIONS.map(o => ({
+      id: o.id, label: o.label, style: tagChipStyle(o.id === 'sent' ? '#14584f' : '#8c491a', s.unitForm.triageStatus === o.id),
+      onClick: () => this.setState({ unitForm: Object.assign({}, s.unitForm, { triageStatus: o.id }) })
+    }));
+
+    return {
+      uiText: ui,
+      pageTitleStyle: { fontFamily: 'var(--font-heading)', fontWeight: 400, fontSize: Number(ui.titleSize || 40), lineHeight: 1.05, margin: '8px 0 6px' },
+      navigationTabs: navigationTabs, boardSectionStyles: boardSectionStyles,
+      kpis: kpis, medCards: medCards, otherCards: otherCards, adminUnits: adminUnits, listContacts: listContacts, timeline: timeline,
+      boardColumns: boardColumns,
+      upcomingJourneys: upcomingJourneys, upcomingEmpty: upcomingJourneys.length === 0,
+      calendarMonthLabel: MONTH_NAMES[calendarMonthNum] + ' ' + calendarYear,
+      journeyLegend: Object.keys(JOURNEY_STATUS).map(key => ({ label: JOURNEY_STATUS[key].label, color: JOURNEY_STATUS[key].color })),
+      weekDays: WEEK_DAYS, calendarCells: calendarCells,
+      dayModalOpen: !!s.dayModal, dayModalTitle: s.dayModal ? 'Eventos · ' + fmt(s.dayModal) : 'Eventos',
+      dayJourneys: selectedDayJourneys, dayModalEmpty: selectedDayJourneys.length === 0,
+      journeyModalOpen: !!s.journeyModal, journeyModalTitle: s.journeyModal === 'new' ? 'Nuevo evento UCV' : 'Editar evento UCV',
+      journeyForm: s.journeyForm, journeyChecks: journeyChecks, eventTypes: EVENT_TYPES,
+      journeyCalendarLabel: journeyCalendarLabel, journeyDateCells: journeyDateCells,
+      journeyDateChips: journeyDateChips, journeyDateChipsEmpty: journeyDateChipsEmpty,
+      prevJourneyMonth: () => this.moveJourneyCalendar(-1),
+      nextJourneyMonth: () => this.moveJourneyCalendar(1),
+      journeyReadiness: JOURNEY_QUESTIONS.filter(q => !!formChecks[q.key]).length + '/' + JOURNEY_QUESTIONS.length,
+      customizeOpen: s.customizeOpen, customizeForm: draftUI, customizeTabs: customizeTabs, customizeSections: customizeSections,
+      timelineEmpty: timeline.length === 0,
+      isBoard: s.view === 'board', isCalendar: s.view === 'calendar', showContactFilters: ['hierarchy', 'list', 'timeline'].indexOf(s.view) > -1, isHierarchy: s.view === 'hierarchy', isList: s.view === 'list', isTimeline: s.view === 'timeline', isVolunteers: s.view === 'volunteers',
+      volunteerCards: volunteerCards, volunteersEmpty: volunteersEmpty,
+      volunteerJourneys: volunteerJourneys, volunteerJourneysEmpty: volunteerJourneysEmpty,
+      newVolunteer: this.newVolunteer,
+      volunteerModalOpen: !!s.volunteerModal, volunteerModalTitle: s.volunteerModal === 'new' ? 'Nuevo voluntario' : 'Editar voluntario',
+      isEditingVolunteer: !!s.volunteerModal && s.volunteerModal !== 'new',
+      volunteerForm: s.volunteerForm,
+      volunteerAvailChips: volunteerAvailChips, volunteerAvailEmpty: volunteerAvailEmpty,
+      availCalendarCells: availCalendarCells, volunteerCalendarLabel: volunteerCalendarLabel,
+      prevVolunteerMonth: () => this.moveVolunteerCalendar(-1),
+      nextVolunteerMonth: () => this.moveVolunteerCalendar(1),
+      closeVolunteerModal: this.closeVolunteerModal,
+      saveVolunteer: this.saveVolunteer,
+      deleteCurrentVolunteer: () => this.deleteVolunteer(s.volunteerModal),
+      onVolunteerName: e => this.setState({ volunteerForm: Object.assign({}, s.volunteerForm, { name: e.target.value }) }),
+      onVolunteerPhone: e => this.setState({ volunteerForm: Object.assign({}, s.volunteerForm, { phone: e.target.value }) }),
+      onVolunteerEmail: e => this.setState({ volunteerForm: Object.assign({}, s.volunteerForm, { email: e.target.value }) }),
+      onVolunteerSkill: e => this.setState({ volunteerForm: Object.assign({}, s.volunteerForm, { skill: e.target.value }) }),
+      onVolunteerNotes: e => this.setState({ volunteerForm: Object.assign({}, s.volunteerForm, { notes: e.target.value }) }),
+      assignModalOpen: !!assignJourney,
+      assignJourneyTitle: assignJourney ? (assignJourney.title || 'Evento por confirmar') : '',
+      assignJourneyDate: assignJourney ? (assignJourney.dates || []).map(fmt).join(', ') : '',
+      assignCandidates: assignCandidates, assignCandidatesEmpty: assignCandidatesEmpty,
+      closeAssign: this.closeAssign,
+      availabilityMonthLabel: availabilityMonthLabel, availabilityCells: availabilityCells,
+      prevAvailabilityMonth: () => this.moveAvailabilityMonth(-1),
+      nextAvailabilityMonth: () => this.moveAvailabilityMonth(1),
+      availabilityDayModalOpen: !!s.availabilityDayModal,
+      availabilityDayTitle: s.availabilityDayModal ? fmt(s.availabilityDayModal) : '',
+      availabilityDayVolunteers: availabilityDayVolunteers, availabilityDayVolunteersEmpty: availabilityDayVolunteers.length === 0,
+      availabilityDayJourneys: availabilityDayJourneys, availabilityDayJourneysEmpty: availabilityDayJourneys.length === 0,
+      closeAvailabilityDay: this.closeAvailabilityDay,
+      addEventForDay: () => this.addEventForDay(s.availabilityDayModal),
+      addVolunteerForDay: () => this.newVolunteerForDate(s.availabilityDayModal),
+      volunteersPanelOpen: s.volunteersPanelOpen,
+      toggleVolunteersPanel: this.toggleVolunteersPanel,
+      volunteersToggleIcon: s.volunteersPanelOpen ? '▾' : '▸',
+      volunteersToggleLabel: 'Voluntarios (' + s.volunteers.length + ')',
+      query: s.query, facultyFilter: s.faculty, roleFilter: s.role,
+      facultyOptions: ADMIN.map(a => ({ id: a.id, label: a.emoji + ' ' + a.name }))
+        .concat(FACULTIES.map(f => ({ id: f.id, label: f.num + '. ' + f.name }))),
+      resultLabel: shown.length + ' de ' + all.length + ' contactos',
+      followBtnStyle: Object.assign({ border: '1px solid var(--color-neutral-300)', borderRadius: 999, padding: '10px 16px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }, s.onlyFollow
+        ? { background: '#fdebeb', color: '#a02525', borderColor: '#f0bcbc' }
+        : { background: '#fff', color: 'var(--color-neutral-800)' }),
+      tabHover: { filter: 'brightness(.94)' },
+      lightHover: { filter: 'brightness(1.06)' },
+      chipHover: { background: '#fff', borderColor: 'var(--color-neutral-400)' },
+      primaryHover: { background: 'var(--color-accent-600)' },
+      modalOpen: !!s.modal, modal: modal, form: { notes: s.notes, date: s.date, follow: s.follow },
+      taskModalOpen: !!s.taskModal, taskModalTitle: s.taskModal === 'new' ? 'Nueva tarea operativa' : 'Editar tarea operativa', taskForm: s.taskForm,
+      taskAreaChips: taskAreaChips, taskStatusChips: taskStatusChips, taskPriorityChips: taskPriorityChips,
+      contactModalOpen: !!s.contactModal, contactModalTitle: s.contactModal === 'new' ? 'Nuevo contacto' : 'Editar contacto',
+      isEditingContact: !!s.contactModal && s.contactModal !== 'new',
+      contactForm: s.contactForm, roleOptions: Object.keys(ROLE).map(k => ({ id: k, label: ROLE[k].emoji + ' ' + ROLE[k].short })),
+      unitOptions: this.unitOptionsList(),
+      typeStyles: { meeting: tstyle('meeting'), call: tstyle('call'), mail: tstyle('mail') },
+      openCustomize: this.openCustomize,
+      closeCustomize: this.closeCustomize,
+      resetCustomize: this.resetCustomize,
+      saveCustomize: this.saveCustomize,
+      onCustomPageTitle: e => this.setState({ customizeForm: Object.assign({}, draftUI, { pageTitle: e.target.value }) }),
+      onCustomPageSubtitle: e => this.setState({ customizeForm: Object.assign({}, draftUI, { pageSubtitle: e.target.value }) }),
+      onCustomBoardIntro: e => this.setState({ customizeForm: Object.assign({}, draftUI, { boardIntro: e.target.value }) }),
+      onCustomQuestionsTitle: e => this.setState({ customizeForm: Object.assign({}, draftUI, { questionsTitle: e.target.value }) }),
+      onCustomUpcomingTitle: e => this.setState({ customizeForm: Object.assign({}, draftUI, { upcomingTitle: e.target.value }) }),
+      onCustomCalendarTitle: e => this.setState({ customizeForm: Object.assign({}, draftUI, { calendarTitle: e.target.value }) }),
+      onCustomBubbleSize: e => this.setState({ customizeForm: Object.assign({}, draftUI, { bubbleSize: e.target.value }) }),
+      onCustomTitleSize: e => this.setState({ customizeForm: Object.assign({}, draftUI, { titleSize: e.target.value }) }),
+      setViewBoard: () => this.setState({ view: 'board' }),
+      setViewCalendar: () => this.setState({ view: 'calendar' }),
+      setViewHierarchy: () => this.setState({ view: 'hierarchy' }),
+      setViewList: () => this.setState({ view: 'list' }),
+      setViewTimeline: () => this.setState({ view: 'timeline' }),
+      onQuery: e => this.setState({ query: e.target.value }),
+      onFaculty: e => this.setState({ faculty: e.target.value }),
+      onRole: e => this.setState({ role: e.target.value }),
+      toggleFollow: () => this.setState({ onlyFollow: !s.onlyFollow }),
+      clearFilters: () => this.setState({ query: '', faculty: 'all', role: 'all', onlyFollow: false }),
+      pickMeeting: () => this.setState({ type: 'meeting' }),
+      pickCall: () => this.setState({ type: 'call' }),
+      pickMail: () => this.setState({ type: 'mail' }),
+      onNotes: e => this.setState({ notes: e.target.value }),
+      onDate: e => this.setState({ date: e.target.value }),
+      onFollow: e => this.setState({ follow: e.target.value }),
+      newJourney: this.newJourney,
+      closeJourneyModal: this.closeJourneyModal,
+      closeDayModal: this.closeDayModal,
+      addJourneyForDay: () => this.newJourney(s.dayModal || TODAY),
+      saveJourney: this.saveJourney,
+      previousMonth: () => this.moveCalendar(-1),
+      nextMonth: () => this.moveCalendar(1),
+      goToday: () => this.setState({ calendarMonth: TODAY.slice(0, 7) }),
+      calendarCellHover: { background: 'var(--color-neutral-100)', borderColor: 'var(--color-accent-300)' },
+      onJourneyTitle: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { title: e.target.value }) }),
+      onJourneyEventType: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { eventType: e.target.value }) }),
+      onJourneyTime: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { time: e.target.value }) }),
+      onJourneyLocation: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { location: e.target.value }) }),
+      onJourneyArea: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { area: e.target.value }) }),
+      onJourneyOwner: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { owner: e.target.value }) }),
+      onJourneyStatus: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { status: e.target.value }) }),
+      onJourneyNotes: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { notes: e.target.value }) }),
+      newTask: this.newTask,
+      closeTaskModal: this.closeTaskModal,
+      saveTask: this.saveTask,
+      doneCaptureOpen: !!s.doneCapture,
+      doneCaptureSubmitted: !!(s.doneCapture && s.doneCapture.submitted),
+      doneCaptureTitle: s.doneCapture ? s.doneCapture.title : '',
+      doneCaptureText: s.doneCapture ? s.doneCapture.text : '',
+      doneCaptureDisplayText: s.doneCapture && s.doneCapture.text ? s.doneCapture.text : 'Se completó sin detalles adicionales.',
+      onDoneCaptureText: e => this.setState({ doneCapture: Object.assign({}, s.doneCapture, { text: e.target.value }) }),
+      submitDoneCapture: this.submitDoneCapture,
+      skipDoneCapture: this.skipDoneCapture,
+      closeDoneCapture: this.closeDoneCapture,
+      onTaskTitle: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { title: e.target.value }) }),
+      onTaskOwner: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { owner: e.target.value }) }),
+      onTaskArea: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { area: e.target.value }) }),
+      onTaskStatus: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { status: e.target.value }) }),
+      onTaskPriority: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { priority: e.target.value }) }),
+      onTaskHorizon: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { horizon: e.target.value }) }),
+      onTaskDetail: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { detail: e.target.value }) }),
+      onTaskNextAction: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { nextAction: e.target.value }) }),
+      newContact: this.newContact,
+      closeContactModal: this.closeContactModal,
+      saveContact: this.saveContact,
+      deleteCurrentContact: () => this.deleteContact(s.contactModal),
+      onContactName: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { name: e.target.value }) }),
+      onContactRole: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { role: e.target.value }) }),
+      onContactUnit: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { unit: e.target.value }) }),
+      onContactEmail: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { email: e.target.value }) }),
+      onContactPhone: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { phone: e.target.value }) }),
+      onContactStatus: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { status: e.target.value }) }),
+      onContactAction: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { action: e.target.value }) }),
+      closeModal: this.closeModal, saveInteraction: this.saveInteraction,
+      unitModalOpen: !!s.unitModal, unitModalTitle: s.unitModalName || '',
+      unitForm: s.unitForm, unitTriageChips: unitTriageChips,
+      unitHasAttachment: !!s.unitForm.attachmentName, unitAttachmentName: s.unitForm.attachmentName,
+      closeUnitModal: this.closeUnitModal,
+      saveUnitInfo: this.saveUnitInfo,
+      removeUnitAttachment: this.removeUnitAttachment,
+      onUnitResponsibleName: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsibleName: e.target.value }) }),
+      onUnitResponsiblePhone: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsiblePhone: e.target.value }) }),
+      onUnitResponsibleEmail: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsibleEmail: e.target.value }) }),
+      onUnitSupportName: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportName: e.target.value }) }),
+      onUnitSupportPhone: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportPhone: e.target.value }) }),
+      onUnitSupportEmail: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportEmail: e.target.value }) }),
+      onUnitAttachment: e => this.onUnitAttachment(e),
+      onUnitAttachmentText: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { attachmentText: e.target.value }) }),
+      stop: e => e.stopPropagation(),
+      tabStyles: { board: tab('board'), calendar: tab('calendar'), hierarchy: tab('hierarchy'), list: tab('list'), timeline: tab('timeline'), volunteers: tab('volunteers') }
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+# UX contract — Control operativo UCV
+
+## Scope
+
+This is a portable, single-page coordination artifact for Fundación Ingenia / CONEKTADOS. It has five peer views: operational board, event calendar, UCV hierarchy, contacts, and interaction history.
+
+## Canonical UI map
+
+| Capability | Canonical owner | Source of truth | Allowed variants | Verification |
+| --- | --- | --- | --- | --- |
+| Select/Listbox | Native browser select | This UX contract | Native | Keyboard selection and narrow viewport. |
+| Date | Native browser date input | This UX contract | Native `YYYY-MM-DD` | Date entry and focus behavior. |
+| Form | Screen-owned controlled fields | This UX contract | Task / event / interaction editor | Create/edit task, event and interaction. |
+| Scrollbar | Global application stylesheet | `DESIGN.md` + runtime CSS | Horizontal board / modal | Board horizontal scroll and modal scroll. |
+| CRUD | Screen-owned local state | This UX contract | Task and event create/edit; task movement | Add, edit, move left/right, reload. |
+| Calendar | Screen-owned month grid | This UX contract | Previous / next / today; day detail | Add event, navigate months, open a day, reload. |
+| App status | Hierarchy unit select | This UX contract | Developing / resolved / not started | Change status, reload. |
+| Personalization | Screen-owned editing dialog | This UX contract | Text, density, navigation order, board order | Edit draft, cancel, save, reload. |
+
+## Behavior
+
+- The operational board is the default view.
+- Every saved event appears automatically in the monthly calendar and in “Próximos eventos”.
+- Clicking a calendar day opens its events and allows creating a new one with that date preselected.
+- Every event requires a type selected from the maintained event taxonomy.
+- Each event tracks communication, team, materials, volunteers/training, and prior data as five explicit internal-audit checks.
+- App development is not part of the event audit; it is edited independently for every hierarchy unit.
+- Calendar status always includes a text label: Por confirmar, En preparación, Confirmada or Completada.
+- “Guardar tarea” saves locally and closes the editor.
+- “Cancelar” closes without committing the draft.
+- Status movement is available through visible left/right buttons; dragging is not required.
+- Unknown information is displayed as “Por confirmar”.
+- Local persistence is best-effort through `localStorage`; when storage is unavailable, the current session remains usable.
+- Contact interactions persist locally after save.
+- “Modo edición” opens a draft: Cancelar discards it and Guardar diseño commits it locally.
+- Editable copy includes the principal title and subtitle plus the presentation, audit, upcoming-events and calendar headings.
+- Bubble/card density has compact, normal and large variants and applies consistently to KPI, event, contact and calendar-event surfaces.
+- Navigation and board sections are reordered with visible arrow buttons so pointer, touch and keyboard users have the same capability.
+- “Restablecer borrador” restores the original layout inside the editor; it is not committed until “Guardar diseño”.
+- The board never invents institutional approvals, contact details, dates, or responsibilities.
+
+## Accessibility and locale
+
+- Interface language is Spanish.
+- Controls use native buttons, inputs, labels, and selects.
+- All icon-only buttons have accessible names.
+- Focus is visibly indicated.
+- Status and priority use text and symbols in addition to color.
+- Horizontal scrolling is retained for the Kanban on narrow screens.
+- Reduced-motion preferences remove nonessential motion.
