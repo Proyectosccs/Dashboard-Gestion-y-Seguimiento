@@ -225,13 +225,13 @@
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px">
           <sc-for list="{{ adminUnits }}" as="a" hint-placeholder-count="3">
-            <div style="{{ a.style }}">
+            <div style="{{ a.style }}" onDragOver="{{ a.onUnitDragOver }}" onDragLeave="{{ a.onUnitDragLeave }}" onDrop="{{ a.onUnitDrop }}">
               <div style="display: flex; align-items: center; gap: 10px">
                 <span style="font-size: 20px">{{ a.emoji }}</span>
                 <div style="{{ a.titleStyle }}">{{ a.name }}</div>
               </div>
               <sc-for list="{{ a.contacts }}" as="c" hint-placeholder-count="1">
-                <button onClick="{{ c.open }}" style="{{ c.chipStyle }}" style-hover="{{ chipHover }}">
+                <button draggable="{{ c.draggable }}" onDragStart="{{ c.dragStart }}" onDragEnd="{{ c.dragEnd }}" onClick="{{ c.open }}" style="{{ c.chipStyle }}" style-hover="{{ chipHover }}">
                   <span style="font-size: 17px">{{ c.emoji }}</span>
                   <span style="min-width: 0; display: flex; flex-direction: column">
                     <span style="font-size: 13px; font-weight: 700">{{ c.name }}</span>
@@ -266,7 +266,7 @@
                       </sc-if>
                       <div style="{{ col.unitsStyle }}">
                       <sc-for list="{{ col.units }}" as="u" hint-placeholder-count="3">
-                        <div style="{{ u.boxStyle }}">
+                        <div style="{{ u.boxStyle }}" onDragOver="{{ u.onUnitDragOver }}" onDragLeave="{{ u.onUnitDragLeave }}" onDrop="{{ u.onUnitDrop }}">
                           <div style="display: flex; align-items: flex-start; gap: 8px">
                             <span style="font-size: 16px; line-height: 1.2">{{ u.emoji }}</span>
                             <div style="min-width: 0; flex: 1">
@@ -289,7 +289,7 @@
                             </div>
                           </div>
                           <sc-for list="{{ u.contacts }}" as="c" hint-placeholder-count="1">
-                            <button onClick="{{ c.open }}" style="{{ c.chipStyle }}" style-hover="{{ chipHover }}">
+                            <button draggable="{{ c.draggable }}" onDragStart="{{ c.dragStart }}" onDragEnd="{{ c.dragEnd }}" onClick="{{ c.open }}" style="{{ c.chipStyle }}" style-hover="{{ chipHover }}">
                               <span style="font-size: 15px">{{ c.emoji }}</span>
                               <span style="min-width: 0; display: flex; flex-direction: column; flex: 1">
                                 <span style="font-size: 12.5px; font-weight: 700; line-height: 1.2">{{ c.name }}</span>
@@ -327,7 +327,7 @@
                       </sc-if>
                       <div style="{{ col.unitsStyle }}">
                       <sc-for list="{{ col.units }}" as="u" hint-placeholder-count="2">
-                        <div style="{{ u.boxStyle }}">
+                        <div style="{{ u.boxStyle }}" onDragOver="{{ u.onUnitDragOver }}" onDragLeave="{{ u.onUnitDragLeave }}" onDrop="{{ u.onUnitDrop }}">
                           <div style="display: flex; align-items: flex-start; gap: 8px">
                             <span style="font-size: 16px; line-height: 1.2">{{ u.emoji }}</span>
                             <div style="min-width: 0; flex: 1">
@@ -350,7 +350,7 @@
                             </div>
                           </div>
                           <sc-for list="{{ u.contacts }}" as="c" hint-placeholder-count="1">
-                            <button onClick="{{ c.open }}" style="{{ c.chipStyle }}" style-hover="{{ chipHover }}">
+                            <button draggable="{{ c.draggable }}" onDragStart="{{ c.dragStart }}" onDragEnd="{{ c.dragEnd }}" onClick="{{ c.open }}" style="{{ c.chipStyle }}" style-hover="{{ chipHover }}">
                               <span style="font-size: 15px">{{ c.emoji }}</span>
                               <span style="min-width: 0; display: flex; flex-direction: column; flex: 1">
                                 <span style="font-size: 12.5px; font-weight: 700; line-height: 1.2">{{ c.name }}</span>
@@ -1237,6 +1237,11 @@ const ROLE = {
   'Por confirmar': { emoji: '❔', short: 'Rol por confirmar', bg: '#f1ede6', fg: '#645c50' }
 };
 
+const ROLE_ORDER = { 'Coordinador': 0, 'Enlace': 1, 'Profesional del Área': 2, 'Por confirmar': 3 };
+function byRole(list) {
+  return list.slice().sort((a, b) => (ROLE_ORDER[a.role] != null ? ROLE_ORDER[a.role] : 9) - (ROLE_ORDER[b.role] != null ? ROLE_ORDER[b.role] : 9));
+}
+
 const TYPES = {
   meeting: { emoji: '🤝', label: 'Reunión' },
   call: { emoji: '📞', label: 'Llamada' },
@@ -1477,6 +1482,7 @@ class Component extends DCLogic {
   state = {
     view: 'board', query: '', faculty: 'all', role: 'all', onlyFollow: false,
     dragTaskId: null, dragOverCol: null, dragOverIndex: null, doneCapture: null,
+    dragContactId: null, dragOverUnit: null,
     contacts: readStore('ucv-contacts-v1', CONTACTS),
     interactions: readStore('ucv-interactions-v2', SEED),
     tasks: readStore('ucv-tasks-v2', TASKS),
@@ -1603,12 +1609,28 @@ class Component extends DCLogic {
     const r = ROLE[c.role];
     const size = this.state.ui.bubbleSize;
     const metrics = size === 'compact' ? { padding: '6px 8px', radius: 10, gap: 7 } : size === 'large' ? { padding: '11px 13px', radius: 17, gap: 11 } : { padding: '8px 10px', radius: 14, gap: 9 };
+    const dragging = this.state.dragContactId === c.id;
     return {
       id: c.id, name: c.name, emoji: r.emoji, roleShort: r.short,
       flag: c.overdue ? '🔴' : (c.nextFollow ? '🟢' : '⚪'),
       open: () => this.openModal(c.id),
-      chipStyle: { cursor: 'pointer', textAlign: 'left', border: '1px solid var(--color-neutral-200)', background: 'var(--color-neutral-100)', borderRadius: metrics.radius, padding: metrics.padding, display: 'flex', alignItems: 'center', gap: metrics.gap, width: '100%' }
+      chipStyle: { cursor: 'grab', textAlign: 'left', border: '1px solid var(--color-neutral-200)', background: 'var(--color-neutral-100)', borderRadius: metrics.radius, padding: metrics.padding, display: 'flex', alignItems: 'center', gap: metrics.gap, width: '100%', opacity: dragging ? 0.4 : 1 },
+      draggable: true,
+      dragStart: e => {
+        this.setState({ dragContactId: c.id });
+        if (e && e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', c.id); } catch (err) {} }
+      },
+      dragEnd: () => this.setState({ dragContactId: null, dragOverUnit: null })
     };
+  }
+
+  moveContactToUnit = (contactId, unitId) => {
+    const s = this.state;
+    const contact = s.contacts.find(c => c.id === contactId);
+    if (!contact || contact.unit === unitId) { this.setState({ dragContactId: null, dragOverUnit: null }); return; }
+    const list = s.contacts.map(c => c.id === contactId ? Object.assign({}, c, { unit: unitId }) : c);
+    writeStore('ucv-contacts-v1', list);
+    this.setState({ contacts: list, dragContactId: null, dragOverUnit: null });
   }
 
   openModal(id) { this.setState({ modal: id, type: 'meeting', notes: '', date: TODAY, follow: '' }); }
@@ -2394,20 +2416,30 @@ class Component extends DCLogic {
 
     const unitBox = { background: '#fff', borderRadius: 14, padding: '9px 10px', display: 'flex', flexDirection: 'column', gap: 6, borderWidth: 1.5, borderStyle: 'solid' };
     const buildFacultyCard = f => {
-      const cols = f.cols.map(col => ({
+      const cols = f.cols.map(col => {
+        let unitsSource = col.units;
+        if (f.id === 'med' && !col.title) {
+          unitsSource = unitsSource.slice().sort((a, b) => {
+            const aHas = shown.some(c => c.unit === a.id) ? 0 : 1;
+            const bHas = shown.some(c => c.unit === b.id) ? 0 : 1;
+            return aHas - bHas;
+          });
+        }
+        return {
         hasTitle: !!col.title, title: col.title || '', note: col.note || '',
         unitsStyle: { display: 'grid', gap: 8, alignItems: 'start', gridTemplateColumns: col.units.length > 3 ? 'repeat(auto-fit, minmax(140px, 1fr))' : '1fr' },
-        units: col.units.map(u => {
+        units: unitsSource.map(u => {
           const appKey = s.appStatuses[u.id] || 'not_started';
           const appMeta = APP_STATUS[appKey] || APP_STATUS.not_started;
           const info = s.unitInfo[u.id] || {};
           const triageSent = info.triageStatus === 'sent';
+          const isOver = s.dragOverUnit === u.id;
           return {
           name: u.name, emoji: u.emoji, note: u.note || '', appStatus: appKey,
           appLabel: 'Estado del desarrollo de la app en ' + u.name,
           onAppStatus: e => this.setAppStatus(u.id, e.target.value),
           appStatusStyle: { maxWidth: '100%', minWidth: 0, border: '1px solid ' + appMeta.color + '55', borderRadius: 999, padding: '3px 7px', fontSize: 9.5, fontWeight: 700, background: appMeta.soft, color: appMeta.color, cursor: 'pointer' },
-          boxStyle: Object.assign({}, unitBox, { borderColor: f.color + '33' }),
+          boxStyle: Object.assign({}, unitBox, { borderColor: f.color + '33' }, isOver ? { outline: '2px dashed ' + f.color, outlineOffset: -2, background: f.soft } : {}),
           titleStyle: { fontSize: 12.5, fontWeight: 700, lineHeight: 1.25, color: f.color },
           editIconStyle: { border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, flex: 'none', opacity: .6 },
           editUnit: () => this.openUnitModal(u.id, u.name),
@@ -2418,9 +2450,19 @@ class Component extends DCLogic {
             triageSent ? '✅ Triaje' : '',
             (info.attachmentName || info.attachmentText) ? '📎 Adjunto' : ''
           ].filter(Boolean).join(' · '),
-          contacts: shown.filter(c => c.unit === u.id).map(c => this.chip(c))
+          contacts: byRole(shown.filter(c => c.unit === u.id)).map(c => this.chip(c)),
+          onUnitDragOver: e => {
+            e.preventDefault(); e.stopPropagation();
+            if (s.dragOverUnit !== u.id) this.setState({ dragOverUnit: u.id });
+          },
+          onUnitDragLeave: () => { if (s.dragOverUnit === u.id) this.setState({ dragOverUnit: null }); },
+          onUnitDrop: e => {
+            e.preventDefault(); e.stopPropagation();
+            const id = s.dragContactId || (e.dataTransfer && e.dataTransfer.getData('text/plain'));
+            if (id) this.moveContactToUnit(id, u.id);
+          }
         }; })
-      }));
+      }; });
       const total = shown.filter(c => c.meta.facultyId === f.id).length;
       return {
         num: f.num, name: f.name, count: total, cols: cols,
@@ -2432,12 +2474,24 @@ class Component extends DCLogic {
     const medCards = medFacultyRaw ? [buildFacultyCard(medFacultyRaw)] : [];
     const otherCards = FACULTIES.filter(f => f.id !== 'med').map(buildFacultyCard);
 
-    const adminUnits = ADMIN.map(a => ({
+    const adminUnits = ADMIN.map(a => {
+      const isOver = s.dragOverUnit === a.id;
+      return {
       name: a.name, emoji: a.emoji,
-      style: { background: '#fff', borderRadius: 20, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, boxShadow: 'var(--shadow-sm)', borderTop: '5px solid ' + a.color },
+      style: Object.assign({ background: '#fff', borderRadius: 20, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, boxShadow: 'var(--shadow-sm)', borderTop: '5px solid ' + a.color }, isOver ? { outline: '2px dashed ' + a.color, outlineOffset: -2, background: '#fbf8f2' } : {}),
       titleStyle: { fontWeight: 700, fontSize: 14.5, lineHeight: 1.2, color: a.color },
-      contacts: shown.filter(c => c.unit === a.id).map(c => this.chip(c))
-    }));
+      contacts: byRole(shown.filter(c => c.unit === a.id)).map(c => this.chip(c)),
+      onUnitDragOver: e => {
+        e.preventDefault(); e.stopPropagation();
+        if (s.dragOverUnit !== a.id) this.setState({ dragOverUnit: a.id });
+      },
+      onUnitDragLeave: () => { if (s.dragOverUnit === a.id) this.setState({ dragOverUnit: null }); },
+      onUnitDrop: e => {
+        e.preventDefault(); e.stopPropagation();
+        const id = s.dragContactId || (e.dataTransfer && e.dataTransfer.getData('text/plain'));
+        if (id) this.moveContactToUnit(id, a.id);
+      }
+    }; });
 
     const listContacts = shown.map(c => {
       const r = ROLE[c.role];
