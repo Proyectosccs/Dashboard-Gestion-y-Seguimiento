@@ -136,11 +136,15 @@
                   <p style="margin: 0; font-size: 12.5px; color: var(--color-neutral-700); line-height: 1.4; text-wrap: pretty">{{ task.detail }}</p>
                   <div style="display: grid; gap: 5px; font-size: 11.5px; color: var(--color-neutral-800)">
                     <div>👤 <strong>{{ task.owner }}</strong></div>
+                    <div>🏢 {{ task.organization }}</div>
                     <div>🗓️ {{ task.horizon }}</div>
+                    <sc-if value="{{ task.hasDueDate }}" hint-placeholder-val="{{ false }}">
+                      <div>⏰ Fecha límite: {{ task.dueDateLabel }}</div>
+                    </sc-if>
                     <div>➡️ {{ task.nextAction }}</div>
                   </div>
-                  <sc-if value="{{ task.achievement }}" hint-placeholder-val="{{ false }}">
-                    <div style="background: #eafbf0; border: 1px solid #b7e4c7; border-radius: 10px; padding: 6px 9px; font-size: 11px; color: #1f7a3d; text-wrap: pretty">🎯 {{ task.achievement }}</div>
+                  <sc-if value="{{ task.evidence }}" hint-placeholder-val="{{ false }}">
+                    <div style="background: #eafbf0; border: 1px solid #b7e4c7; border-radius: 10px; padding: 6px 9px; font-size: 11px; color: #1f7a3d; text-wrap: pretty">📎 Evidencia: {{ task.evidence }}</div>
                   </sc-if>
                   <div style="display: flex; gap: 6px; padding-top: 2px">
                     <button aria-label="Mover tarea a la columna anterior" onClick="{{ task.movePrev }}" disabled="{{ task.noPrev }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); border-radius: 999px; width: 32px; height: 32px; cursor: pointer">←</button>
@@ -272,6 +276,9 @@
                             <div style="min-width: 0; flex: 1">
                               <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px">
                                 <div style="{{ u.titleStyle }}">{{ u.name }}</div>
+                                <sc-if value="{{ u.hasSpecialtyStatus }}" hint-placeholder-val="{{ false }}">
+                                  <span style="{{ u.specialtyStatusStyle }}">{{ u.specialtyStatusLabel }}</span>
+                                </sc-if>
                                 <label style="display: inline-flex; align-items: center; gap: 4px; min-width: 0" title="Estado del desarrollo de la app">
                                   <span aria-hidden="true">📱</span>
                                   <select aria-label="{{ u.appLabel }}" value="{{ u.appStatus }}" onChange="{{ u.onAppStatus }}" style="{{ u.appStatusStyle }}">
@@ -333,6 +340,9 @@
                             <div style="min-width: 0; flex: 1">
                               <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px">
                                 <div style="{{ u.titleStyle }}">{{ u.name }}</div>
+                                <sc-if value="{{ u.hasSpecialtyStatus }}" hint-placeholder-val="{{ false }}">
+                                  <span style="{{ u.specialtyStatusStyle }}">{{ u.specialtyStatusLabel }}</span>
+                                </sc-if>
                                 <label style="display: inline-flex; align-items: center; gap: 4px; min-width: 0" title="Estado del desarrollo de la app">
                                   <span aria-hidden="true">📱</span>
                                   <select aria-label="{{ u.appLabel }}" value="{{ u.appStatus }}" onChange="{{ u.onAppStatus }}" style="{{ u.appStatusStyle }}">
@@ -719,13 +729,25 @@
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Especialidad o área
             <input type="text" placeholder="Por confirmar" value="{{ journeyForm.area }}" onChange="{{ onJourneyArea }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Especialidad vinculada
+            <select value="{{ journeyForm.specialtyUnit }}" onChange="{{ onJourneySpecialtyUnit }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <option value="">Sin vincular</option>
+              <sc-for list="{{ unitOptions }}" as="o" hint-placeholder-count="6"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+            </select>
+          </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Responsable
             <input type="text" placeholder="Por confirmar" value="{{ journeyForm.owner }}" onChange="{{ onJourneyOwner }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Estado
             <select value="{{ journeyForm.status }}" onChange="{{ onJourneyStatus }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
-              <option value="draft">Por confirmar</option><option value="preparing">En preparación</option><option value="confirmed">Confirmada</option><option value="completed">Completada</option>
+              <option value="planned">Planificada</option><option value="confirmed">Confirmada</option><option value="executing">Ejecutándose</option><option value="closed">Cerrada</option>
             </select>
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Médicos participantes
+            <input type="text" placeholder="Nombres separados por coma" value="{{ journeyForm.doctors }}" onChange="{{ onJourneyDoctors }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Estudiantes participantes
+            <input type="text" placeholder="Nombres separados por coma" value="{{ journeyForm.students }}" onChange="{{ onJourneyStudents }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
         </div>
 
@@ -812,6 +834,9 @@
               <option value="Hoy">Hoy</option><option value="Mañana">Mañana</option><option value="Esta semana">Esta semana</option><option value="Próxima semana">Próxima semana</option><option value="Por definir">Por definir</option>
             </select>
           </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Fecha límite
+            <input type="date" value="{{ taskForm.dueDate }}" onChange="{{ onTaskDueDate }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
         </div>
 
         <div style="background: var(--color-accent-2-100); border: 1px solid var(--color-accent-2-300); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 12px">
@@ -840,12 +865,22 @@
               </sc-for>
             </span>
           </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 6px">Organización
+            <span style="display: flex; flex-wrap: wrap; gap: 7px">
+              <sc-for list="{{ taskOrgChips }}" as="o" hint-placeholder-count="4">
+                <button type="button" onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
+              </sc-for>
+            </span>
+          </label>
         </div>
         <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Detalle
           <textarea value="{{ taskForm.detail }}" onChange="{{ onTaskDetail }}" rows="3" style="border: 1px solid var(--color-neutral-300); border-radius: 16px; padding: 11px 12px; background: #fff; color: var(--color-text); resize: none"></textarea>
         </label>
         <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Próxima acción
           <textarea value="{{ taskForm.nextAction }}" onChange="{{ onTaskNextAction }}" rows="2" style="border: 1px solid var(--color-neutral-300); border-radius: 16px; padding: 11px 12px; background: #fff; color: var(--color-text); resize: none"></textarea>
+        </label>
+        <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Evidencia
+          <textarea value="{{ taskForm.evidence }}" onChange="{{ onTaskEvidence }}" rows="2" placeholder="Prueba o resultado de la ejecución…" style="border: 1px solid var(--color-neutral-300); border-radius: 16px; padding: 11px 12px; background: #fff; color: var(--color-text); resize: none"></textarea>
         </label>
         <div style="display: flex; gap: 10px; justify-content: flex-end">
           <button onClick="{{ closeTaskModal }}" style="border: 1px solid var(--color-neutral-300); background: transparent; border-radius: 999px; padding: 11px 18px; font-weight: 700; cursor: pointer">Cancelar</button>
@@ -874,6 +909,22 @@
             <input type="text" placeholder="Teléfono" value="{{ unitForm.responsiblePhone }}" onChange="{{ onUnitResponsiblePhone }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
             <input type="text" placeholder="Correo" value="{{ unitForm.responsibleEmail }}" onChange="{{ onUnitResponsibleEmail }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px">
+            <select value="{{ unitForm.responsibleRole }}" onChange="{{ onUnitResponsibleRole }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <sc-for list="{{ personRoleOptions }}" as="o" hint-placeholder-count="5">
+                <option value="{{ o.id }}">{{ o.label }}</option>
+              </sc-for>
+            </select>
+            <select value="{{ unitForm.responsibleFunction }}" onChange="{{ onUnitResponsibleFunction }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <sc-for list="{{ personFunctionOptions }}" as="o" hint-placeholder-count="8">
+                <option value="{{ o.id }}">{{ o.label }}</option>
+              </sc-for>
+            </select>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px">
+            <input type="text" placeholder="Cuenta corporativa" value="{{ unitForm.responsibleAccount }}" onChange="{{ onUnitResponsibleAccount }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+            <input type="text" placeholder="Afiliación" value="{{ unitForm.responsibleAffiliation }}" onChange="{{ onUnitResponsibleAffiliation }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </div>
         </div>
         <div style="background: var(--color-neutral-100); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 8px">
           <div style="font-family: var(--font-heading); font-size: 15px">Estudiante o voluntario que registra los datos</div>
@@ -882,6 +933,31 @@
             <input type="text" placeholder="Teléfono" value="{{ unitForm.supportPhone }}" onChange="{{ onUnitSupportPhone }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
             <input type="text" placeholder="Correo" value="{{ unitForm.supportEmail }}" onChange="{{ onUnitSupportEmail }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px">
+            <select value="{{ unitForm.supportRole }}" onChange="{{ onUnitSupportRole }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <sc-for list="{{ personRoleOptions }}" as="o" hint-placeholder-count="5">
+                <option value="{{ o.id }}">{{ o.label }}</option>
+              </sc-for>
+            </select>
+            <select value="{{ unitForm.supportFunction }}" onChange="{{ onUnitSupportFunction }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <sc-for list="{{ personFunctionOptions }}" as="o" hint-placeholder-count="8">
+                <option value="{{ o.id }}">{{ o.label }}</option>
+              </sc-for>
+            </select>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px">
+            <input type="text" placeholder="Cuenta corporativa" value="{{ unitForm.supportAccount }}" onChange="{{ onUnitSupportAccount }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+            <input type="text" placeholder="Afiliación" value="{{ unitForm.supportAffiliation }}" onChange="{{ onUnitSupportAffiliation }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </div>
+        </div>
+
+        <div style="background: var(--color-neutral-100); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 8px">
+          <div style="font-family: var(--font-heading); font-size: 15px">Estado de la especialidad</div>
+          <span style="display: flex; flex-wrap: wrap; gap: 7px">
+            <sc-for list="{{ specialtyStatusChips }}" as="o" hint-placeholder-count="5">
+              <button type="button" onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
+            </sc-for>
+          </span>
         </div>
 
         <div style="background: var(--color-accent-2-100); border: 1px solid var(--color-accent-2-300); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
@@ -1326,15 +1402,21 @@ const SEED = [
 ];
 
 const BOARD_STATUS = [
-  { id: 'todo', label: 'Por iniciar', emoji: '○', color: '#82796a' },
-  { id: 'waiting', label: 'En espera', emoji: '◷', color: '#c67139' },
-  { id: 'doing', label: 'En curso', emoji: '↻', color: '#4a7fd4' },
-  { id: 'done', label: 'Listo', emoji: '✓', color: '#4f8f68' }
+  { id: 'pending', label: 'Pendiente', emoji: '○', color: '#82796a' },
+  { id: 'contacted', label: 'Contactado', emoji: '📞', color: '#4a7fd4' },
+  { id: 'following', label: 'En seguimiento', emoji: '↻', color: '#2fa89b' },
+  { id: 'waiting_response', label: 'Esperando respuesta', emoji: '◷', color: '#c67139' },
+  { id: 'executed', label: 'Ejecutado', emoji: '✓', color: '#4f8f68' },
+  { id: 'blocked', label: 'Bloqueado', emoji: '⛔', color: '#a02525' }
 ];
+const STATUS_MIGRATION = { todo: 'pending', waiting: 'waiting_response', doing: 'following', done: 'executed' };
+function migrateTaskStatus(id) { return STATUS_MIGRATION[id] || id; }
+
+const ORGANIZATIONS = ['CONEKTADOS', 'UCV', 'Florangel', 'Externo'];
 
 const AREA_COLORS = { Estructura: '#6b5bd6', Contactos: '#c67139', Cronograma: '#4a7fd4', Datos: '#2fa89b', Evento: '#e0a423', Jornada: '#e0a423', Florangel: '#7a8a5e' };
 
-const TASKS = [
+const TASKS_RAW = [
   { id: 't01', title: 'Solicitar el cronograma de actividades UCV', area: 'Cronograma', status: 'waiting', priority: 'high', owner: 'Dr. Pedro Franz', horizon: 'Hoy', detail: 'Obtener fechas, facultades, responsables y tipo de actividad para llevarlas a una vista semanal.', nextAction: 'Contactar a Pedro y pedir el cronograma consolidado.' },
   { id: 't02', title: 'Aclarar Servicios Comunitarios ↔ Arquitectura', area: 'Estructura', status: 'todo', priority: 'high', owner: 'Pedro + José', horizon: 'Esta semana', detail: 'Resolver quién coordina Arquitectura, quién entrega su cronograma y cómo se conecta con Servicios Comunitarios.', nextAction: 'Acordar una llamada conjunta o identificar al responsable final.' },
   { id: 't03', title: 'Incorporar Servicios Comunitarios bajo Vicerrectorado', area: 'Estructura', status: 'doing', priority: 'medium', owner: 'Equipo CONEKTADOS', horizon: 'Hoy', detail: 'Representar la capa operativa coordinada por el Dr. Pedro Franz dentro del mapa jerárquico.', nextAction: 'Validar que la ubicación y dependencia institucional sean correctas.' },
@@ -1347,6 +1429,7 @@ const TASKS = [
   { id: 't10', title: 'Definir ficha de auditoría por evento', area: 'Evento', status: 'todo', priority: 'high', owner: 'Equipo CONEKTADOS', horizon: 'Esta semana', detail: 'Cada evento debe completar cinco controles internos de información antes de confirmarse.', nextAction: 'Crear una ficha por fecha con comunicación, equipo, materiales, voluntariado y data.' },
   { id: 't11', title: 'Completar directorio con datos confirmados', area: 'Contactos', status: 'doing', priority: 'medium', owner: 'Equipo CONEKTADOS', horizon: 'Esta semana', detail: 'El borrador debe contener solo nombres y datos verificados, marcando lo desconocido como Por confirmar.', nextAction: 'Completar teléfonos, correos, cargos y unidades de los siete contactos identificados.' }
 ];
+const TASKS = TASKS_RAW.map(t => Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t, { status: migrateTaskStatus(t.status) }));
 
 const JOURNEY_QUESTIONS = [
   { key: 'communication', emoji: '💬', label: 'Comunicación confirmada' },
@@ -1371,12 +1454,25 @@ const APP_STATUS = {
   not_started: { label: 'Sin desarrollar aún', color: '#8c491a', soft: '#fff0e6' }
 };
 
-const JOURNEY_STATUS = {
-  draft: { label: 'Por confirmar', color: '#c67139', soft: '#fff0e6' },
-  preparing: { label: 'En preparación', color: '#4a7fd4', soft: '#eaf1fc' },
-  confirmed: { label: 'Confirmada', color: '#2fa89b', soft: '#e6f6f3' },
-  completed: { label: 'Completada', color: '#4f8f68', soft: '#edf6ef' }
+const PERSON_ROLES = ['Responsable', 'Coordinador', 'Médico', 'Estudiante', 'Voluntario'];
+const PERSON_FUNCTIONS = ['Registro de datos', 'Triaje', 'Coordinación médica', 'Carga de pacientes', 'Seguimiento clínico', 'Logística', 'Inventario', 'Otra'];
+
+const SPECIALTY_STATUS = {
+  active: { label: 'Activo', emoji: '✅', color: '#1f7a3d', soft: '#e6f6f3' },
+  not_contacted: { label: 'No contactado', emoji: '⚠️', color: '#8c491a', soft: '#fff0e6' },
+  inactive: { label: 'No activo', emoji: '❌', color: '#a02525', soft: '#fdebeb' },
+  following: { label: 'En seguimiento', emoji: '🔄', color: '#315a9d', soft: '#eaf1fc' },
+  pending_info: { label: 'Pendiente de información', emoji: '🟠', color: '#9a6b12', soft: '#fdf4de' }
 };
+
+const JOURNEY_STATUS = {
+  planned: { label: 'Planificada', color: '#c67139', soft: '#fff0e6' },
+  confirmed: { label: 'Confirmada', color: '#2fa89b', soft: '#e6f6f3' },
+  executing: { label: 'Ejecutándose', color: '#4a7fd4', soft: '#eaf1fc' },
+  closed: { label: 'Cerrada', color: '#4f8f68', soft: '#edf6ef' }
+};
+const JOURNEY_STATUS_MIGRATION = { draft: 'planned', preparing: 'confirmed', confirmed: 'confirmed', completed: 'closed' };
+function migrateJourneyStatus(id) { return JOURNEY_STATUS[id] ? id : (JOURNEY_STATUS_MIGRATION[id] || 'planned'); }
 
 const JOURNEYS = [];
 
@@ -1442,8 +1538,8 @@ function writeStore(key, value) {
 }
 
 function normalizeJourney(j) {
-  if (Array.isArray(j.dates) && j.dates.length) return j;
-  return Object.assign({}, j, { dates: j.date ? [j.date] : [] });
+  const withDates = (Array.isArray(j.dates) && j.dates.length) ? j : Object.assign({}, j, { dates: j.date ? [j.date] : [] });
+  return Object.assign({ specialtyUnit: '', doctors: '', students: '' }, withDates, { status: migrateJourneyStatus(withDates.status) });
 }
 
 function normalizeUI(value) {
@@ -1485,7 +1581,7 @@ class Component extends DCLogic {
     dragContactId: null, dragOverUnit: null,
     contacts: readStore('ucv-contacts-v1', CONTACTS),
     interactions: readStore('ucv-interactions-v2', SEED),
-    tasks: readStore('ucv-tasks-v2', TASKS),
+    tasks: readStore('ucv-tasks-v2', TASKS).map(t => Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t, { status: migrateTaskStatus(t.status) })),
     journeys: readStore('ucv-journeys-v3', JOURNEYS).map(normalizeJourney),
     volunteers: readStore('ucv-volunteers-v1', VOLUNTEERS),
     volunteerModal: null,
@@ -1499,17 +1595,18 @@ class Component extends DCLogic {
     unitInfo: readStore('ucv-unit-info-v1', {}),
     unitModal: null,
     unitForm: {
-      responsibleName: '', responsiblePhone: '', responsibleEmail: '',
-      supportName: '', supportPhone: '', supportEmail: '',
+      responsibleName: '', responsiblePhone: '', responsibleEmail: '', responsibleRole: 'Responsable', responsibleFunction: '', responsibleAccount: '', responsibleAffiliation: '',
+      supportName: '', supportPhone: '', supportEmail: '', supportRole: 'Estudiante', supportFunction: '', supportAccount: '', supportAffiliation: '',
+      specialtyStatus: 'not_contacted',
       triageStatus: 'pending', attachmentName: '', attachmentData: '', attachmentText: ''
     },
     ui: cloneUI(SAVED_UI), customizeOpen: false, customizeForm: cloneUI(SAVED_UI),
     calendarMonth: TODAY.slice(0, 7), dayModal: null, journeyModal: null,
     journeyCalendarMonth: TODAY.slice(0, 7),
-    journeyForm: { title: '', eventType: 'health', dates: [TODAY], time: '', location: '', area: '', owner: '', status: 'draft', notes: '', checks: {} },
+    journeyForm: { title: '', eventType: 'health', dates: [TODAY], time: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, specialtyUnit: '', doctors: '', students: '' },
     modal: null, type: 'meeting', notes: '', date: TODAY, follow: '',
     taskModal: null,
-    taskForm: { title: '', owner: 'Por confirmar', area: 'Contactos', status: 'todo', priority: 'medium', horizon: 'Por definir', detail: '', nextAction: '' },
+    taskForm: { title: '', owner: 'Por confirmar', area: 'Contactos', status: 'pending', priority: 'medium', horizon: 'Por definir', detail: '', nextAction: '', organization: 'CONEKTADOS', dueDate: '', evidence: '' },
     contactModal: null,
     contactForm: { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar' }
   };
@@ -1535,6 +1632,7 @@ class Component extends DCLogic {
     if (!field) return;
     let v = value;
     if (field === 'journeys' && Array.isArray(v)) v = v.map(normalizeJourney);
+    if (field === 'tasks' && Array.isArray(v)) v = v.map(t => Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t, { status: migrateTaskStatus(t.status) }));
     if (field === 'ui') v = cloneUI(v);
     writeLocal(key, v);
     this.setState({ [field]: v });
@@ -1549,6 +1647,7 @@ class Component extends DCLogic {
       if (!field) return;
       let v = row.value;
       if (field === 'journeys' && Array.isArray(v)) v = v.map(normalizeJourney);
+      if (field === 'tasks' && Array.isArray(v)) v = v.map(t => Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t, { status: migrateTaskStatus(t.status) }));
       if (field === 'ui') v = cloneUI(v);
       writeLocal(row.key, v);
       patch[field] = v;
@@ -1689,13 +1788,13 @@ class Component extends DCLogic {
 
   newTask = () => this.setState({
     taskModal: 'new',
-    taskForm: { title: '', owner: 'Por confirmar', area: 'Contactos', status: 'todo', priority: 'medium', horizon: 'Por definir', detail: '', nextAction: '' }
+    taskForm: { title: '', owner: 'Por confirmar', area: 'Contactos', status: 'pending', priority: 'medium', horizon: 'Por definir', detail: '', nextAction: '', organization: 'CONEKTADOS', dueDate: '', evidence: '' }
   });
 
   openTask(id) {
     const task = this.state.tasks.find(t => t.id === id);
     if (!task) return;
-    this.setState({ taskModal: id, taskForm: Object.assign({}, task) });
+    this.setState({ taskModal: id, taskForm: Object.assign({ organization: 'CONEKTADOS', dueDate: '', evidence: '' }, task) });
   }
 
   closeTaskModal = () => this.setState({ taskModal: null });
@@ -1709,7 +1808,7 @@ class Component extends DCLogic {
     const s = this.state;
     if (!s.doneCapture) return;
     const text = s.doneCapture.text.trim();
-    const list = s.tasks.map(t => t.id === s.doneCapture.taskId ? Object.assign({}, t, { achievement: text }) : t);
+    const list = s.tasks.map(t => t.id === s.doneCapture.taskId ? Object.assign({}, t, { evidence: text }) : t);
     writeStore('ucv-tasks-v2', list);
     this.setState({ tasks: list, doneCapture: Object.assign({}, s.doneCapture, { text: text, submitted: true }) });
     if (this._doneCaptureTimer) clearTimeout(this._doneCaptureTimer);
@@ -1740,7 +1839,7 @@ class Component extends DCLogic {
     else list = s.tasks.map(t => t.id === s.taskModal ? Object.assign({}, clean, { id: t.id }) : t);
     writeStore('ucv-tasks-v2', list);
     this.setState({ tasks: list, taskModal: null });
-    if (clean.status === 'done' && (!prevTask || prevTask.status !== 'done')) this.promptDoneCapture(s.taskModal === 'new' ? list[list.length - 1].id : s.taskModal, clean.title);
+    if (clean.status === 'executed' && (!prevTask || prevTask.status !== 'executed')) this.promptDoneCapture(s.taskModal === 'new' ? list[list.length - 1].id : s.taskModal, clean.title);
   };
 
   moveTask(id, direction) {
@@ -1751,7 +1850,7 @@ class Component extends DCLogic {
       const current = order.indexOf(t.status);
       const next = Math.max(0, Math.min(order.length - 1, current + direction));
       const nextStatus = order[next];
-      if (nextStatus === 'done' && t.status !== 'done') celebrated = t.title || 'La tarea';
+      if (nextStatus === 'executed' && t.status !== 'executed') celebrated = t.title || 'La tarea';
       return Object.assign({}, t, { status: nextStatus });
     });
     writeStore('ucv-tasks-v2', list);
@@ -1774,11 +1873,11 @@ class Component extends DCLogic {
     tasks.splice(insertAt, 0, moved);
     writeStore('ucv-tasks-v2', tasks);
     this.setState({ tasks: tasks, dragTaskId: null, dragOverCol: null, dragOverIndex: null });
-    if (targetStatus === 'done' && original.status !== 'done') this.promptDoneCapture(id, original.title || 'La tarea');
+    if (targetStatus === 'executed' && original.status !== 'executed') this.promptDoneCapture(id, original.title || 'La tarea');
   }
 
   blankJourney(date) {
-    return { title: '', eventType: 'health', dates: date ? [date] : [], time: '', location: '', area: '', owner: '', status: 'draft', notes: '', checks: {}, assignedVolunteers: [] };
+    return { title: '', eventType: 'health', dates: date ? [date] : [], time: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, assignedVolunteers: [], specialtyUnit: '', doctors: '', students: '' };
   }
 
   blankVolunteer() {
@@ -1952,7 +2051,10 @@ class Component extends DCLogic {
       unitModalName: unitName,
       unitForm: {
         responsibleName: info.responsibleName || '', responsiblePhone: info.responsiblePhone || '', responsibleEmail: info.responsibleEmail || '',
+        responsibleRole: info.responsibleRole || 'Responsable', responsibleFunction: info.responsibleFunction || '', responsibleAccount: info.responsibleAccount || '', responsibleAffiliation: info.responsibleAffiliation || '',
         supportName: info.supportName || '', supportPhone: info.supportPhone || '', supportEmail: info.supportEmail || '',
+        supportRole: info.supportRole || 'Estudiante', supportFunction: info.supportFunction || '', supportAccount: info.supportAccount || '', supportAffiliation: info.supportAffiliation || '',
+        specialtyStatus: info.specialtyStatus || 'not_contacted',
         triageStatus: info.triageStatus || 'pending',
         attachmentName: info.attachmentName || '',
         attachmentData: info.attachmentData || '',
@@ -1969,7 +2071,10 @@ class Component extends DCLogic {
     const info = Object.assign({}, s.unitInfo, {
       [s.unitModal]: {
         responsibleName: s.unitForm.responsibleName.trim(), responsiblePhone: s.unitForm.responsiblePhone.trim(), responsibleEmail: s.unitForm.responsibleEmail.trim(),
+        responsibleRole: s.unitForm.responsibleRole, responsibleFunction: s.unitForm.responsibleFunction.trim(), responsibleAccount: s.unitForm.responsibleAccount.trim(), responsibleAffiliation: s.unitForm.responsibleAffiliation.trim(),
         supportName: s.unitForm.supportName.trim(), supportPhone: s.unitForm.supportPhone.trim(), supportEmail: s.unitForm.supportEmail.trim(),
+        supportRole: s.unitForm.supportRole, supportFunction: s.unitForm.supportFunction.trim(), supportAccount: s.unitForm.supportAccount.trim(), supportAffiliation: s.unitForm.supportAffiliation.trim(),
+        specialtyStatus: SPECIALTY_STATUS[s.unitForm.specialtyStatus] ? s.unitForm.specialtyStatus : 'not_contacted',
         triageStatus: s.unitForm.triageStatus === 'sent' ? 'sent' : 'pending',
         attachmentName: s.unitForm.attachmentName,
         attachmentData: s.unitForm.attachmentData,
@@ -2037,7 +2142,7 @@ class Component extends DCLogic {
     const readinessCount = j => JOURNEY_QUESTIONS.filter(q => !!(j.checks || {})[q.key]).length;
     const primaryDate = j => (j.dates && j.dates[0]) || '';
     const journeyCard = j => {
-      const meta = JOURNEY_STATUS[j.status] || JOURNEY_STATUS.draft;
+      const meta = JOURNEY_STATUS[j.status] || JOURNEY_STATUS.planned;
       const type = EVENT_TYPES.find(t => t.id === j.eventType) || EVENT_TYPES[EVENT_TYPES.length - 1];
       const dates = j.dates || [];
       const dateLabel = dates.length > 1
@@ -2058,7 +2163,7 @@ class Component extends DCLogic {
       });
     };
     const sortedJourneys = s.journeys.slice().sort((a, b) => (primaryDate(a) + (a.time || '')).localeCompare(primaryDate(b) + (b.time || '')));
-    const upcomingJourneys = sortedJourneys.filter(j => (j.dates || []).some(d => d >= TODAY) && j.status !== 'completed').slice(0, 6).map(journeyCard);
+    const upcomingJourneys = sortedJourneys.filter(j => (j.dates || []).some(d => d >= TODAY) && j.status !== 'closed').slice(0, 6).map(journeyCard);
 
     const monthParts = s.calendarMonth.split('-');
     const calendarYear = Number(monthParts[0]);
@@ -2080,7 +2185,7 @@ class Component extends DCLogic {
         blank: false, day: true, number: day,
         countLabel: dayJourneys.length ? dayJourneys.length + (dayJourneys.length === 1 ? ' evento' : ' eventos') : '',
         events: dayJourneys.slice(0, 3).map(j => {
-          const meta = JOURNEY_STATUS[j.status] || JOURNEY_STATUS.draft;
+          const meta = JOURNEY_STATUS[j.status] || JOURNEY_STATUS.planned;
           const brief = (j.title || 'Evento por confirmar') + (j.owner ? ' de ' + j.owner : '') + (j.location ? ' en ' + j.location : '');
           return { color: meta.color, soft: meta.soft, time: j.time ? j.time + ' · ' : '', title: brief, style: { display: 'block', textAlign: 'left', borderLeft: '3px solid ' + meta.color, background: meta.soft, borderRadius: Math.max(6, bubble.radius - 8), padding: bubble.eventPadding, fontSize: bubble.eventFont, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } };
         }),
@@ -2109,21 +2214,22 @@ class Component extends DCLogic {
     const kpi = (bg, fg) => Object.assign({}, kpiBase, { background: bg, color: fg });
     const kpis = s.view === 'board' ? [
       { emoji: '🧩', value: s.tasks.length, label: 'Tareas operativas', style: kpi('#fff', 'var(--color-text)') },
-      { emoji: '◷', value: s.tasks.filter(t => t.status === 'waiting').length, label: 'En espera', style: kpi('#fff2eb', '#8c491a') },
-      { emoji: '↻', value: s.tasks.filter(t => t.status === 'doing').length, label: 'En curso', style: kpi('#eaf1fc', '#315a9d') },
-      { emoji: '✓', value: s.tasks.filter(t => t.status === 'done').length, label: 'Listas', style: kpi('#e6f6f3', '#14584f') },
-      { emoji: '⚑', value: s.tasks.filter(t => t.priority === 'high' && t.status !== 'done').length, label: 'Prioridad alta', style: kpi('#fdebeb', '#a02525') }
+      { emoji: '◷', value: s.tasks.filter(t => t.status === 'waiting_response').length, label: 'Esperando respuesta', style: kpi('#fff2eb', '#8c491a') },
+      { emoji: '↻', value: s.tasks.filter(t => t.status === 'following').length, label: 'En seguimiento', style: kpi('#eaf1fc', '#315a9d') },
+      { emoji: '✓', value: s.tasks.filter(t => t.status === 'executed').length, label: 'Ejecutadas', style: kpi('#e6f6f3', '#14584f') },
+      { emoji: '⛔', value: s.tasks.filter(t => t.status === 'blocked').length, label: 'Bloqueadas', style: kpi('#fdebeb', '#a02525') },
+      { emoji: '⚑', value: s.tasks.filter(t => t.priority === 'high' && t.status !== 'executed').length, label: 'Prioridad alta', style: kpi('#fdf4de', '#855d09') }
     ] : s.view === 'calendar' ? [
       { emoji: '🗓️', value: s.journeys.length, label: 'Eventos registrados', style: kpi('#fff', 'var(--color-text)') },
       { emoji: '📍', value: s.journeys.filter(j => (j.dates || []).some(d => d.slice(0, 7) === s.calendarMonth)).length, label: 'En este mes', style: kpi('#fff0e6', '#8c491a') },
-      { emoji: '↻', value: s.journeys.filter(j => j.status === 'preparing').length, label: 'En preparación', style: kpi('#eaf1fc', '#315a9d') },
+      { emoji: '↻', value: s.journeys.filter(j => j.status === 'executing').length, label: 'Ejecutándose', style: kpi('#eaf1fc', '#315a9d') },
       { emoji: '✓', value: s.journeys.filter(j => j.status === 'confirmed').length, label: 'Confirmadas', style: kpi('#e6f6f3', '#14584f') },
-      { emoji: '◷', value: s.journeys.filter(j => readinessCount(j) < JOURNEY_QUESTIONS.length && j.status !== 'completed').length, label: 'Auditoría pendiente', style: kpi('#fdf4de', '#855d09') }
+      { emoji: '◷', value: s.journeys.filter(j => readinessCount(j) < JOURNEY_QUESTIONS.length && j.status !== 'closed').length, label: 'Auditoría pendiente', style: kpi('#fdf4de', '#855d09') }
     ] : s.view === 'volunteers' ? [
       { emoji: '🙋', value: s.volunteers.length, label: 'Voluntarios registrados', style: kpi('#fff', 'var(--color-text)') },
-      { emoji: '🗓️', value: s.journeys.filter(j => (j.dates || []).some(d => d >= TODAY) && j.status !== 'completed').length, label: 'Eventos próximos', style: kpi('#fff0e6', '#8c491a') },
+      { emoji: '🗓️', value: s.journeys.filter(j => (j.dates || []).some(d => d >= TODAY) && j.status !== 'closed').length, label: 'Eventos próximos', style: kpi('#fff0e6', '#8c491a') },
       { emoji: '🤝', value: s.journeys.reduce((sum, j) => sum + (j.assignedVolunteers || []).length, 0), label: 'Asignaciones totales', style: kpi('#e6f6f3', '#14584f') },
-      { emoji: '⚠️', value: s.journeys.filter(j => (j.dates || []).some(d => d >= TODAY) && j.status !== 'completed' && (j.assignedVolunteers || []).length === 0).length, label: 'Eventos sin voluntarios', style: kpi('#fdebeb', '#a02525') }
+      { emoji: '⚠️', value: s.journeys.filter(j => (j.dates || []).some(d => d >= TODAY) && j.status !== 'closed' && (j.assignedVolunteers || []).length === 0).length, label: 'Eventos sin voluntarios', style: kpi('#fdebeb', '#a02525') }
     ] : [
       { emoji: '👥', value: all.length, label: 'Contactos identificados', style: kpi('#fff', 'var(--color-text)') },
       { emoji: '🧭', value: count('Coordinador'), label: 'Coordinadores', style: kpi('#efe7ff', '#3a2482') },
@@ -2150,7 +2256,7 @@ class Component extends DCLogic {
 
     const volunteerJourneys = sortedJourneys.map(j => {
       const assignedIds = j.assignedVolunteers || [];
-      const meta = JOURNEY_STATUS[j.status] || JOURNEY_STATUS.draft;
+      const meta = JOURNEY_STATUS[j.status] || JOURNEY_STATUS.planned;
       return {
         id: j.id,
         title: j.title || 'Evento por confirmar',
@@ -2317,7 +2423,7 @@ class Component extends DCLogic {
       : [];
     const availabilityDayJourneys = s.availabilityDayModal
       ? sortedJourneys.filter(j => (j.dates || []).indexOf(s.availabilityDayModal) > -1).map(j => {
-        const meta = JOURNEY_STATUS[j.status] || JOURNEY_STATUS.draft;
+        const meta = JOURNEY_STATUS[j.status] || JOURNEY_STATUS.planned;
         const names = (j.assignedVolunteers || []).map(id => volunteerById[id] ? volunteerById[id].name : 'Voluntario eliminado');
         return {
           id: j.id, title: j.title || 'Evento por confirmar', statusLabel: meta.label, color: meta.color,
@@ -2343,6 +2449,7 @@ class Component extends DCLogic {
         const dragging = s.dragTaskId === t.id;
         return Object.assign({}, t, {
           areaColor: AREA_COLORS[t.area] || '#82796a',
+          hasDueDate: !!t.dueDate, dueDateLabel: t.dueDate ? fmt(t.dueDate) : '',
           priorityLabel: p.label,
           priorityStyle: { background: p.bg, color: p.fg, borderRadius: 999, padding: '4px 8px', fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap' },
           cardStyle: { background: '#fff', borderRadius: bubble.radius, padding: bubble.padding, boxShadow: 'var(--shadow-sm)', borderLeft: '5px solid ' + (AREA_COLORS[t.area] || '#82796a'), display: 'flex', flexDirection: 'column', gap: 9, cursor: 'grab', opacity: dragging ? 0.4 : 1 },
@@ -2413,6 +2520,10 @@ class Component extends DCLogic {
       id: p, label: priorityMeta[p].label, style: tagChipStyle(priorityMeta[p].fg, s.taskForm.priority === p),
       onClick: () => this.setState({ taskForm: Object.assign({}, s.taskForm, { priority: p }) })
     }));
+    const taskOrgChips = ORGANIZATIONS.map(o => ({
+      id: o, label: o, style: tagChipStyle('#6b5bd6', s.taskForm.organization === o),
+      onClick: () => this.setState({ taskForm: Object.assign({}, s.taskForm, { organization: o }) })
+    }));
 
     const unitBox = { background: '#fff', borderRadius: 14, padding: '9px 10px', display: 'flex', flexDirection: 'column', gap: 6, borderWidth: 1.5, borderStyle: 'solid' };
     const buildFacultyCard = f => {
@@ -2434,19 +2545,23 @@ class Component extends DCLogic {
           const info = s.unitInfo[u.id] || {};
           const triageSent = info.triageStatus === 'sent';
           const isOver = s.dragOverUnit === u.id;
+          const specMeta = SPECIALTY_STATUS[info.specialtyStatus] || null;
           return {
           name: u.name, emoji: u.emoji, note: u.note || '', appStatus: appKey,
           appLabel: 'Estado del desarrollo de la app en ' + u.name,
           onAppStatus: e => this.setAppStatus(u.id, e.target.value),
           appStatusStyle: { maxWidth: '100%', minWidth: 0, border: '1px solid ' + appMeta.color + '55', borderRadius: 999, padding: '3px 7px', fontSize: 9.5, fontWeight: 700, background: appMeta.soft, color: appMeta.color, cursor: 'pointer' },
+          hasSpecialtyStatus: !!specMeta,
+          specialtyStatusLabel: specMeta ? specMeta.emoji + ' ' + specMeta.label : '',
+          specialtyStatusStyle: specMeta ? { border: '1px solid ' + specMeta.color + '55', borderRadius: 999, padding: '3px 7px', fontSize: 9.5, fontWeight: 700, background: specMeta.soft, color: specMeta.color } : {},
           boxStyle: Object.assign({}, unitBox, { borderColor: f.color + '33' }, isOver ? { outline: '2px dashed ' + f.color, outlineOffset: -2, background: f.soft } : {}),
           titleStyle: { fontSize: 12.5, fontWeight: 700, lineHeight: 1.25, color: f.color },
           editIconStyle: { border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, flex: 'none', opacity: .6 },
           editUnit: () => this.openUnitModal(u.id, u.name),
           hasUnitSummary: !!(info.responsibleName || info.supportName || triageSent || info.attachmentName || info.attachmentText),
           unitSummaryLine: [
-            info.responsibleName ? '👤 ' + info.responsibleName : '',
-            info.supportName ? '🎓 ' + info.supportName : '',
+            info.responsibleName ? '👤 ' + info.responsibleName + (info.responsibleFunction ? ' (' + info.responsibleFunction + ')' : '') : '',
+            info.supportName ? '🎓 ' + info.supportName + (info.supportFunction ? ' (' + info.supportFunction + ')' : '') : '',
             triageSent ? '✅ Triaje' : '',
             (info.attachmentName || info.attachmentText) ? '📎 Adjunto' : ''
           ].filter(Boolean).join(' · '),
@@ -2577,6 +2692,12 @@ class Component extends DCLogic {
       id: o.id, label: o.label, style: tagChipStyle(o.id === 'sent' ? '#14584f' : '#8c491a', s.unitForm.triageStatus === o.id),
       onClick: () => this.setState({ unitForm: Object.assign({}, s.unitForm, { triageStatus: o.id }) })
     }));
+    const specialtyStatusChips = Object.keys(SPECIALTY_STATUS).map(key => ({
+      id: key, label: SPECIALTY_STATUS[key].emoji + ' ' + SPECIALTY_STATUS[key].label, style: tagChipStyle(SPECIALTY_STATUS[key].color, s.unitForm.specialtyStatus === key),
+      onClick: () => this.setState({ unitForm: Object.assign({}, s.unitForm, { specialtyStatus: key }) })
+    }));
+    const personRoleOptions = PERSON_ROLES.map(r => ({ id: r, label: r }));
+    const personFunctionOptions = [{ id: '', label: 'Función específica…' }].concat(PERSON_FUNCTIONS.map(f => ({ id: f, label: f })));
 
     return {
       uiText: ui,
@@ -2650,7 +2771,7 @@ class Component extends DCLogic {
       primaryHover: { background: 'var(--color-accent-600)' },
       modalOpen: !!s.modal, modal: modal, form: { notes: s.notes, date: s.date, follow: s.follow },
       taskModalOpen: !!s.taskModal, taskModalTitle: s.taskModal === 'new' ? 'Nueva tarea operativa' : 'Editar tarea operativa', taskForm: s.taskForm,
-      taskAreaChips: taskAreaChips, taskStatusChips: taskStatusChips, taskPriorityChips: taskPriorityChips,
+      taskAreaChips: taskAreaChips, taskStatusChips: taskStatusChips, taskPriorityChips: taskPriorityChips, taskOrgChips: taskOrgChips,
       contactModalOpen: !!s.contactModal, contactModalTitle: s.contactModal === 'new' ? 'Nuevo contacto' : 'Editar contacto',
       isEditingContact: !!s.contactModal && s.contactModal !== 'new',
       contactForm: s.contactForm, roleOptions: Object.keys(ROLE).map(k => ({ id: k, label: ROLE[k].emoji + ' ' + ROLE[k].short })),
@@ -2698,6 +2819,9 @@ class Component extends DCLogic {
       onJourneyTime: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { time: e.target.value }) }),
       onJourneyLocation: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { location: e.target.value }) }),
       onJourneyArea: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { area: e.target.value }) }),
+      onJourneySpecialtyUnit: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { specialtyUnit: e.target.value }) }),
+      onJourneyDoctors: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { doctors: e.target.value }) }),
+      onJourneyStudents: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { students: e.target.value }) }),
       onJourneyOwner: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { owner: e.target.value }) }),
       onJourneyStatus: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { status: e.target.value }) }),
       onJourneyNotes: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { notes: e.target.value }) }),
@@ -2721,6 +2845,8 @@ class Component extends DCLogic {
       onTaskHorizon: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { horizon: e.target.value }) }),
       onTaskDetail: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { detail: e.target.value }) }),
       onTaskNextAction: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { nextAction: e.target.value }) }),
+      onTaskDueDate: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { dueDate: e.target.value }) }),
+      onTaskEvidence: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { evidence: e.target.value }) }),
       newContact: this.newContact,
       closeContactModal: this.closeContactModal,
       saveContact: this.saveContact,
@@ -2734,7 +2860,8 @@ class Component extends DCLogic {
       onContactAction: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { action: e.target.value }) }),
       closeModal: this.closeModal, saveInteraction: this.saveInteraction,
       unitModalOpen: !!s.unitModal, unitModalTitle: s.unitModalName || '',
-      unitForm: s.unitForm, unitTriageChips: unitTriageChips,
+      unitForm: s.unitForm, unitTriageChips: unitTriageChips, specialtyStatusChips: specialtyStatusChips,
+      personRoleOptions: personRoleOptions, personFunctionOptions: personFunctionOptions,
       unitHasAttachment: !!s.unitForm.attachmentName, unitAttachmentName: s.unitForm.attachmentName,
       closeUnitModal: this.closeUnitModal,
       saveUnitInfo: this.saveUnitInfo,
@@ -2742,9 +2869,17 @@ class Component extends DCLogic {
       onUnitResponsibleName: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsibleName: e.target.value }) }),
       onUnitResponsiblePhone: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsiblePhone: e.target.value }) }),
       onUnitResponsibleEmail: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsibleEmail: e.target.value }) }),
+      onUnitResponsibleRole: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsibleRole: e.target.value }) }),
+      onUnitResponsibleFunction: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsibleFunction: e.target.value }) }),
+      onUnitResponsibleAccount: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsibleAccount: e.target.value }) }),
+      onUnitResponsibleAffiliation: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsibleAffiliation: e.target.value }) }),
       onUnitSupportName: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportName: e.target.value }) }),
       onUnitSupportPhone: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportPhone: e.target.value }) }),
       onUnitSupportEmail: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportEmail: e.target.value }) }),
+      onUnitSupportRole: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportRole: e.target.value }) }),
+      onUnitSupportFunction: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportFunction: e.target.value }) }),
+      onUnitSupportAccount: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportAccount: e.target.value }) }),
+      onUnitSupportAffiliation: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportAffiliation: e.target.value }) }),
       onUnitAttachment: e => this.onUnitAttachment(e),
       onUnitAttachmentText: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { attachmentText: e.target.value }) }),
       stop: e => e.stopPropagation(),
