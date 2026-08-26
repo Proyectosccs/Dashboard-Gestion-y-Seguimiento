@@ -72,6 +72,7 @@
         <option value="Coordinador">🧭 Coordinador</option>
         <option value="Enlace">🔗 Enlace</option>
         <option value="Profesional del Área">🩺 Profesional del Área</option>
+        <option value="Estudiante">🎓 Estudiante</option>
         <option value="Por confirmar">❔ Rol por confirmar</option>
       </select>
       <button onClick="{{ toggleFollow }}" style="{{ followBtnStyle }}">⏰ Requieren seguimiento</button>
@@ -128,13 +129,13 @@
                 <article draggable="{{ task.draggable }}" onDragStart="{{ task.dragStart }}" onDragEnd="{{ task.dragEnd }}" onDragOver="{{ task.onCardDragOver }}" style="{{ task.cardStyle }}">
                   <div style="display: flex; gap: 8px; align-items: flex-start">
                     <div style="min-width: 0; flex: 1">
-                      <div style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: {{ task.areaColor }}">{{ task.area }}</div>
-                      <div style="font-weight: 700; line-height: 1.25; margin-top: 3px">{{ task.title }}</div>
+                      <div style="{{ task.areaLabelStyle }}">{{ task.area }}</div>
+                      <div style="{{ task.titleStyle }}">{{ task.title }}</div>
                     </div>
                     <span style="{{ task.priorityStyle }}">{{ task.priorityLabel }}</span>
                   </div>
-                  <p style="margin: 0; font-size: 12.5px; color: var(--color-neutral-700); line-height: 1.4; text-wrap: pretty">{{ task.detail }}</p>
-                  <div style="display: grid; gap: 5px; font-size: 11.5px; color: var(--color-neutral-800)">
+                  <p style="{{ task.detailStyle }}">{{ task.detail }}</p>
+                  <div style="{{ task.metaStyle }}">
                     <div>👤 <strong>{{ task.owner }}</strong></div>
                     <div>🏢 {{ task.organization }}</div>
                     <div>🗓️ {{ task.horizon }}</div>
@@ -276,6 +277,9 @@
                             <div style="min-width: 0; flex: 1">
                               <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px">
                                 <div style="{{ u.titleStyle }}">{{ u.name }}</div>
+                                <sc-if value="{{ u.notInvolved }}" hint-placeholder-val="{{ false }}">
+                                  <span style="{{ u.notInvolvedStyle }}">🚫 No involucrado</span>
+                                </sc-if>
                                 <sc-if value="{{ u.hasSpecialtyStatus }}" hint-placeholder-val="{{ false }}">
                                   <span style="{{ u.specialtyStatusStyle }}">{{ u.specialtyStatusLabel }}</span>
                                 </sc-if>
@@ -340,6 +344,9 @@
                             <div style="min-width: 0; flex: 1">
                               <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px">
                                 <div style="{{ u.titleStyle }}">{{ u.name }}</div>
+                                <sc-if value="{{ u.notInvolved }}" hint-placeholder-val="{{ false }}">
+                                  <span style="{{ u.notInvolvedStyle }}">🚫 No involucrado</span>
+                                </sc-if>
                                 <sc-if value="{{ u.hasSpecialtyStatus }}" hint-placeholder-val="{{ false }}">
                                   <span style="{{ u.specialtyStatusStyle }}">{{ u.specialtyStatusLabel }}</span>
                                 </sc-if>
@@ -417,6 +424,9 @@
             </div>
             <div style="background: var(--color-accent-2-100); border-radius: 14px; padding: 10px 12px; display: grid; gap: 4px; font-size: 12px">
               <div>📍 Estado: <strong>{{ c.status }}</strong></div>
+              <sc-if value="{{ c.hasFunction }}" hint-placeholder-val="{{ false }}">
+                <div>🛠️ Función: <strong>{{ c.functionLabel }}</strong></div>
+              </sc-if>
               <div>➡️ Próxima acción: {{ c.action }}</div>
             </div>
             <div style="background: var(--color-neutral-100); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 12px">
@@ -952,6 +962,15 @@
         </div>
 
         <div style="background: var(--color-neutral-100); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 8px">
+          <div style="font-family: var(--font-heading); font-size: 15px">Participación en las jornadas</div>
+          <select value="{{ unitForm.involved }}" onChange="{{ onUnitInvolved }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+            <sc-for list="{{ involvementOptions }}" as="o" hint-placeholder-count="2">
+              <option value="{{ o.id }}">{{ o.label }}</option>
+            </sc-for>
+          </select>
+        </div>
+
+        <div style="background: var(--color-neutral-100); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 8px">
           <div style="font-family: var(--font-heading); font-size: 15px">Estado de la especialidad</div>
           <span style="display: flex; flex-wrap: wrap; gap: 7px">
             <sc-for list="{{ specialtyStatusChips }}" as="o" hint-placeholder-count="5">
@@ -1008,6 +1027,11 @@
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Rol
             <select value="{{ contactForm.role }}" onChange="{{ onContactRole }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
               <sc-for list="{{ roleOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+            </select>
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Función (qué está desarrollando)
+            <select value="{{ contactForm.function }}" onChange="{{ onContactFunction }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <sc-for list="{{ personFunctionOptions }}" as="o" hint-placeholder-count="8"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
             </select>
           </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Unidad
@@ -1387,8 +1411,8 @@ const FACULTIES = [
     cols: [{ units: [{ id: 'civ', name: 'Escuela de Ingeniería Civil', emoji: '🌉', note: 'Ingenieros civiles' }] }] }
 ];
 
-function C(id, n, r, u, e, t, status, action) {
-  return { id: id, name: n, role: r, unit: u, email: e, phone: t, status: status, action: action };
+function C(id, n, r, u, e, t, status, action, func) {
+  return { id: id, name: n, role: r, unit: u, email: e, phone: t, status: status, action: action, function: func || '' };
 }
 
 const CONTACTS = [
@@ -1476,6 +1500,11 @@ const SPECIALTY_STATUS = {
   following: { label: 'En seguimiento', emoji: '🔄', color: '#315a9d', soft: '#eaf1fc' },
   pending_info: { label: 'Pendiente de información', emoji: '🟠', color: '#9a6b12', soft: '#fdf4de' }
 };
+
+const INVOLVEMENT_OPTIONS = [
+  { id: 'yes', label: '✅ Involucrado en las jornadas' },
+  { id: 'no', label: '🚫 No está involucrado' }
+];
 
 const JOURNEY_STATUS = {
   planned: { label: 'Planificada', color: '#c67139', soft: '#fff0e6' },
@@ -1632,7 +1661,7 @@ class Component extends DCLogic {
     unitForm: {
       responsibleName: '', responsiblePhone: '', responsibleEmail: '', responsibleRole: 'Responsable', responsibleFunction: '', responsibleAccount: '', responsibleAffiliation: '',
       supportName: '', supportPhone: '', supportEmail: '', supportRole: 'Estudiante', supportFunction: '', supportAccount: '', supportAffiliation: '',
-      specialtyStatus: 'not_contacted',
+      specialtyStatus: 'not_contacted', involved: 'yes',
       triageStatus: 'pending', attachmentName: '', attachmentData: '', attachmentText: ''
     },
     ui: cloneUI(SAVED_UI), customizeOpen: false, customizeForm: cloneUI(SAVED_UI),
@@ -1643,7 +1672,7 @@ class Component extends DCLogic {
     taskModal: null,
     taskForm: { title: '', owner: 'Por confirmar', area: 'Contactos', status: 'pending', priority: 'medium', horizon: 'Por definir', detail: '', nextAction: '', organization: 'CONEKTADOS', dueDate: '', evidence: '' },
     contactModal: null,
-    contactForm: { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar' }
+    contactForm: { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar', function: '' }
   };
 
   componentDidMount() {
@@ -1873,7 +1902,7 @@ class Component extends DCLogic {
   };
 
   blankContact() {
-    return { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar' };
+    return { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar', function: '' };
   }
 
   newContact = () => this.setState({ contactModal: 'new', contactForm: this.blankContact() });
@@ -2181,6 +2210,7 @@ class Component extends DCLogic {
         supportName: info.supportName || '', supportPhone: info.supportPhone || '', supportEmail: info.supportEmail || '',
         supportRole: info.supportRole || 'Estudiante', supportFunction: info.supportFunction || '', supportAccount: info.supportAccount || '', supportAffiliation: info.supportAffiliation || '',
         specialtyStatus: info.specialtyStatus || 'not_contacted',
+        involved: info.involved === 'no' ? 'no' : 'yes',
         triageStatus: info.triageStatus || 'pending',
         attachmentName: info.attachmentName || '',
         attachmentData: info.attachmentData || '',
@@ -2201,6 +2231,7 @@ class Component extends DCLogic {
         supportName: s.unitForm.supportName.trim(), supportPhone: s.unitForm.supportPhone.trim(), supportEmail: s.unitForm.supportEmail.trim(),
         supportRole: s.unitForm.supportRole, supportFunction: s.unitForm.supportFunction.trim(), supportAccount: s.unitForm.supportAccount.trim(), supportAffiliation: s.unitForm.supportAffiliation.trim(),
         specialtyStatus: SPECIALTY_STATUS[s.unitForm.specialtyStatus] ? s.unitForm.specialtyStatus : 'not_contacted',
+        involved: s.unitForm.involved === 'no' ? 'no' : 'yes',
         triageStatus: s.unitForm.triageStatus === 'sent' ? 'sent' : 'pending',
         attachmentName: s.unitForm.attachmentName,
         attachmentData: s.unitForm.attachmentData,
@@ -2256,10 +2287,10 @@ class Component extends DCLogic {
     const s = this.state;
     const ui = normalizeUI(s.ui);
     const bubble = ui.bubbleSize === 'compact'
-      ? { padding: 10, radius: 15, minCard: 190, eventPadding: '3px 4px', eventFont: 9.5 }
+      ? { padding: 10, radius: 15, minCard: 190, eventPadding: '3px 4px', eventFont: 9.5, taskTitleFont: 12.5, taskDetailFont: 11, taskMetaFont: 10, taskPriorityFont: 9.5 }
       : ui.bubbleSize === 'large'
-        ? { padding: 18, radius: 22, minCard: 260, eventPadding: '6px 7px', eventFont: 11.5 }
-        : { padding: 14, radius: 18, minCard: 220, eventPadding: '4px 5px', eventFont: 10.5 };
+        ? { padding: 18, radius: 22, minCard: 260, eventPadding: '6px 7px', eventFont: 11.5, taskTitleFont: 17, taskDetailFont: 14.5, taskMetaFont: 13.5, taskPriorityFont: 12.5 }
+        : { padding: 14, radius: 18, minCard: 220, eventPadding: '4px 5px', eventFont: 10.5, taskTitleFont: 14, taskDetailFont: 12.5, taskMetaFont: 11.5, taskPriorityFont: 10.5 };
     const all = this.enrich();
     const shown = all.filter(c => this.matches(c));
     const shownIds = {};
@@ -2360,6 +2391,7 @@ class Component extends DCLogic {
       { emoji: '👥', value: all.length, label: 'Contactos identificados', style: kpi('#fff', 'var(--color-text)') },
       { emoji: '🧭', value: count('Coordinador'), label: 'Coordinadores', style: kpi('#efe7ff', '#3a2482') },
       { emoji: '🔗', value: count('Enlace'), label: 'Enlaces', style: kpi('#e3f6f2', '#14584f') },
+      { emoji: '🎓', value: count('Estudiante'), label: 'Estudiantes', style: kpi('#eaf1fc', '#315a9d') },
       { emoji: '❔', value: count('Por confirmar'), label: 'Roles por confirmar', style: kpi('#ffe9d6', '#8c491a') },
       { emoji: '⏰', value: all.filter(c => c.needsFollow).length, label: 'Requieren seguimiento', style: kpi('#fdebeb', '#a02525') }
     ];
@@ -2577,8 +2609,12 @@ class Component extends DCLogic {
           areaColor: AREA_COLORS[t.area] || '#82796a',
           hasDueDate: !!t.dueDate, dueDateLabel: t.dueDate ? fmt(t.dueDate) : '',
           priorityLabel: p.label,
-          priorityStyle: { background: p.bg, color: p.fg, borderRadius: 999, padding: '4px 8px', fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap' },
+          priorityStyle: { background: p.bg, color: p.fg, borderRadius: 999, padding: '4px 8px', fontSize: bubble.taskPriorityFont, fontWeight: 700, whiteSpace: 'nowrap' },
           cardStyle: { background: '#fff', borderRadius: bubble.radius, padding: bubble.padding, boxShadow: 'var(--shadow-sm)', borderLeft: '5px solid ' + (AREA_COLORS[t.area] || '#82796a'), display: 'flex', flexDirection: 'column', gap: 9, cursor: 'grab', opacity: dragging ? 0.4 : 1 },
+          areaLabelStyle: { fontSize: bubble.taskMetaFont, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: AREA_COLORS[t.area] || '#82796a' },
+          titleStyle: { fontSize: bubble.taskTitleFont, fontWeight: 700, lineHeight: 1.25, marginTop: 3 },
+          detailStyle: { margin: 0, fontSize: bubble.taskDetailFont, color: 'var(--color-neutral-700)', lineHeight: 1.4, textWrap: 'pretty' },
+          metaStyle: { display: 'grid', gap: 5, fontSize: bubble.taskMetaFont, color: 'var(--color-neutral-800)' },
           noPrev: pos === 0,
           noNext: pos === statusOrder.length - 1,
           movePrev: () => this.moveTask(t.id, -1),
@@ -2659,6 +2695,7 @@ class Component extends DCLogic {
       const suppMatch = !!info.supportName && (info.supportRole === 'Médico' || info.supportRole === 'Estudiante');
       return respMatch || suppMatch;
     };
+    const isInvolved = unitId => (s.unitInfo[unitId] || {}).involved !== 'no';
     const buildFacultyCard = f => {
       const cols = f.cols.map(col => {
         let unitsSource = col.units;
@@ -2675,6 +2712,7 @@ class Component extends DCLogic {
             return aHas - bHas;
           });
         }
+        unitsSource = unitsSource.slice().sort((a, b) => (isInvolved(a.id) ? 0 : 1) - (isInvolved(b.id) ? 0 : 1));
         return {
         hasTitle: !!col.title, title: col.title || '', note: col.note || '',
         unitsStyle: { display: 'grid', gap: 8, alignItems: 'start', gridTemplateColumns: col.units.length > 3 ? 'repeat(auto-fit, minmax(140px, 1fr))' : '1fr' },
@@ -2685,6 +2723,7 @@ class Component extends DCLogic {
           const triageSent = info.triageStatus === 'sent';
           const isOver = s.dragOverUnit === u.id;
           const specMeta = SPECIALTY_STATUS[info.specialtyStatus] || null;
+          const notInvolved = info.involved === 'no';
           return {
           name: u.name, emoji: u.emoji, note: u.note || '', appStatus: appKey,
           appLabel: 'Estado del desarrollo de la app en ' + u.name,
@@ -2693,7 +2732,9 @@ class Component extends DCLogic {
           hasSpecialtyStatus: !!specMeta,
           specialtyStatusLabel: specMeta ? specMeta.emoji + ' ' + specMeta.label : '',
           specialtyStatusStyle: specMeta ? { border: '1px solid ' + specMeta.color + '55', borderRadius: 999, padding: '3px 7px', fontSize: 9.5, fontWeight: 700, background: specMeta.soft, color: specMeta.color } : {},
-          boxStyle: Object.assign({}, unitBox, { borderColor: f.color + '33' }, isOver ? { outline: '2px dashed ' + f.color, outlineOffset: -2, background: f.soft } : {}),
+          notInvolved: notInvolved,
+          notInvolvedStyle: { border: '1px solid #a0252555', borderRadius: 999, padding: '3px 7px', fontSize: 9.5, fontWeight: 700, background: '#fdebeb', color: '#a02525' },
+          boxStyle: Object.assign({}, unitBox, { borderColor: f.color + '33' }, isOver ? { outline: '2px dashed ' + f.color, outlineOffset: -2, background: f.soft } : {}, notInvolved ? { opacity: .55 } : {}),
           titleStyle: { fontSize: 12.5, fontWeight: 700, lineHeight: 1.25, color: f.color },
           editIconStyle: { border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, flex: 'none', opacity: .6 },
           editUnit: () => this.openUnitModal(u.id, u.name),
@@ -2751,6 +2792,7 @@ class Component extends DCLogic {
       const r = ROLE[c.role];
       return {
         name: c.name, emoji: r.emoji, roleShort: r.short, email: c.email, phone: c.phone, status: c.status, action: c.action,
+        hasFunction: !!c.function, functionLabel: c.function || '',
         affiliation: c.meta.facultyName + ' · ' + c.meta.unitName,
         lastLabel: c.last ? TYPES[c.last.type].label + ' · ' + fmt(c.last.date) : 'Sin contacto aún',
         followLabel: c.nextFollow ? fmt(c.nextFollow) + (c.overdue ? ' (vencido)' : '') : 'Por definir',
@@ -2992,6 +3034,7 @@ class Component extends DCLogic {
       deleteCurrentContact: () => this.deleteContact(s.contactModal),
       onContactName: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { name: e.target.value }) }),
       onContactRole: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { role: e.target.value }) }),
+      onContactFunction: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { function: e.target.value }) }),
       onContactUnit: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { unit: e.target.value }) }),
       onContactEmail: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { email: e.target.value }) }),
       onContactPhone: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { phone: e.target.value }) }),
@@ -3000,6 +3043,8 @@ class Component extends DCLogic {
       closeModal: this.closeModal, saveInteraction: this.saveInteraction,
       unitModalOpen: !!s.unitModal, unitModalTitle: s.unitModalName || '',
       unitForm: s.unitForm, unitTriageChips: unitTriageChips, specialtyStatusChips: specialtyStatusChips,
+      involvementOptions: INVOLVEMENT_OPTIONS,
+      onUnitInvolved: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { involved: e.target.value }) }),
       personRoleOptions: personRoleOptions, personFunctionOptions: personFunctionOptions,
       unitHasAttachment: !!s.unitForm.attachmentName, unitAttachmentName: s.unitForm.attachmentName,
       closeUnitModal: this.closeUnitModal,
