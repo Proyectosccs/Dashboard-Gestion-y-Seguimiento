@@ -245,6 +245,7 @@
                   <span style="margin-left: auto; font-size: 12px">{{ c.flag }}</span>
                 </button>
               </sc-for>
+              <button type="button" onClick="{{ a.addContact }}" style="border: 1px dashed var(--color-neutral-400); background: transparent; border-radius: 999px; padding: 7px 10px; font-size: 11.5px; font-weight: 700; color: var(--color-neutral-700); cursor: pointer">➕ Agregar contacto</button>
             </div>
           </sc-for>
         </div>
@@ -309,6 +310,7 @@
                               <span style="font-size: 11px">{{ c.flag }}</span>
                             </button>
                           </sc-for>
+                          <button type="button" onClick="{{ u.addContact }}" style="border: 1px dashed var(--color-neutral-400); background: transparent; border-radius: 999px; padding: 6px 9px; font-size: 10.5px; font-weight: 700; color: var(--color-neutral-700); cursor: pointer">➕ Agregar contacto</button>
                         </div>
                       </sc-for>
                       </div>
@@ -376,6 +378,7 @@
                               <span style="font-size: 11px">{{ c.flag }}</span>
                             </button>
                           </sc-for>
+                          <button type="button" onClick="{{ u.addContact }}" style="border: 1px dashed var(--color-neutral-400); background: transparent; border-radius: 999px; padding: 6px 9px; font-size: 10.5px; font-weight: 700; color: var(--color-neutral-700); cursor: pointer">➕ Agregar contacto</button>
                         </div>
                       </sc-for>
                       </div>
@@ -749,7 +752,9 @@
             </select>
           </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Responsable
-            <input type="text" placeholder="Por confirmar" value="{{ journeyForm.owner }}" onChange="{{ onJourneyOwner }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+            <select value="{{ journeyForm.owner }}" onChange="{{ onJourneyOwner }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <sc-for list="{{ contactOwnerOptions }}" as="o" hint-placeholder-count="8"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+            </select>
           </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Estado
             <select value="{{ journeyForm.status }}" onChange="{{ onJourneyStatus }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
@@ -1338,7 +1343,10 @@
 
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1000}}">
-const TODAY = '2026-08-20';
+const TODAY = (() => {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+})();
 
 const ROLE = {
   'Coordinador': { emoji: '🧭', short: 'Coordinador', bg: '#efe7ff', fg: '#4a2f9c' },
@@ -1916,6 +1924,8 @@ class Component extends DCLogic {
   }
 
   newContact = () => this.setState({ contactModal: 'new', contactForm: this.blankContact() });
+
+  newContactForUnit = (unitId) => this.setState({ contactModal: 'new', contactForm: Object.assign(this.blankContact(), { unit: unitId }) });
 
   openContactEdit(id) {
     const c = this.state.contacts.find(x => x.id === id);
@@ -2709,6 +2719,14 @@ class Component extends DCLogic {
       };
     });
 
+    const contactOwnerOptions = (() => {
+      const list = ['Por confirmar', 'Equipo CONEKTADOS'].concat(s.contacts.map(c => c.name));
+      const current = s.journeyForm.owner;
+      if (current && list.indexOf(current) === -1) list.unshift(current);
+      const seen = {};
+      return list.filter(n => { if (seen[n]) return false; seen[n] = true; return true; }).map(n => ({ id: n, label: n }));
+    })();
+
     const unitBox = { background: '#fff', borderRadius: 14, padding: '9px 10px', display: 'flex', flexDirection: 'column', gap: 6, borderWidth: 1.5, borderStyle: 'solid' };
     const hasMedicalPerson = unitId => {
       const info = s.unitInfo[unitId];
@@ -2755,6 +2773,7 @@ class Component extends DCLogic {
           hasSpecialtyStatus: !!specMeta,
           specialtyStatusLabel: specMeta ? specMeta.emoji + ' ' + specMeta.label : '',
           specialtyStatusStyle: specMeta ? { border: '1px solid ' + specMeta.color + '55', borderRadius: 999, padding: '3px 7px', fontSize: 9.5, fontWeight: 700, background: specMeta.soft, color: specMeta.color } : {},
+          addContact: () => this.newContactForUnit(u.id),
           notInvolved: notInvolved,
           notInvolvedStyle: { border: '1px solid #a0252555', borderRadius: 999, padding: '3px 7px', fontSize: 9.5, fontWeight: 700, background: '#fdebeb', color: '#a02525' },
           boxStyle: Object.assign({}, unitBox, { borderColor: f.color + '33' }, isOver ? { outline: '2px dashed ' + f.color, outlineOffset: -2, background: f.soft } : {}, notInvolved ? { opacity: .55 } : {}),
@@ -2799,6 +2818,7 @@ class Component extends DCLogic {
       style: Object.assign({ background: '#fff', borderRadius: 20, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, boxShadow: 'var(--shadow-sm)', borderTop: '5px solid ' + a.color }, isOver ? { outline: '2px dashed ' + a.color, outlineOffset: -2, background: '#fbf8f2' } : {}),
       titleStyle: { fontWeight: 700, fontSize: 14.5, lineHeight: 1.2, color: a.color },
       contacts: byRole(shown.filter(c => belongsToUnit(c, a.id))).map(c => this.chip(c)),
+      addContact: () => this.newContactForUnit(a.id),
       onUnitDragOver: e => {
         e.preventDefault(); e.stopPropagation();
         if (s.dragOverUnit !== a.id) this.setState({ dragOverUnit: a.id });
@@ -2976,7 +2996,7 @@ class Component extends DCLogic {
       primaryHover: { background: 'var(--color-accent-600)' },
       modalOpen: !!s.modal, modal: modal, form: { notes: s.notes, date: s.date, follow: s.follow },
       taskModalOpen: !!s.taskModal, taskModalTitle: s.taskModal === 'new' ? 'Nueva tarea operativa' : 'Editar tarea operativa', taskForm: s.taskForm,
-      taskAreaChips: taskAreaChips, taskStatusChips: taskStatusChips, taskPriorityChips: taskPriorityChips, taskOrgChips: taskOrgChips, extraUnitChips: extraUnitChips,
+      taskAreaChips: taskAreaChips, taskStatusChips: taskStatusChips, taskPriorityChips: taskPriorityChips, taskOrgChips: taskOrgChips, extraUnitChips: extraUnitChips, contactOwnerOptions: contactOwnerOptions,
       contactModalOpen: !!s.contactModal, contactModalTitle: s.contactModal === 'new' ? 'Nuevo contacto' : 'Editar contacto',
       isEditingContact: !!s.contactModal && s.contactModal !== 'new',
       contactForm: s.contactForm, roleOptions: Object.keys(ROLE).map(k => ({ id: k, label: ROLE[k].emoji + ' ' + ROLE[k].short })),
