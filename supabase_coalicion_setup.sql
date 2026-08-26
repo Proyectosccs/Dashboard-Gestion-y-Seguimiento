@@ -30,6 +30,7 @@ create table if not exists public.coalicion_events (
   event_date date not null,
   start_time time,
   location text not null,
+  maps_url text,
   status text not null default 'planned' check (status in ('planned', 'confirmed', 'in_progress', 'completed')),
   notes text,
   created_by uuid references auth.users(id),
@@ -68,6 +69,7 @@ create table if not exists public.coalicion_batches (
 -- Compatibilidad si se ejecutó una versión anterior basada en cuentas.
 alter table public.coalicion_contacts alter column created_by drop not null;
 alter table public.coalicion_events alter column created_by drop not null;
+alter table public.coalicion_events add column if not exists maps_url text;
 alter table public.coalicion_inventory alter column created_by drop not null;
 alter table public.coalicion_batches alter column created_by drop not null;
 
@@ -218,17 +220,22 @@ begin
     if nullif(trim(p_payload->>'title'), '') is null or nullif(trim(p_payload->>'location'), '') is null then
       raise exception 'title and location are required' using errcode = '22023';
     end if;
+    if nullif(trim(p_payload->>'maps_url'), '') is not null and
+       lower(trim(p_payload->>'maps_url')) !~ '^https://((www\.)?google\.[a-z.]+/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl/maps)([/?]|$)' then
+      raise exception 'invalid Google Maps URL' using errcode = '22023';
+    end if;
     if p_id is null then
-      insert into public.coalicion_events (title, event_date, start_time, location, status, notes)
+      insert into public.coalicion_events (title, event_date, start_time, location, maps_url, status, notes)
       values (
         trim(p_payload->>'title'), (p_payload->>'event_date')::date, nullif(p_payload->>'start_time', '')::time,
-        trim(p_payload->>'location'), coalesce(nullif(p_payload->>'status', ''), 'planned'),
+        trim(p_payload->>'location'), nullif(trim(p_payload->>'maps_url'), ''), coalesce(nullif(p_payload->>'status', ''), 'planned'),
         nullif(trim(p_payload->>'notes'), '')
       ) returning to_jsonb(coalicion_events) into saved;
     else
       update public.coalicion_events set
         title = trim(p_payload->>'title'), event_date = (p_payload->>'event_date')::date,
         start_time = nullif(p_payload->>'start_time', '')::time, location = trim(p_payload->>'location'),
+        maps_url = nullif(trim(p_payload->>'maps_url'), ''),
         status = coalesce(nullif(p_payload->>'status', ''), 'planned'), notes = nullif(trim(p_payload->>'notes'), ''),
         updated_at = now()
       where id = p_id and archived_at is null
