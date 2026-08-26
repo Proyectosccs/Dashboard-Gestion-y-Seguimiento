@@ -1310,10 +1310,11 @@ const ROLE = {
   'Coordinador': { emoji: '🧭', short: 'Coordinador', bg: '#efe7ff', fg: '#4a2f9c' },
   'Enlace': { emoji: '🔗', short: 'Enlace', bg: '#e3f6f2', fg: '#1c6f65' },
   'Profesional del Área': { emoji: '🩺', short: 'Profesional del Área', bg: '#ffe9d6', fg: '#9a4a12' },
+  'Estudiante': { emoji: '🎓', short: 'Estudiante', bg: '#eaf1fc', fg: '#315a9d' },
   'Por confirmar': { emoji: '❔', short: 'Rol por confirmar', bg: '#f1ede6', fg: '#645c50' }
 };
 
-const ROLE_ORDER = { 'Coordinador': 0, 'Enlace': 1, 'Profesional del Área': 2, 'Por confirmar': 3 };
+const ROLE_ORDER = { 'Coordinador': 0, 'Enlace': 1, 'Profesional del Área': 2, 'Estudiante': 3, 'Por confirmar': 4 };
 function byRole(list) {
   return list.slice().sort((a, b) => (ROLE_ORDER[a.role] != null ? ROLE_ORDER[a.role] : 9) - (ROLE_ORDER[b.role] != null ? ROLE_ORDER[b.role] : 9));
 }
@@ -1372,10 +1373,14 @@ const FACULTIES = [
   { id: 'hum', num: '4', name: 'Facultad de Humanidades y Educación', color: '#7b6bd6', soft: '#f0edfc',
     cols: [{ units: [
       { id: 'psi', name: 'Escuela de Psicología', emoji: '🧠', note: 'Psicólogos' },
-      { id: 'edu', name: 'Escuela de Educación', emoji: '📚', note: 'Educadores' }
+      { id: 'edu', name: 'Escuela de Educación', emoji: '📚', note: 'Educadores' },
+      { id: 'com', name: 'Escuela de Comunicación Social', emoji: '📣', note: 'Comunicadores sociales' }
     ] }] },
   { id: 'ces', num: '5', name: 'Facultad de Ciencias Económicas y Sociales', color: '#e14b4b', soft: '#fdebeb',
-    cols: [{ units: [{ id: 'ts', name: 'Escuela de Trabajo Social', emoji: '📈', note: 'Trabajadores sociales' }] }] },
+    cols: [{ units: [
+      { id: 'ts', name: 'Escuela de Trabajo Social', emoji: '📈', note: 'Trabajadores sociales' },
+      { id: 'soc', name: 'Escuela de Sociología', emoji: '🧭', note: 'Sociólogos' }
+    ] }] },
   { id: 'arq', num: '6', name: 'Facultad de Arquitectura y Urbanismo', color: '#e0a423', soft: '#fdf4de',
     cols: [{ units: [{ id: 'arq-e', name: 'Escuela de Arquitectura', emoji: '📐', note: 'Arquitectos' }] }] },
   { id: 'ing', num: '7', name: 'Facultad de Ingeniería', color: '#4a7fd4', soft: '#eaf1fc',
@@ -1387,13 +1392,20 @@ function C(id, n, r, u, e, t, status, action) {
 }
 
 const CONTACTS = [
-  C('c01', 'Fátima', 'Enlace', 'vac', 'Por confirmar', 'Por confirmar', 'Identificada', 'Confirmar cargo, datos de contacto y alcance desde Vicerrectorado Académico.'),
+  C('c01', 'Fátima Garcés', 'Enlace', 'vac', 'Por confirmar', '+58 414-1363868', 'Identificada', 'Confirmar cargo, datos de contacto y alcance desde Vicerrectorado Académico.'),
   C('c02', 'Dr. Pedro Franz', 'Coordinador', 'sc', 'Por confirmar', 'Por confirmar', 'Por contactar', 'Solicitar cronograma UCV y validar la relación con Arquitectura.'),
   C('c03', 'Prof. José', 'Enlace', 'arq-e', 'Por confirmar', 'Por confirmar', 'Por coordinar', 'Aclarar responsables y cronograma de Arquitectura junto con Pedro.'),
   C('c04', 'Andrea', 'Enlace', 'sp-mi', 'Por confirmar', 'Por confirmar', 'Respondió', 'Recibir el audio pendiente para optimizar el triaje de Medicina Interna.'),
   C('c05', 'Majo', 'Por confirmar', 'op', 'Por confirmar', 'Por confirmar', 'Respondió', 'Confirmar su rol, unidad y responsabilidad para registrarla correctamente.'),
   C('c06', 'Responsable de Odontología', 'Por confirmar', 'odo-e', 'Por confirmar', 'Por confirmar', 'Información disponible', 'Verificar qué data fue cargada y qué continúa pendiente.'),
-  C('c07', 'Doctor o fisioterapeuta pendiente', 'Profesional del Área', 'sal-fis', 'Por confirmar', 'Por confirmar', 'Esperando información', 'Recuperar los datos prometidos durante el evento del lunes.')
+  C('c07', 'Doctor o fisioterapeuta pendiente', 'Profesional del Área', 'sal-fis', 'Por confirmar', 'Por confirmar', 'Esperando información', 'Recuperar los datos prometidos durante el evento del lunes.'),
+  C('c08', 'Joxsy Gonzalez', 'Enlace', 'sal-fis', 'Por confirmar', '+58 414-9195750', 'Identificada', 'Especialista de datos; cubre la Escuela de Salud Pública (Fisioterapia y Terapia Ocupacional).'),
+  C('c09', 'Lissandra Chirino', 'Estudiante', 'edu', 'Lissandrachirino@gmail.com', '0424-2013133', 'Identificada', 'Estudiante de Educación (3er año) - UCV. Cédula 25482023.'),
+  C('c10', 'Adriana Avendaño', 'Estudiante', 'soc', 'Adrineko2004@gmail.com', '0412-9241669', 'Identificada', 'Estudiante de Sociología (1er semestre) y Comunicación Social (8vo trimestre) - UCV. Cédula 31045916.'),
+  C('c11', 'Victoria Castro', 'Estudiante', 'edu', 'Victoriacastroucv@gmail.com', '0412-9091251', 'Identificada', 'Estudiante de Educación (4to año) - UCV. Cédula 27978967.'),
+  C('c12', 'Yonier Pinto', 'Estudiante', 'edu', 'Yesderpinto01@gmail.com', '0424-1685516', 'Identificada', 'Estudiante de Educación (3er año) - UCV. Cédula 31794115.'),
+  C('c13', 'Llaisube Quijada', 'Estudiante', 'edu', 'Llaisubeq@gmail.com', '0414-1879756', 'Identificada', 'Estudiante de Educación (9no semestre) - UCV. Cédula 16363549.'),
+  C('c14', 'Prof. Rodolfo Ron', 'Enlace', 'sc', 'Rodolforon7@gmail.com', '0412-0610316', 'Identificada', 'Profesor encargado de Servicio Comunitario; reporta directamente al coordinador (Dr. Pedro Franz). Cédula 10490357.')
 ];
 
 const SEED = [
@@ -1476,7 +1488,10 @@ function migrateJourneyStatus(id) { return JOURNEY_STATUS[id] ? id : (JOURNEY_ST
 
 const JOURNEYS = [];
 
-const VOLUNTEERS = [];
+const VOLUNTEERS = [
+  { id: 'v01', name: 'Maru Sinco', phone: '+58 424-8309919', email: 'Por confirmar', skill: 'Por confirmar', notes: '', availability: [] },
+  { id: 'v02', name: 'Fabiana', phone: '+58 424-8520641', email: 'Por confirmar', skill: 'Por confirmar', notes: '', availability: [] }
+];
 
 const DEFAULT_UI = {
   pageTitle: 'Control operativo de Relaciones UCV',
