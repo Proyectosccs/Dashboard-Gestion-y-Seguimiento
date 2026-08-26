@@ -3,6 +3,7 @@
 
   const SUPABASE_URL = 'https://hcylkagvwfncdaaizutn.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_E-cV9DiNK9rctFCxzondvA_7OppBD7Y';
+  const EDITOR_FUNCTION_URL = SUPABASE_URL + '/functions/v1/coalicion-editor';
   const TABLES = {
     contacts: 'coalicion_contacts',
     events: 'coalicion_events',
@@ -179,7 +180,7 @@
       return;
     }
     setBusy(dom.keySubmit, true);
-    const result = await state.client.rpc('coalicion_verify_editor_key', { p_key: key });
+    const result = await callEditorApi('verify', { key: key });
     setBusy(dom.keySubmit, false);
     if (result.error || result.data !== true) {
       dom.keyError.textContent = 'La clave no es válida. Verifícala e inténtalo nuevamente.';
@@ -232,7 +233,7 @@
     dom.connectivityBanner.hidden = true;
 
     const contactsRequest = state.editing
-      ? state.client.rpc('coalicion_get_contacts', { p_key: state.editorKey })
+      ? callEditorApi('contacts', { key: state.editorKey })
       : state.client.from(TABLES.contacts).select('id,name,role,created_at,updated_at').is('archived_at', null).order('name');
     const results = await Promise.all([
       contactsRequest,
@@ -523,11 +524,11 @@
     dom.editorForm.querySelectorAll('[aria-invalid="true"]').forEach(function (node) { node.removeAttribute('aria-invalid'); });
     const payload = normalizePayload(state.editor.type, data);
     setBusy(dom.dialogSave, true);
-    const result = await state.client.rpc('coalicion_save_record', {
-      p_key: state.editorKey,
-      p_entity: state.editor.type,
-      p_payload: payload,
-      p_id: state.editor.record ? state.editor.record.id : null
+    const result = await callEditorApi('save', {
+      key: state.editorKey,
+      entity: state.editor.type,
+      payload: payload,
+      id: state.editor.record ? state.editor.record.id : null
     });
     setBusy(dom.dialogSave, false);
     if (result.error) {
@@ -632,6 +633,32 @@
 
   function canEdit() {
     return state.editing && !!state.editorKey;
+  }
+
+  async function callEditorApi(action, payload) {
+    try {
+      const response = await fetch(EDITOR_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(Object.assign({ action: action }, payload || {}))
+      });
+      const body = await response.json().catch(function () { return {}; });
+      if (!response.ok) {
+        return {
+          data: null,
+          error: {
+            code: response.status === 401 ? '28000' : 'EDGE_FUNCTION_ERROR',
+            message: body.error || 'operation unavailable'
+          }
+        };
+      }
+      return { data: body.data, error: null };
+    } catch (_error) {
+      return { data: null, error: { code: 'NETWORK_ERROR', message: 'network unavailable' } };
+    }
   }
 
   function nextEvent() {

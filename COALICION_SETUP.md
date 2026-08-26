@@ -15,6 +15,8 @@ La consulta abre directamente, sin cuentas. La edición y los datos completos de
 
 El script no contiene datos personales ni la clave real.
 
+La función `supabase/functions/coalicion-editor/index.ts` también debe desplegarse con `verify_jwt = false`, como indica `supabase/config.toml`. La función implementa su propia validación de la clave compartida antes de leer datos privados o escribir.
+
 ## 2. Definir la clave de edición
 
 Al final de `supabase_coalicion_setup.sql` hay una sentencia comentada para definir o cambiar la clave.
@@ -35,7 +37,7 @@ Supabase guarda únicamente el hash bcrypt de la clave.
 - **Bloquear edición:** elimina la clave de la memoria de la página y vuelve a la consulta pública.
 - **Actualizar la página:** también elimina la clave y exige ingresarla nuevamente para editar.
 
-La interfaz no compara la clave en JavaScript. Supabase la verifica nuevamente en cada operación de guardado.
+La interfaz no compara la clave en JavaScript. La función de borde `coalicion-editor` la envía al servidor y Supabase la verifica nuevamente en cada operación de guardado. Las funciones internas de base de datos no son ejecutables por visitantes públicos.
 
 ## 4. Cargar la información inicial
 

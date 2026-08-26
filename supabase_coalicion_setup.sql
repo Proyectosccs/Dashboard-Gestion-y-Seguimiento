@@ -2,7 +2,7 @@
 -- Ejecutar en Supabase: SQL Editor -> New query -> pegar todo -> Run.
 -- Este archivo crea la estructura y las políticas, pero NO contiene la clave ni datos personales.
 
-create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
 
 create table if not exists public.coalicion_settings (
   key text primary key,
@@ -65,7 +65,7 @@ create table if not exists public.coalicion_batches (
   archived_at timestamptz
 );
 
--- Compatibilidad si se ejecutó una versión anterior del esquema protegido.
+-- Compatibilidad si se ejecutó una versión anterior basada en cuentas.
 alter table public.coalicion_contacts alter column created_by drop not null;
 alter table public.coalicion_events alter column created_by drop not null;
 alter table public.coalicion_inventory alter column created_by drop not null;
@@ -74,6 +74,10 @@ alter table public.coalicion_batches alter column created_by drop not null;
 create index if not exists coalicion_events_event_date_idx on public.coalicion_events(event_date);
 create index if not exists coalicion_contacts_name_idx on public.coalicion_contacts(name);
 create index if not exists coalicion_batches_event_id_idx on public.coalicion_batches(event_id);
+create index if not exists coalicion_contacts_created_by_idx on public.coalicion_contacts(created_by);
+create index if not exists coalicion_events_created_by_idx on public.coalicion_events(created_by);
+create index if not exists coalicion_inventory_created_by_idx on public.coalicion_inventory(created_by);
+create index if not exists coalicion_batches_created_by_idx on public.coalicion_batches(created_by);
 
 alter table public.coalicion_settings enable row level security;
 alter table public.coalicion_contacts enable row level security;
@@ -95,6 +99,16 @@ grant select (id, name, role, created_at, updated_at, archived_at)
 grant select on public.coalicion_events to anon, authenticated;
 grant select on public.coalicion_inventory to anon, authenticated;
 grant select on public.coalicion_batches to anon, authenticated;
+
+grant select, insert, update, delete on public.coalicion_settings to service_role;
+grant select, insert, update, delete on public.coalicion_contacts to service_role;
+grant select, insert, update, delete on public.coalicion_events to service_role;
+grant select, insert, update, delete on public.coalicion_inventory to service_role;
+grant select, insert, update, delete on public.coalicion_batches to service_role;
+
+drop policy if exists "coalicion settings deny clients" on public.coalicion_settings;
+create policy "coalicion settings deny clients" on public.coalicion_settings
+  for all to anon, authenticated using (false) with check (false);
 
 drop policy if exists "coalicion contacts public read" on public.coalicion_contacts;
 create policy "coalicion contacts public read" on public.coalicion_contacts
@@ -130,15 +144,15 @@ create or replace function public.coalicion_verify_editor_key(p_key text)
 returns boolean
 language sql
 stable
-security definer
-set search_path = public
+security invoker
+set search_path = ''
 as $$
   select exists (
     select 1
     from public.coalicion_settings
     where key = 'editor_key'
       and length(coalesce(p_key, '')) >= 12
-      and value_hash = crypt(p_key, value_hash)
+      and value_hash = extensions.crypt(p_key, value_hash)
   );
 $$;
 
@@ -146,8 +160,8 @@ create or replace function public.coalicion_get_contacts(p_key text)
 returns setof public.coalicion_contacts
 language plpgsql
 stable
-security definer
-set search_path = public
+security invoker
+set search_path = ''
 as $$
 begin
   if not public.coalicion_verify_editor_key(p_key) then
@@ -169,8 +183,8 @@ create or replace function public.coalicion_save_record(
 returns jsonb
 language plpgsql
 volatile
-security definer
-set search_path = public
+security invoker
+set search_path = ''
 as $$
 declare
   saved jsonb;
@@ -275,15 +289,18 @@ $$;
 revoke all on function public.coalicion_verify_editor_key(text) from public;
 revoke all on function public.coalicion_get_contacts(text) from public;
 revoke all on function public.coalicion_save_record(text, text, jsonb, uuid) from public;
-grant execute on function public.coalicion_verify_editor_key(text) to anon, authenticated;
-grant execute on function public.coalicion_get_contacts(text) to anon, authenticated;
-grant execute on function public.coalicion_save_record(text, text, jsonb, uuid) to anon, authenticated;
+revoke all on function public.coalicion_verify_editor_key(text) from anon, authenticated;
+revoke all on function public.coalicion_get_contacts(text) from anon, authenticated;
+revoke all on function public.coalicion_save_record(text, text, jsonb, uuid) from anon, authenticated;
+grant execute on function public.coalicion_verify_editor_key(text) to service_role;
+grant execute on function public.coalicion_get_contacts(text) to service_role;
+grant execute on function public.coalicion_save_record(text, text, jsonb, uuid) to service_role;
 
 do $$
 declare
   table_name text;
 begin
-  foreach table_name in array array['coalicion_contacts', 'coalicion_events', 'coalicion_inventory', 'coalicion_batches']
+  foreach table_name in array array['coalicion_events', 'coalicion_inventory', 'coalicion_batches']
   loop
     if not exists (
       select 1 from pg_publication_tables
@@ -299,6 +316,6 @@ end $$;
 -- Usa 12 caracteres o más. No guardes la clave real en GitHub.
 --
 -- insert into public.coalicion_settings (key, value_hash, updated_at)
--- values ('editor_key', crypt('REEMPLAZAR_CON_CLAVE_SEGURA', gen_salt('bf', 12)), now())
+-- values ('editor_key', extensions.crypt('REEMPLAZAR_CON_CLAVE_SEGURA', extensions.gen_salt('bf', 12)), now())
 -- on conflict (key) do update
 -- set value_hash = excluded.value_hash, updated_at = now();

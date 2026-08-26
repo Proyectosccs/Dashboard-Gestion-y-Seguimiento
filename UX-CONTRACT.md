@@ -21,9 +21,9 @@ The two surfaces share visual tokens and link to one another, but never share ev
 | Calendar | Screen-owned month grid | This UX contract | Previous / next / today; day detail | Add event, navigate months, open a day, reload. |
 | App status | Hierarchy unit select | This UX contract | Developing / resolved / not started | Change status, reload. |
 | Personalization | Screen-owned editing dialog | This UX contract | Text, density, navigation order, board order | Edit draft, cancel, save, reload. |
-| Edit access | Hashed operational key via Supabase RPC | `supabase_coalicion_setup.sql` | Public consultation / editing active | Invalid key, activate, lock and changed-key recovery. |
-| Authorization | Supabase grants + RLS + security-definer RPC | `supabase_coalicion_setup.sql` | Public read / key-gated write | Direct REST write rejection and RPC validation. |
-| Shared CRUD | Supabase tables + key-gated RPC | `supabase_coalicion_setup.sql` | Contact / event / inventory / batch | Create, edit, reload, realtime refresh and server failure. |
+| Edit access | Hashed operational key via Supabase Edge Function | `supabase/functions/coalicion-editor/index.ts` | Public consultation / editing active | Invalid key, activate, lock and changed-key recovery. |
+| Authorization | Supabase grants + RLS + server-side key verification | SQL + Edge Function | Public read / key-gated write | Direct REST write rejection and server validation. |
+| Shared CRUD | Supabase tables + key-gated Edge Function | SQL + Edge Function | Contact / event / inventory / batch | Create, edit, reload, realtime refresh and server failure. |
 
 ## Behavior
 
@@ -53,9 +53,9 @@ The two surfaces share visual tokens and link to one another, but never share ev
 - The HTML and JavaScript contain no real contact, identity, address, inventory, or batch data.
 - The dashboard opens directly without an account and supports narrow mobile viewports.
 - Events, inventory and aggregate batches are publicly readable. Column-level grants expose only the contact name and role to public requests.
-- Cédula, phone, email and contact notes are returned only by a security-definer RPC after the edit key is verified.
+- Cédula, phone, email and contact notes are returned only through the Edge Function after the edit key is verified server-side.
 - Editing is activated with one shared operational key. Supabase stores only a bcrypt hash; the real key is never committed to GitHub.
-- Direct anonymous insert or update requests are denied. All writes pass through the allowlisted `coalicion_save_record` RPC, which verifies the key again on every mutation.
+- Direct anonymous insert or update requests are denied. All writes pass through the allowlisted Edge Function and the internal `coalicion_save_record` RPC, which verifies the key again on every mutation.
 - The key remains only in page memory and is cleared when editing is locked or the page reloads.
 - Events, contacts, inventory, and lots wait for server confirmation before reporting a successful save.
 - Failed saves keep the form and entered values available for correction or retry.
