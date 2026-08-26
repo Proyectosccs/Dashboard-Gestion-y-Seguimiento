@@ -45,7 +45,9 @@ Caprasimo is reserved for page and section headings. Figtree carries controls, t
 
 ## Layout
 
-The application uses a wide responsive workspace with five peer views: operational board, calendar, hierarchy, contacts, and interactions. The Kanban scrolls horizontally on narrow screens rather than compressing cards below a usable width. The monthly calendar keeps seven readable columns and uses compact event chips. Filters and summary metrics wrap naturally.
+The UCV application uses a wide responsive workspace with five peer views: operational board, calendar, hierarchy, contacts, and interactions. The Kanban scrolls horizontally on narrow screens rather than compressing cards below a usable width. The monthly calendar keeps seven readable columns and uses compact event chips. Filters and summary metrics wrap naturally.
+
+Coalición Venezuela lives on a separate public, mobile-first route instead of becoming another UCV tab. It inherits the same Organic tokens and typography, but its information architecture is purpose-built for one field event: operational pulse, calendar, contacts, inventory, and beneficiary batches. Consultation opens without an account; editing and full contact details require the shared operational key. Its signature is the four-stage delivery route, which explains the group flow without storing beneficiary identities.
 
 The built-in editing mode may reorder navigation views and the three primary board blocks. Reordering changes information placement, not the underlying visual hierarchy: color roles, typography families and semantic status treatments remain canonical.
 
@@ -71,5 +73,7 @@ The existing runtime CSS variables in `_ds/.../styles.css` remain the token sour
 - Do preserve unanswered questions as explicit pending items.
 - Do keep UCV and Florangel coordination linked without presenting Florangel as part of the UCV hierarchy.
 - Do not invent names, emails, phone numbers, meeting dates, or institutional approvals.
-- Do not mix the Harvey logistics front into this board.
+- Do keep the Coalición Venezuela logistics front on its own public mobile route and link to it as a peer dashboard.
+- Do not mix the Harvey logistics data into the UCV board.
+- Do not place contact details, identity numbers, private addresses, or event records directly in public HTML or JavaScript.
 - Do not use red for ordinary pending work.

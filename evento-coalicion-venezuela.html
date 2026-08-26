@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es-VE">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Control operativo móvil para eventos de Coalición Venezuela y Fundación Ingenia.">
+  <title>Resumen — Evento Coalición Venezuela</title>
+  <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
+  <link rel="stylesheet" href="./evento-coalicion-venezuela.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
+  <script src="./evento-coalicion-venezuela.js" defer></script>
+</head>
+<body>
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+  <div id="app-shell" class="app-shell">
+    <header class="app-header">
+      <div class="header-copy">
+        <p class="eyebrow">Operación móvil · Fundación Ingenia</p>
+        <h1>Evento Coalición Venezuela</h1>
+        <p>Control compartido de responsables, calendario, inventario y recepción por lotes.</p>
+      </div>
+      <div class="session-card">
+        <span id="session-name" class="session-name">Acceso desde cualquier dispositivo</span>
+        <span id="session-role" class="role-badge">Vista pública</span>
+        <button id="edit-access-button" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)">🔑 Activar edición</button>
+      </div>
+    </header>
+
+    <nav class="tab-nav" aria-label="Secciones del evento">
+      <button class="tab-button" type="button" data-view="summary" aria-current="page" onclick="window.coalicionAction(event)">◉ Resumen</button>
+      <button class="tab-button" type="button" data-view="calendar" onclick="window.coalicionAction(event)">▦ Calendario</button>
+      <button class="tab-button" type="button" data-view="contacts" onclick="window.coalicionAction(event)">◎ Contactos</button>
+      <button class="tab-button" type="button" data-view="batches" onclick="window.coalicionAction(event)">▤ Lotes</button>
+      <a class="tab-link" href="./">↗ Tablero UCV</a>
+    </nav>
+
+    <div id="connectivity-banner" class="notice notice-warning page-notice" role="status" hidden>
+      No pudimos actualizar los datos. Conservamos la última información visible. <button id="retry-load" type="button" onclick="window.coalicionAction(event)">Reintentar</button>
+    </div>
+
+    <section id="loading-state" class="loading-state" aria-live="polite">
+      <span class="loader" aria-hidden="true"></span>
+      <p>Cargando operación compartida…</p>
+    </section>
+
+    <section id="summary-view" class="view" aria-labelledby="summary-title" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">Vista del día</p>
+          <h2 id="summary-title">Pulso operativo</h2>
+        </div>
+        <button class="btn btn-primary editable-only" type="button" data-action="new-event" onclick="window.coalicionAction(event)">＋ Agregar evento</button>
+      </div>
+      <div id="kpi-grid" class="kpi-grid"></div>
+      <div class="summary-grid">
+        <article id="next-event-card" class="event-hero panel"></article>
+        <section class="panel" aria-labelledby="inventory-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Disponibilidad</p>
+              <h3 id="inventory-title">Inventario del evento</h3>
+            </div>
+            <button class="btn btn-secondary editable-only" type="button" data-action="new-inventory" onclick="window.coalicionAction(event)">＋ Artículo</button>
+          </div>
+          <div id="inventory-list" class="inventory-list"></div>
+        </section>
+      </div>
+      <section class="panel flow-panel" aria-labelledby="flow-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Recepción ordenada</p>
+            <h3 id="flow-title">Ruta de entrega por lotes</h3>
+          </div>
+        </div>
+        <ol class="delivery-flow">
+          <li><span>1</span><strong>Líder agrupa</strong><small>Convoca un lote de 15 o más personas.</small></li>
+          <li><span>2</span><strong>Llegada conjunta</strong><small>El lote se presenta en su horario acordado.</small></li>
+          <li><span>3</span><strong>Validación</strong><small>El equipo confirma lote y disponibilidad.</small></li>
+          <li><span>4</span><strong>Entrega y salida</strong><small>Se registra la cantidad entregada y el grupo se retira.</small></li>
+        </ol>
+      </section>
+    </section>
+
+    <section id="calendar-view" class="view" aria-labelledby="calendar-title" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">Agenda compartida</p>
+          <h2 id="calendar-title">Calendario del evento</h2>
+        </div>
+        <button class="btn btn-primary editable-only" type="button" data-action="new-event" onclick="window.coalicionAction(event)">＋ Agregar evento</button>
+      </div>
+      <div class="calendar-toolbar panel">
+        <button id="calendar-prev" class="icon-button" type="button" aria-label="Mes anterior" onclick="window.coalicionAction(event)">‹</button>
+        <h3 id="calendar-month-label"></h3>
+        <button id="calendar-next" class="icon-button" type="button" aria-label="Mes siguiente" onclick="window.coalicionAction(event)">›</button>
+        <button id="calendar-today" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)">Hoy</button>
+      </div>
+      <div id="calendar-grid" class="calendar-grid panel"></div>
+    </section>
+
+    <section id="contacts-view" class="view" aria-labelledby="contacts-title" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">Directorio privado</p>
+          <h2 id="contacts-title">Responsables y contactos</h2>
+        </div>
+        <button class="btn btn-primary editable-only" type="button" data-action="new-contact" onclick="window.coalicionAction(event)">＋ Agregar contacto</button>
+      </div>
+      <div class="list-toolbar panel">
+        <div class="search-field">
+          <label class="sr-only" for="contact-search">Buscar contactos</label>
+          <span aria-hidden="true">⌕</span>
+          <input id="contact-search" type="text" placeholder="Buscar por nombre, rol o correo…" autocomplete="off">
+          <button id="contact-search-clear" class="search-clear" type="button" aria-label="Limpiar búsqueda" onclick="window.coalicionAction(event)" hidden>×</button>
+        </div>
+        <p id="contact-result-count" class="result-count" aria-live="polite"></p>
+      </div>
+      <div id="contacts-list" class="contact-grid"></div>
+    </section>
+
+    <section id="batches-view" class="view" aria-labelledby="batches-title" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">Recepción por grupos</p>
+          <h2 id="batches-title">Lotes de beneficiarios</h2>
+          <p class="view-description">Este módulo registra cantidades y coordinación del lote; no almacena datos médicos ni identidades de beneficiarios.</p>
+        </div>
+        <button class="btn btn-primary editable-only" type="button" data-action="new-batch" onclick="window.coalicionAction(event)">＋ Agregar lote</button>
+      </div>
+      <div id="batches-list" class="batch-list"></div>
+    </section>
+  </div>
+
+  <dialog id="key-dialog" class="editor-dialog key-dialog" aria-labelledby="key-dialog-title">
+    <form id="key-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">Movilidad sin cuentas</p>
+          <h2 id="key-dialog-title">Activar modo edición</h2>
+        </div>
+        <button id="key-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.coalicionAction(event)">×</button>
+      </div>
+      <div class="key-dialog-copy">
+        <p>La consulta es pública. Ingresa la clave operativa para editar y visualizar los datos completos de contacto.</p>
+      </div>
+      <div id="key-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-fields key-fields">
+        <div class="field field-full">
+          <label for="editor-key">Clave de edición</label>
+          <div class="password-field">
+            <input id="editor-key" class="input" name="editor_key" type="password" autocomplete="off" required aria-describedby="key-error">
+            <button id="toggle-editor-key" class="password-toggle" type="button" aria-label="Mostrar clave de edición" aria-pressed="false" onclick="window.coalicionAction(event)">Mostrar</button>
+          </div>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="key-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)">Cancelar</button>
+        <button id="key-submit" class="btn btn-primary" type="submit">
+          <span class="button-label">Activar edición</span>
+          <span class="button-spinner" aria-hidden="true"></span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="editor-dialog" class="editor-dialog" aria-labelledby="dialog-title">
+    <form id="editor-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p id="dialog-eyebrow" class="eyebrow">Editar</p>
+          <h2 id="dialog-title">Registro</h2>
+        </div>
+        <button id="dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.coalicionAction(event)">×</button>
+      </div>
+      <div id="dialog-error" class="notice notice-error" role="alert" hidden></div>
+      <div id="dialog-fields" class="dialog-fields"></div>
+      <div class="dialog-actions">
+        <button id="dialog-cancel" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)">Cancelar</button>
+        <button id="dialog-save" class="btn btn-primary" type="submit">
+          <span class="button-label">Guardar cambios</span>
+          <span class="button-spinner" aria-hidden="true"></span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
