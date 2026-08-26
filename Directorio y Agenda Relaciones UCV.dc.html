@@ -1039,6 +1039,13 @@
               <sc-for list="{{ unitOptions }}" as="o" hint-placeholder-count="8"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
             </select>
           </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 6px; grid-column: 1 / -1">También pertenece a (opcional, para roles en más de una escuela)
+            <span style="display: flex; flex-wrap: wrap; gap: 7px; max-height: 140px; overflow-y: auto; padding: 4px; border: 1px solid var(--color-neutral-200); border-radius: 14px; background: #fff">
+              <sc-for list="{{ extraUnitChips }}" as="o" hint-placeholder-count="6">
+                <button type="button" onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
+              </sc-for>
+            </span>
+          </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Correo
             <input type="text" placeholder="Por confirmar" value="{{ contactForm.email }}" onChange="{{ onContactEmail }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
@@ -1672,7 +1679,7 @@ class Component extends DCLogic {
     taskModal: null,
     taskForm: { title: '', owner: 'Por confirmar', area: 'Contactos', status: 'pending', priority: 'medium', horizon: 'Por definir', detail: '', nextAction: '', organization: 'CONEKTADOS', dueDate: '', evidence: '' },
     contactModal: null,
-    contactForm: { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar', function: '' }
+    contactForm: { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar', function: '', extraUnits: [] }
   };
 
   componentDidMount() {
@@ -1902,7 +1909,7 @@ class Component extends DCLogic {
   };
 
   blankContact() {
-    return { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar', function: '' };
+    return { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar', function: '', extraUnits: [] };
   }
 
   newContact = () => this.setState({ contactModal: 'new', contactForm: this.blankContact() });
@@ -1922,7 +1929,8 @@ class Component extends DCLogic {
       email: s.contactForm.email.trim() || 'Por confirmar',
       phone: s.contactForm.phone.trim() || 'Por confirmar',
       status: s.contactForm.status.trim() || 'Por confirmar',
-      action: s.contactForm.action.trim() || 'Por confirmar'
+      action: s.contactForm.action.trim() || 'Por confirmar',
+      extraUnits: (Array.isArray(s.contactForm.extraUnits) ? s.contactForm.extraUnits : []).filter(id => id !== s.contactForm.unit)
     });
     let list;
     if (s.contactModal === 'new') list = s.contacts.concat([Object.assign({}, clean, { id: 'c' + Date.now() })]);
@@ -2686,6 +2694,17 @@ class Component extends DCLogic {
       id: o, label: o, style: tagChipStyle('#6b5bd6', s.taskForm.organization === o),
       onClick: () => this.setState({ taskForm: Object.assign({}, s.taskForm, { organization: o }) })
     }));
+    const extraUnitChips = this.unitOptionsList().filter(o => o.id !== s.contactForm.unit).map(o => {
+      const active = (s.contactForm.extraUnits || []).indexOf(o.id) > -1;
+      return {
+        id: o.id, label: o.label, style: tagChipStyle('#6b5bd6', active),
+        onClick: () => {
+          const cur = s.contactForm.extraUnits || [];
+          const next = active ? cur.filter(x => x !== o.id) : cur.concat([o.id]);
+          this.setState({ contactForm: Object.assign({}, s.contactForm, { extraUnits: next }) });
+        }
+      };
+    });
 
     const unitBox = { background: '#fff', borderRadius: 14, padding: '9px 10px', display: 'flex', flexDirection: 'column', gap: 6, borderWidth: 1.5, borderStyle: 'solid' };
     const hasMedicalPerson = unitId => {
@@ -2696,6 +2715,7 @@ class Component extends DCLogic {
       return respMatch || suppMatch;
     };
     const isInvolved = unitId => (s.unitInfo[unitId] || {}).involved !== 'no';
+    const belongsToUnit = (c, unitId) => c.unit === unitId || (c.extraUnits || []).indexOf(unitId) > -1;
     const buildFacultyCard = f => {
       const cols = f.cols.map(col => {
         let unitsSource = col.units;
@@ -2707,8 +2727,8 @@ class Component extends DCLogic {
           });
         } else if (f.id === 'med' && !col.title) {
           unitsSource = unitsSource.slice().sort((a, b) => {
-            const aHas = shown.some(c => c.unit === a.id) ? 0 : 1;
-            const bHas = shown.some(c => c.unit === b.id) ? 0 : 1;
+            const aHas = shown.some(c => belongsToUnit(c, a.id)) ? 0 : 1;
+            const bHas = shown.some(c => belongsToUnit(c, b.id)) ? 0 : 1;
             return aHas - bHas;
           });
         }
@@ -2745,7 +2765,7 @@ class Component extends DCLogic {
             triageSent ? '✅ Triaje' : '',
             (info.attachmentName || info.attachmentText) ? '📎 Adjunto' : ''
           ].filter(Boolean).join(' · '),
-          contacts: byRole(shown.filter(c => c.unit === u.id)).map(c => this.chip(c)),
+          contacts: byRole(shown.filter(c => belongsToUnit(c, u.id))).map(c => this.chip(c)),
           onUnitDragOver: e => {
             e.preventDefault(); e.stopPropagation();
             if (s.dragOverUnit !== u.id) this.setState({ dragOverUnit: u.id });
@@ -2775,7 +2795,7 @@ class Component extends DCLogic {
       name: a.name, emoji: a.emoji,
       style: Object.assign({ background: '#fff', borderRadius: 20, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, boxShadow: 'var(--shadow-sm)', borderTop: '5px solid ' + a.color }, isOver ? { outline: '2px dashed ' + a.color, outlineOffset: -2, background: '#fbf8f2' } : {}),
       titleStyle: { fontWeight: 700, fontSize: 14.5, lineHeight: 1.2, color: a.color },
-      contacts: byRole(shown.filter(c => c.unit === a.id)).map(c => this.chip(c)),
+      contacts: byRole(shown.filter(c => belongsToUnit(c, a.id))).map(c => this.chip(c)),
       onUnitDragOver: e => {
         e.preventDefault(); e.stopPropagation();
         if (s.dragOverUnit !== a.id) this.setState({ dragOverUnit: a.id });
@@ -2793,7 +2813,7 @@ class Component extends DCLogic {
       return {
         name: c.name, emoji: r.emoji, roleShort: r.short, email: c.email, phone: c.phone, status: c.status, action: c.action,
         hasFunction: !!c.function, functionLabel: c.function || '',
-        affiliation: c.meta.facultyName + ' · ' + c.meta.unitName,
+        affiliation: c.meta.facultyName + ' · ' + c.meta.unitName + ((c.extraUnits || []).length ? ' (+' + c.extraUnits.length + ' más)' : ''),
         lastLabel: c.last ? TYPES[c.last.type].label + ' · ' + fmt(c.last.date) : 'Sin contacto aún',
         followLabel: c.nextFollow ? fmt(c.nextFollow) + (c.overdue ? ' (vencido)' : '') : 'Por definir',
         followStyle: { color: c.overdue ? '#a02525' : 'var(--color-neutral-800)', fontWeight: c.overdue ? 700 : 400 },
@@ -2952,7 +2972,7 @@ class Component extends DCLogic {
       primaryHover: { background: 'var(--color-accent-600)' },
       modalOpen: !!s.modal, modal: modal, form: { notes: s.notes, date: s.date, follow: s.follow },
       taskModalOpen: !!s.taskModal, taskModalTitle: s.taskModal === 'new' ? 'Nueva tarea operativa' : 'Editar tarea operativa', taskForm: s.taskForm,
-      taskAreaChips: taskAreaChips, taskStatusChips: taskStatusChips, taskPriorityChips: taskPriorityChips, taskOrgChips: taskOrgChips,
+      taskAreaChips: taskAreaChips, taskStatusChips: taskStatusChips, taskPriorityChips: taskPriorityChips, taskOrgChips: taskOrgChips, extraUnitChips: extraUnitChips,
       contactModalOpen: !!s.contactModal, contactModalTitle: s.contactModal === 'new' ? 'Nuevo contacto' : 'Editar contacto',
       isEditingContact: !!s.contactModal && s.contactModal !== 'new',
       contactForm: s.contactForm, roleOptions: Object.keys(ROLE).map(k => ({ id: k, label: ROLE[k].emoji + ' ' + ROLE[k].short })),
@@ -3035,6 +3055,7 @@ class Component extends DCLogic {
       onContactName: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { name: e.target.value }) }),
       onContactRole: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { role: e.target.value }) }),
       onContactFunction: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { function: e.target.value }) }),
+      onContactExtraUnits: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { extraUnits: Array.from(e.target.selectedOptions).map(o => o.value) }) }),
       onContactUnit: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { unit: e.target.value }) }),
       onContactEmail: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { email: e.target.value }) }),
       onContactPhone: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { phone: e.target.value }) }),
