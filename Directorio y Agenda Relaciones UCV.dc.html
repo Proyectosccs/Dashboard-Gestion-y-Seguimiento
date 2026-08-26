@@ -433,7 +433,10 @@
               <div>🕒 Última: <strong>{{ c.lastLabel }}</strong></div>
               <div style="{{ c.followStyle }}">⏰ Seguimiento: <strong>{{ c.followLabel }}</strong></div>
             </div>
-            <button onClick="{{ c.open }}" style="border: none; cursor: pointer; border-radius: 999px; padding: 10px 14px; font-size: 13px; font-weight: 700; background: var(--color-accent-500); color: #fff" style-hover="{{ primaryHover }}">✍️ Registrar interacción</button>
+            <div style="display: flex; gap: 8px">
+              <button onClick="{{ c.edit }}" style="border: 1px solid var(--color-neutral-300); background: #fff; cursor: pointer; border-radius: 999px; padding: 10px 14px; font-size: 13px; font-weight: 700; color: var(--color-text)">✏️ Editar</button>
+              <button onClick="{{ c.open }}" style="flex: 1; border: none; cursor: pointer; border-radius: 999px; padding: 10px 14px; font-size: 13px; font-weight: 700; background: var(--color-accent-500); color: #fff" style-hover="{{ primaryHover }}">✍️ Registrar interacción</button>
+            </div>
           </div>
         </sc-for>
       </div>
@@ -710,7 +713,7 @@
   </sc-if>
 
   <sc-if value="{{ journeyModalOpen }}" hint-placeholder-val="{{ false }}">
-    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.62); display: flex; align-items: flex-start; justify-content: center; padding: 28px 16px; overflow: auto; z-index: 120" onClick="{{ closeJourneyModal }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.62); display: flex; align-items: flex-start; justify-content: center; padding: 28px 16px; overflow: auto; z-index: 120">
       <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Editar evento" style="background: var(--color-bg); border-radius: 30px; width: 100%; max-width: 760px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 16px">
         <div style="display: flex; gap: 12px; align-items: center">
           <div style="width: 46px; height: 46px; border-radius: 999px; display: grid; place-items: center; background: var(--color-accent-100); font-size: 22px">🗓️</div>
@@ -821,7 +824,7 @@
   </sc-if>
 
   <sc-if value="{{ taskModalOpen }}" hint-placeholder-val="{{ false }}">
-    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.58); display: flex; align-items: flex-start; justify-content: center; padding: 34px 16px; overflow: auto; z-index: 110" onClick="{{ closeTaskModal }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.58); display: flex; align-items: flex-start; justify-content: center; padding: 34px 16px; overflow: auto; z-index: 110">
       <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Editar tarea operativa" style="background: var(--color-bg); border-radius: 28px; width: 100%; max-width: 620px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 15px">
         <div style="display: flex; gap: 12px; align-items: center">
           <div style="width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: var(--color-accent-100); font-size: 21px">🧩</div>
@@ -901,7 +904,7 @@
   </sc-if>
 
   <sc-if value="{{ unitModalOpen }}" hint-placeholder-val="{{ false }}">
-    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.58); display: flex; align-items: flex-start; justify-content: center; padding: 34px 16px; overflow: auto; z-index: 113" onClick="{{ closeUnitModal }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.58); display: flex; align-items: flex-start; justify-content: center; padding: 34px 16px; overflow: auto; z-index: 113">
       <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Editar especialidad" style="background: var(--color-bg); border-radius: 28px; width: 100%; max-width: 560px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 15px">
         <div style="display: flex; gap: 12px; align-items: center">
           <div style="width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: var(--color-accent-100); font-size: 21px">🩺</div>
@@ -1009,7 +1012,7 @@
   </sc-if>
 
   <sc-if value="{{ contactModalOpen }}" hint-placeholder-val="{{ false }}">
-    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.58); display: flex; align-items: flex-start; justify-content: center; padding: 34px 16px; overflow: auto; z-index: 112" onClick="{{ closeContactModal }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.58); display: flex; align-items: flex-start; justify-content: center; padding: 34px 16px; overflow: auto; z-index: 112">
       <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Editar contacto" style="background: var(--color-bg); border-radius: 28px; width: 100%; max-width: 620px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 15px">
         <div style="display: flex; gap: 12px; align-items: center">
           <div style="width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: var(--color-accent-100); font-size: 21px">👤</div>
@@ -1137,7 +1140,7 @@
   </sc-if>
 
   <sc-if value="{{ volunteerModalOpen }}" hint-placeholder-val="{{ false }}">
-    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.58); display: flex; align-items: flex-start; justify-content: center; padding: 34px 16px; overflow: auto; z-index: 112" onClick="{{ closeVolunteerModal }}">
+    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.58); display: flex; align-items: flex-start; justify-content: center; padding: 34px 16px; overflow: auto; z-index: 112">
       <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Editar voluntario" style="background: var(--color-bg); border-radius: 28px; width: 100%; max-width: 620px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 15px">
         <div style="display: flex; gap: 12px; align-items: center">
           <div style="width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: var(--color-accent-100); font-size: 21px">🙋</div>
@@ -2820,7 +2823,8 @@ class Component extends DCLogic {
         cardStyle: { background: '#fff', borderRadius: bubble.radius + 4, padding: bubble.padding + 2, display: 'flex', flexDirection: 'column', gap: 12, boxShadow: 'var(--shadow-sm)', borderLeft: '6px solid ' + c.meta.color },
         avatarStyle: { width: 46, height: 46, borderRadius: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flex: 'none', background: c.meta.soft },
         roleStyle: { borderRadius: 999, padding: '5px 11px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', background: r.bg, color: r.fg },
-        open: () => this.openModal(c.id)
+        open: () => this.openModal(c.id),
+        edit: () => this.openContactEdit(c.id)
       };
     });
 
