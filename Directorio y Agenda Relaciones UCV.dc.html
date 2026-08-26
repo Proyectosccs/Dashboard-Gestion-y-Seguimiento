@@ -281,9 +281,13 @@
                                 <sc-if value="{{ u.notInvolved }}" hint-placeholder-val="{{ false }}">
                                   <span style="{{ u.notInvolvedStyle }}">🚫 No involucrado</span>
                                 </sc-if>
-                                <sc-if value="{{ u.hasSpecialtyStatus }}" hint-placeholder-val="{{ false }}">
-                                  <span style="{{ u.specialtyStatusStyle }}">{{ u.specialtyStatusLabel }}</span>
-                                </sc-if>
+                                <select aria-label="{{ u.specialtyStatusLabel }}" value="{{ u.specialtyStatusValue }}" onChange="{{ u.onSpecialtyStatus }}" style="{{ u.specialtyStatusStyle }}">
+                                  <option value="active">✅ Activo</option>
+                                  <option value="not_contacted">⚠️ No contactado</option>
+                                  <option value="inactive">❌ No activo</option>
+                                  <option value="following">🔄 En seguimiento</option>
+                                  <option value="pending_info">🟠 Pendiente de información</option>
+                                </select>
                                 <label style="display: inline-flex; align-items: center; gap: 4px; min-width: 0" title="Estado del desarrollo de la app">
                                   <span aria-hidden="true">📱</span>
                                   <select aria-label="{{ u.appLabel }}" value="{{ u.appStatus }}" onChange="{{ u.onAppStatus }}" style="{{ u.appStatusStyle }}">
@@ -349,9 +353,13 @@
                                 <sc-if value="{{ u.notInvolved }}" hint-placeholder-val="{{ false }}">
                                   <span style="{{ u.notInvolvedStyle }}">🚫 No involucrado</span>
                                 </sc-if>
-                                <sc-if value="{{ u.hasSpecialtyStatus }}" hint-placeholder-val="{{ false }}">
-                                  <span style="{{ u.specialtyStatusStyle }}">{{ u.specialtyStatusLabel }}</span>
-                                </sc-if>
+                                <select aria-label="{{ u.specialtyStatusLabel }}" value="{{ u.specialtyStatusValue }}" onChange="{{ u.onSpecialtyStatus }}" style="{{ u.specialtyStatusStyle }}">
+                                  <option value="active">✅ Activo</option>
+                                  <option value="not_contacted">⚠️ No contactado</option>
+                                  <option value="inactive">❌ No activo</option>
+                                  <option value="following">🔄 En seguimiento</option>
+                                  <option value="pending_info">🟠 Pendiente de información</option>
+                                </select>
                                 <label style="display: inline-flex; align-items: center; gap: 4px; min-width: 0" title="Estado del desarrollo de la app">
                                   <span aria-hidden="true">📱</span>
                                   <select aria-label="{{ u.appLabel }}" value="{{ u.appStatus }}" onChange="{{ u.onAppStatus }}" style="{{ u.appStatusStyle }}">
@@ -2227,6 +2235,14 @@ class Component extends DCLogic {
     this.setState({ appStatuses: statuses });
   }
 
+  setSpecialtyStatus(unitId, value) {
+    if (!SPECIALTY_STATUS[value]) return;
+    const info = Object.assign({}, this.state.unitInfo);
+    info[unitId] = Object.assign({}, info[unitId], { specialtyStatus: value });
+    writeStore('ucv-unit-info-v1', info);
+    this.setState({ unitInfo: info });
+  }
+
   openUnitModal(unitId, unitName) {
     const info = this.state.unitInfo[unitId] || {};
     this.setState({
@@ -2777,9 +2793,10 @@ class Component extends DCLogic {
           appLabel: 'Estado del desarrollo de la app en ' + u.name,
           onAppStatus: e => this.setAppStatus(u.id, e.target.value),
           appStatusStyle: { maxWidth: '100%', minWidth: 0, border: '1px solid ' + appMeta.color + '55', borderRadius: 999, padding: '3px 7px', fontSize: 9.5, fontWeight: 700, background: appMeta.soft, color: appMeta.color, cursor: 'pointer' },
-          hasSpecialtyStatus: !!specMeta,
-          specialtyStatusLabel: specMeta ? specMeta.emoji + ' ' + specMeta.label : '',
-          specialtyStatusStyle: specMeta ? { border: '1px solid ' + specMeta.color + '55', borderRadius: 999, padding: '3px 7px', fontSize: 9.5, fontWeight: 700, background: specMeta.soft, color: specMeta.color } : {},
+          specialtyStatusValue: info.specialtyStatus || 'not_contacted',
+          specialtyStatusLabel: 'Estado de la especialidad en ' + u.name,
+          onSpecialtyStatus: e => this.setSpecialtyStatus(u.id, e.target.value),
+          specialtyStatusStyle: { maxWidth: '100%', minWidth: 0, border: '1px solid ' + (specMeta || SPECIALTY_STATUS.not_contacted).color + '55', borderRadius: 999, padding: '3px 7px', fontSize: 9.5, fontWeight: 700, background: (specMeta || SPECIALTY_STATUS.not_contacted).soft, color: (specMeta || SPECIALTY_STATUS.not_contacted).color, cursor: 'pointer' },
           addContact: () => this.newContactForUnit(u.id),
           notInvolved: notInvolved,
           notInvolvedStyle: { border: '1px solid #a0252555', borderRadius: 999, padding: '3px 7px', fontSize: 9.5, fontWeight: 700, background: '#fdebeb', color: '#a02525' },
@@ -2838,7 +2855,7 @@ class Component extends DCLogic {
       }
     }; });
 
-    const listContacts = shown.map(c => {
+    const listContacts = shown.slice().sort((a, b) => a.name.localeCompare(b.name, 'es')).map(c => {
       const r = ROLE[c.role];
       return {
         name: c.name, emoji: r.emoji, roleShort: r.short, email: c.email, phone: c.phone, status: c.status, action: c.action,
