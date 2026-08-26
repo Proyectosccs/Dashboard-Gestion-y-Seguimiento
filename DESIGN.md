@@ -7,6 +7,11 @@ colors:
   primary: "#c67139"
   secondary: "#7a8a5e"
   danger: "#a02525"
+  coalicionBackground: "#eef6ff"
+  coalicionSurface: "#ffffff"
+  coalicionPrimary: "#1d4ed8"
+  coalicionNavy: "#0f2742"
+  coalicionSky: "#0284c7"
 typography:
   display:
     fontFamily: "Caprasimo, system-ui, sans-serif"
@@ -33,11 +38,11 @@ components:
 
 The UCV operations dashboard is a warm field-control board for Fundacion Ingenia and CONEKTADOS. It should feel like a well-kept coordination notebook: approachable enough for volunteers, structured enough for institutional follow-up, and readable during fast operational meetings.
 
-The memorable signature is the UCV relationship map flowing directly into a color-coded operational Kanban and calendar. The hierarchy explains who matters; the board explains what happens next; the calendar makes every event visible by date and internal-audit level. Avoid generic corporate blue dashboards and avoid decorative analytics that do not help coordinate an event.
+The memorable signature is the UCV relationship map flowing directly into a color-coded operational Kanban and calendar. The hierarchy explains who matters; the board explains what happens next; the calendar makes every event visible by date and internal-audit level. Avoid decorative analytics that do not help coordinate an event.
 
 ## Colors
 
-The existing Organic runtime stylesheet is canonical. Cream is the page ground, white and sand are working surfaces, terracotta is the primary action color, and sage signals confirmed or completed work. Red is reserved for overdue, blocked, or safety-critical information. Kanban colors always include text labels and icons so status never depends on color alone.
+The existing Organic runtime stylesheet is canonical for the UCV route. Cream is its page ground, white and sand are working surfaces, terracotta is the primary action color, and sage signals confirmed or completed work. The Coalición Venezuela route deliberately uses its own cool field-logistics palette: ice blue ground, white surfaces, cobalt actions, navy anchors and sky-blue highlights. Red is reserved for overdue, blocked, error, or safety-critical information. Status never depends on color alone.
 
 ## Typography
 
@@ -47,7 +52,7 @@ Caprasimo is reserved for page and section headings. Figtree carries controls, t
 
 The UCV application uses a wide responsive workspace with five peer views: operational board, calendar, hierarchy, contacts, and interactions. The Kanban scrolls horizontally on narrow screens rather than compressing cards below a usable width. The monthly calendar keeps seven readable columns and uses compact event chips. Filters and summary metrics wrap naturally.
 
-Coalición Venezuela lives on a separate public, mobile-first route instead of becoming another UCV tab. It inherits the same Organic tokens and typography, but its information architecture is purpose-built for one field event: operational pulse, calendar, contacts, inventory, and beneficiary batches. Consultation opens without an account; editing and full contact details require the shared operational key. Its signature is the four-stage delivery route, which explains the group flow without storing beneficiary identities.
+Coalición Venezuela lives on a separate public, mobile-first route instead of becoming another UCV tab. It keeps the shared typography and component behavior but overrides the Organic colors with a route-owned blue palette. Its information architecture is purpose-built for one field event: operational pulse, calendar, contacts, inventory, and beneficiary batches. Consultation opens without an account; editing and full contact details require the shared operational key. Its signature is the four-stage delivery route, which explains the group flow without storing beneficiary identities.
 
 The built-in editing mode may reorder navigation views and the three primary board blocks. Reordering changes information placement, not the underlying visual hierarchy: color roles, typography families and semantic status treatments remain canonical.
 
@@ -61,7 +66,7 @@ Containers are generously rounded. Controls and compact status markers use pill 
 
 ## Components
 
-Task cards show category, priority, owner, time horizon, next action, and movement controls. Event cards show type, date, time, location, status and completion out of five internal-audit checks; their status colors reuse the Organic palette. Calendar day cells open a focused list and the event editor. Each hierarchy unit shows an editable app-development status beside its title: En desarrollo, Desarrollo de la app resuelto or Sin desarrollar aún. Contact cards show only confirmed information; unknown details read "Por confirmar" and are never fabricated. Native select, date and time controls are accepted for this portable artifact; the browser owns their popup geometry.
+Task cards show category, priority, owner, time horizon, next action, and movement controls. Event cards show type, date, time, location, status and completion out of five internal-audit checks. On the Coalición route, an event may store an optional verified Google Maps link; when absent, the interface opens a Maps search from the readable address. Calendar day cells open a focused list and the event editor. Each hierarchy unit shows an editable app-development status beside its title: En desarrollo, Desarrollo de la app resuelto or Sin desarrollar aún. Contact cards show only confirmed information; unknown details read "Por confirmar" and are never fabricated. Native select, date and time controls are accepted for this portable artifact; the browser owns their popup geometry.
 
 The editing panel owns three density variants—compact, normal and large—for KPI cards, journey bubbles, contact bubbles and calendar event chips. It also owns a restrained three-step scale for the principal title. These are layout variants, not new design tokens.
 
