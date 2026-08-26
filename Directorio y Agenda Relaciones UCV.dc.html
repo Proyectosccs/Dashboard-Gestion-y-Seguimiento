@@ -1629,17 +1629,39 @@ class Component extends DCLogic {
   componentDidMount() {
     if (!sb) return;
     this._loadFromSupabase();
-    this._sbChannel = sb.channel('ucv-board-sync')
+    this._subscribeRealtime();
+    this._onVisible = () => { if (document.visibilityState === 'visible') { this._loadFromSupabase(); this._subscribeRealtime(); } };
+    document.addEventListener('visibilitychange', this._onVisible);
+    window.addEventListener('focus', this._onVisible);
+    this._pollTimer = setInterval(() => { if (document.visibilityState === 'visible') this._loadFromSupabase(); }, 45000);
+  }
+
+  componentWillUnmount() {
+    if (sb && this._sbChannel) sb.removeChannel(this._sbChannel);
+    if (this._onVisible) {
+      document.removeEventListener('visibilitychange', this._onVisible);
+      window.removeEventListener('focus', this._onVisible);
+    }
+    if (this._pollTimer) clearInterval(this._pollTimer);
+  }
+
+  _subscribeRealtime() {
+    if (this._sbChannel) {
+      const state = this._sbChannel.state;
+      if (state === 'joined' || state === 'joining') return;
+      sb.removeChannel(this._sbChannel);
+    }
+    this._sbChannel = sb.channel('ucv-board-sync-' + Date.now())
       .on('postgres_changes', { event: '*', schema: 'public', table: SUPABASE_TABLE }, payload => {
         const row = payload.new;
         if (!row || !row.key) return;
         this._applyRemote(row.key, row.value);
       })
-      .subscribe();
-  }
-
-  componentWillUnmount() {
-    if (sb && this._sbChannel) sb.removeChannel(this._sbChannel);
+      .subscribe(status => {
+        if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setTimeout(() => this._subscribeRealtime(), 2000);
+        }
+      });
   }
 
   _applyRemote(key, value) {
