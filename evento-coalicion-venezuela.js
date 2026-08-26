@@ -332,10 +332,10 @@
     }, 0);
     const completeBatches = state.batches.filter(function (batch) { return batch.status === 'completed'; }).length;
     renderMarkup(dom.kpiGrid,
-      kpi('kpi-terracotta', state.events.length, 'Eventos registrados') +
+      kpi('kpi-primary', state.events.length, 'Eventos registrados') +
       kpi('kpi-blue', state.contacts.length, 'Responsables') +
-      kpi('kpi-green', inventoryAvailable, 'Unidades disponibles') +
-      kpi('kpi-gold', plannedPeople, 'Personas previstas')
+      kpi('kpi-sky', inventoryAvailable, 'Unidades disponibles') +
+      kpi('kpi-indigo', plannedPeople, 'Personas previstas')
     );
 
     const next = nextEvent();
@@ -347,7 +347,7 @@
         '<div class="event-hero-content">' +
           '<div class="event-date-block"><span class="event-day">' + safe(date.day) + '</span><div><span class="event-month">' + safe(date.month + ' ' + date.year) + '</span><div class="status-pill status-' + safe(next.status) + '">' + safe(EVENT_STATUS[next.status] || 'Planificado') + '</div></div></div>' +
           '<h3>' + safe(next.title) + '</h3>' +
-          '<div class="event-meta"><p>◷ ' + safe(formatTime(next.start_time)) + '</p><p>⌖ ' + safe(next.location || 'Ubicación por confirmar') + '</p>' + (next.notes ? '<p>↳ ' + safe(next.notes) + '</p>' : '') + '</div>' +
+          '<div class="event-meta"><p>◷ ' + safe(formatTime(next.start_time)) + '</p>' + renderEventLocation(next) + (next.notes ? '<p>↳ ' + safe(next.notes) + '</p>' : '') + '</div>' +
         '</div>' +
         (canEdit() ? '<div class="event-actions"><button class="btn btn-secondary" type="button" data-action="edit-event" data-id="' + safe(next.id) + '">Editar evento</button></div>' : '')
       );
@@ -480,7 +480,8 @@
     return field('Nombre del evento', 'title', item.title, 'text', true, '', 'field-full') +
       field('Fecha', 'event_date', item.event_date || new Date().toISOString().slice(0, 10), 'date', true) +
       field('Hora de inicio', 'start_time', timeInput(item.start_time), 'time', false) +
-      field('Ubicación', 'location', item.location, 'text', true, '', 'field-full') +
+      field('Ubicación o dirección', 'location', item.location, 'text', true, '', 'field-full', 'Ej.: Calle Real de Mare Abajo, frente al bulevar') +
+      field('Enlace de Google Maps (opcional)', 'maps_url', item.maps_url, 'url', false, 'url', 'field-full', 'Pega el enlace del punto exacto', 'Acepta enlaces de maps.google.com y maps.app.goo.gl.') +
       selectField('Estado', 'status', item.status || 'planned', EVENT_STATUS) +
       textareaField('Indicaciones y notas', 'notes', item.notes, 'field-full');
   }
@@ -558,6 +559,7 @@
       if (!data.title.trim()) return issue('title', 'Escribe el nombre del evento.');
       if (!data.event_date) return issue('event_date', 'Selecciona la fecha del evento.');
       if (!data.location.trim()) return issue('location', 'Indica la ubicación del evento.');
+      if (data.maps_url && !isGoogleMapsUrl(data.maps_url)) return issue('maps_url', 'Pega un enlace válido de Google Maps.');
     }
     if (type === 'inventory') {
       if (!data.name.trim()) return issue('name', 'Escribe el nombre del artículo.');
@@ -675,9 +677,38 @@
     return '<div class="empty-state"><strong>' + safe(title) + '</strong><span>' + safe(copy) + '</span>' + (action || '') + '</div>';
   }
 
-  function field(label, name, value, type, required, inputmode, extraClass) {
+  function field(label, name, value, type, required, inputmode, extraClass, placeholder, help) {
+    const helpId = help ? 'field-' + safe(name) + '-help' : '';
     return '<div class="field ' + safe(extraClass || '') + '"><label for="field-' + safe(name) + '">' + safe(label) + '</label>' +
-      '<input id="field-' + safe(name) + '" class="input" name="' + safe(name) + '" type="' + safe(type || 'text') + '" value="' + safe(value == null ? '' : value) + '"' + (required ? ' required' : '') + (inputmode ? ' inputmode="' + safe(inputmode) + '"' : '') + '></div>';
+      '<input id="field-' + safe(name) + '" class="input" name="' + safe(name) + '" type="' + safe(type || 'text') + '" value="' + safe(value == null ? '' : value) + '"' + (required ? ' required' : '') + (inputmode ? ' inputmode="' + safe(inputmode) + '"' : '') + (placeholder ? ' placeholder="' + safe(placeholder) + '"' : '') + (help ? ' aria-describedby="' + helpId + '"' : '') + '>' + (help ? '<small id="' + helpId + '" class="field-help">' + safe(help) + '</small>' : '') + '</div>';
+  }
+
+  function renderEventLocation(event) {
+    const location = event.location || 'Ubicación por confirmar';
+    const url = googleMapsUrl(event.maps_url, location);
+    return '<p class="event-location"><span>⌖ ' + safe(location) + '</span><a class="maps-link" href="' + safe(url) + '" target="_blank" rel="noopener noreferrer" aria-label="Abrir ' + safe(location) + ' en Google Maps">↗ Abrir en Google Maps</a></p>';
+  }
+
+  function googleMapsUrl(value, location) {
+    if (isGoogleMapsUrl(value)) return String(value).trim();
+    return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(location || '');
+  }
+
+  function isGoogleMapsUrl(value) {
+    if (!value) return false;
+    try {
+      const parsed = new URL(String(value).trim());
+      const host = parsed.hostname.toLowerCase();
+      return parsed.protocol === 'https:' && (
+        host === 'maps.app.goo.gl' ||
+        (host === 'goo.gl' && parsed.pathname.startsWith('/maps')) ||
+        host.startsWith('maps.google.') ||
+        (host.startsWith('www.google.') && parsed.pathname.startsWith('/maps')) ||
+        (host.startsWith('google.') && parsed.pathname.startsWith('/maps'))
+      );
+    } catch (_error) {
+      return false;
+    }
   }
 
   function textareaField(label, name, value, extraClass) {
