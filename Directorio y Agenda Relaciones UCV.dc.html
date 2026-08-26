@@ -1394,6 +1394,7 @@ const FACULTIES = [
       {
         title: 'Medicina', note: 'Medicina se maneja como un área operativa única para CONEKTADOS, organizada por especialidad clínica.',
         units: [
+          { id: 'sp-mg', name: 'Medicina general', emoji: '🩺' },
           { id: 'sp-mi', name: 'Medicina interna', emoji: '🩻' },
           { id: 'sp-ped', name: 'Pediatría', emoji: '🧒' },
           { id: 'sp-tra', name: 'Traumatología', emoji: '🦴' },
@@ -2759,12 +2760,19 @@ class Component extends DCLogic {
       return respMatch || suppMatch;
     };
     const isInvolved = unitId => (s.unitInfo[unitId] || {}).involved !== 'no';
+    const STATUS_PRIORITY = { active: 0, following: 1, pending_info: 2, not_contacted: 3, inactive: 4 };
+    const statusRank = unitId => {
+      const st = (s.unitInfo[unitId] || {}).specialtyStatus || 'not_contacted';
+      return STATUS_PRIORITY[st] != null ? STATUS_PRIORITY[st] : 5;
+    };
     const belongsToUnit = (c, unitId) => c.unit === unitId || (c.extraUnits || []).indexOf(unitId) > -1;
     const buildFacultyCard = f => {
       const cols = f.cols.map(col => {
         let unitsSource = col.units;
         if (f.id === 'med' && col.title) {
           unitsSource = unitsSource.slice().sort((a, b) => {
+            const rankDiff = statusRank(a.id) - statusRank(b.id);
+            if (rankDiff !== 0) return rankDiff;
             const aHas = hasMedicalPerson(a.id) ? 0 : 1;
             const bHas = hasMedicalPerson(b.id) ? 0 : 1;
             return aHas - bHas;
