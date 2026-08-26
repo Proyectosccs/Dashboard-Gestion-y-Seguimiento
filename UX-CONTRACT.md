@@ -58,7 +58,7 @@ The two surfaces share visual tokens and link to one another, but never share ev
 - Direct anonymous insert or update requests are denied. All writes pass through the allowlisted Edge Function and the internal `coalicion_save_record` RPC, which verifies the key again on every mutation.
 - The key remains only in page memory and is cleared when editing is locked or the page reloads.
 - Events, contacts, inventory, and lots wait for server confirmation before reporting a successful save.
-- Every event keeps a readable address and may include an optional HTTPS Google Maps URL. The public event card opens the saved Maps point, or falls back to a Google Maps search using the address.
+- Every event requires either a readable address or an HTTPS Google Maps URL; neither field is individually mandatory. The public event card opens the saved Maps point, or falls back to a Google Maps search using the address.
 - Failed saves keep the form and entered values available for correction or retry.
 - Forms use app-owned validation and protect unsaved changes inside the editor.
 - Contact search is local to the currently visible dataset, has an explicit clear control, and never places the query, key or private fields in the URL.

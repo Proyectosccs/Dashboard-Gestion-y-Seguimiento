@@ -16,7 +16,7 @@
   <div id="app-shell" class="app-shell">
     <header class="app-header">
       <div class="header-copy">
-        <p class="eyebrow">Operación móvil · Fundación Ingenia</p>
+        <p class="eyebrow">🚚 Operación móvil · Fundación Ingenia</p>
         <h1>Evento Coalición Venezuela</h1>
         <p>Control compartido de responsables, calendario, inventario y recepción por lotes.</p>
       </div>
@@ -28,11 +28,11 @@
     </header>
 
     <nav class="tab-nav" aria-label="Secciones del evento">
-      <button class="tab-button" type="button" data-view="summary" aria-current="page" onclick="window.coalicionAction(event)">◉ Resumen</button>
-      <button class="tab-button" type="button" data-view="calendar" onclick="window.coalicionAction(event)">▦ Calendario</button>
-      <button class="tab-button" type="button" data-view="contacts" onclick="window.coalicionAction(event)">◎ Contactos</button>
-      <button class="tab-button" type="button" data-view="batches" onclick="window.coalicionAction(event)">▤ Lotes</button>
-      <a class="tab-link" href="./">↗ Tablero UCV</a>
+      <button class="tab-button" type="button" data-view="summary" aria-current="page" onclick="window.coalicionAction(event)">🏠 Resumen</button>
+      <button class="tab-button" type="button" data-view="calendar" onclick="window.coalicionAction(event)">🗓️ Calendario</button>
+      <button class="tab-button" type="button" data-view="contacts" onclick="window.coalicionAction(event)">🤝 Contactos</button>
+      <button class="tab-button" type="button" data-view="batches" onclick="window.coalicionAction(event)">👥 Lotes</button>
+      <a class="tab-link" href="./">🎓 Tablero UCV</a>
     </nav>
 
     <div id="connectivity-banner" class="notice notice-warning page-notice" role="status" hidden>
@@ -47,10 +47,10 @@
     <section id="summary-view" class="view" aria-labelledby="summary-title" hidden>
       <div class="view-heading">
         <div>
-          <p class="eyebrow">Vista del día</p>
-          <h2 id="summary-title">Pulso operativo</h2>
+          <p class="eyebrow">📍 Vista del día</p>
+          <h2 id="summary-title">💙 Pulso operativo</h2>
         </div>
-        <button class="btn btn-primary editable-only" type="button" data-action="new-event" onclick="window.coalicionAction(event)">＋ Agregar evento</button>
+        <button class="btn btn-primary editable-only" type="button" data-action="new-event" onclick="window.coalicionAction(event)">➕ Agregar evento</button>
       </div>
       <div id="kpi-grid" class="kpi-grid"></div>
       <div class="summary-grid">
@@ -58,10 +58,10 @@
         <section class="panel" aria-labelledby="inventory-title">
           <div class="panel-heading">
             <div>
-              <p class="eyebrow">Disponibilidad</p>
-              <h3 id="inventory-title">Inventario del evento</h3>
+              <p class="eyebrow">📦 Disponibilidad</p>
+              <h3 id="inventory-title">🎁 Inventario del evento</h3>
             </div>
-            <button class="btn btn-secondary editable-only" type="button" data-action="new-inventory" onclick="window.coalicionAction(event)">＋ Artículo</button>
+            <button class="btn btn-secondary editable-only" type="button" data-action="new-inventory" onclick="window.coalicionAction(event)">➕ Artículo</button>
           </div>
           <div id="inventory-list" class="inventory-list"></div>
         </section>
@@ -69,15 +69,15 @@
       <section class="panel flow-panel" aria-labelledby="flow-title">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Recepción ordenada</p>
-            <h3 id="flow-title">Ruta de entrega por lotes</h3>
+            <p class="eyebrow">🚶 Recepción ordenada</p>
+            <h3 id="flow-title">🔄 Ruta de entrega por lotes</h3>
           </div>
         </div>
         <ol class="delivery-flow">
-          <li><span>1</span><strong>Líder agrupa</strong><small>Convoca un lote de 15 o más personas.</small></li>
-          <li><span>2</span><strong>Llegada conjunta</strong><small>El lote se presenta en su horario acordado.</small></li>
-          <li><span>3</span><strong>Validación</strong><small>El equipo confirma lote y disponibilidad.</small></li>
-          <li><span>4</span><strong>Entrega y salida</strong><small>Se registra la cantidad entregada y el grupo se retira.</small></li>
+          <li><span>1</span><strong>📣 Líder agrupa</strong><small>Convoca un lote de 15 o más personas.</small></li>
+          <li><span>2</span><strong>🚶 Llegada conjunta</strong><small>El lote se presenta en su horario acordado.</small></li>
+          <li><span>3</span><strong>✅ Validación</strong><small>El equipo confirma lote y disponibilidad.</small></li>
+          <li><span>4</span><strong>🎁 Entrega y salida</strong><small>Se registra la cantidad entregada y el grupo se retira.</small></li>
         </ol>
       </section>
     </section>
@@ -85,10 +85,10 @@
     <section id="calendar-view" class="view" aria-labelledby="calendar-title" hidden>
       <div class="view-heading">
         <div>
-          <p class="eyebrow">Agenda compartida</p>
-          <h2 id="calendar-title">Calendario del evento</h2>
+          <p class="eyebrow">⏰ Agenda compartida</p>
+          <h2 id="calendar-title">🗓️ Calendario del evento</h2>
         </div>
-        <button class="btn btn-primary editable-only" type="button" data-action="new-event" onclick="window.coalicionAction(event)">＋ Agregar evento</button>
+        <button class="btn btn-primary editable-only" type="button" data-action="new-event" onclick="window.coalicionAction(event)">➕ Agregar evento</button>
       </div>
       <div class="calendar-toolbar panel">
         <button id="calendar-prev" class="icon-button" type="button" aria-label="Mes anterior" onclick="window.coalicionAction(event)">‹</button>
@@ -102,10 +102,10 @@
     <section id="contacts-view" class="view" aria-labelledby="contacts-title" hidden>
       <div class="view-heading">
         <div>
-          <p class="eyebrow">Directorio privado</p>
-          <h2 id="contacts-title">Responsables y contactos</h2>
+          <p class="eyebrow">🔐 Directorio privado</p>
+          <h2 id="contacts-title">🤝 Responsables y contactos</h2>
         </div>
-        <button class="btn btn-primary editable-only" type="button" data-action="new-contact" onclick="window.coalicionAction(event)">＋ Agregar contacto</button>
+        <button class="btn btn-primary editable-only" type="button" data-action="new-contact" onclick="window.coalicionAction(event)">➕ Agregar contacto</button>
       </div>
       <div class="list-toolbar panel">
         <div class="search-field">
@@ -122,11 +122,11 @@
     <section id="batches-view" class="view" aria-labelledby="batches-title" hidden>
       <div class="view-heading">
         <div>
-          <p class="eyebrow">Recepción por grupos</p>
-          <h2 id="batches-title">Lotes de beneficiarios</h2>
+          <p class="eyebrow">🧭 Recepción por grupos</p>
+          <h2 id="batches-title">👥 Lotes de beneficiarios</h2>
           <p class="view-description">Este módulo registra cantidades y coordinación del lote; no almacena datos médicos ni identidades de beneficiarios.</p>
         </div>
-        <button class="btn btn-primary editable-only" type="button" data-action="new-batch" onclick="window.coalicionAction(event)">＋ Agregar lote</button>
+        <button class="btn btn-primary editable-only" type="button" data-action="new-batch" onclick="window.coalicionAction(event)">➕ Agregar lote</button>
       </div>
       <div id="batches-list" class="batch-list"></div>
     </section>

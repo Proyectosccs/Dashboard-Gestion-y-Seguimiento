@@ -332,15 +332,15 @@
     }, 0);
     const completeBatches = state.batches.filter(function (batch) { return batch.status === 'completed'; }).length;
     renderMarkup(dom.kpiGrid,
-      kpi('kpi-primary', state.events.length, 'Eventos registrados') +
-      kpi('kpi-blue', state.contacts.length, 'Responsables') +
-      kpi('kpi-sky', inventoryAvailable, 'Unidades disponibles') +
-      kpi('kpi-indigo', plannedPeople, 'Personas previstas')
+      kpi('kpi-primary', state.events.length, '🗓️ Eventos registrados') +
+      kpi('kpi-blue', state.contacts.length, '🤝 Responsables') +
+      kpi('kpi-sky', inventoryAvailable, '📦 Unidades disponibles') +
+      kpi('kpi-indigo', plannedPeople, '👥 Personas previstas')
     );
 
     const next = nextEvent();
     if (!next) {
-      renderMarkup(dom.nextEventCard, emptyState('Sin evento registrado', 'Agrega la fecha, ubicación y responsable para activar el pulso operativo.', canEdit() ? '<button class="btn btn-primary" type="button" data-action="new-event">＋ Agregar evento</button>' : ''));
+      renderMarkup(dom.nextEventCard, emptyState('🗓️ Sin evento registrado', 'Agrega la fecha, una dirección o un enlace de Maps para activar el pulso operativo.', canEdit() ? '<button class="btn btn-primary" type="button" data-action="new-event">➕ Agregar evento</button>' : ''));
     } else {
       const date = dateParts(next.event_date);
       renderMarkup(dom.nextEventCard,
@@ -354,7 +354,7 @@
     }
 
     if (!state.inventory.length) {
-      renderMarkup(dom.inventoryList, emptyState('Inventario pendiente', 'Registra los artículos disponibles y las unidades distribuidas.', ''));
+      renderMarkup(dom.inventoryList, emptyState('📦 Inventario pendiente', 'Registra los artículos disponibles y las unidades distribuidas.', ''));
     } else {
       renderMarkup(dom.inventoryList, state.inventory.map(function (item) {
         const total = Math.max(0, Number(item.total_quantity || 0));
@@ -405,7 +405,7 @@
     dom.contactResultCount.textContent = contacts.length + ' de ' + state.contacts.length + ' contactos';
     dom.contactSearchClear.hidden = !state.query;
     if (!contacts.length) {
-      renderMarkup(dom.contactsList, emptyState(state.contacts.length ? 'Sin coincidencias' : 'Directorio vacío', state.contacts.length ? 'Prueba otra búsqueda o limpia el filtro.' : 'Agrega los responsables autorizados del evento.', state.contacts.length ? '<button class="btn btn-secondary" type="button" id="empty-clear-search">Limpiar búsqueda</button>' : ''));
+      renderMarkup(dom.contactsList, emptyState(state.contacts.length ? '🔎 Sin coincidencias' : '🤝 Directorio vacío', state.contacts.length ? 'Prueba otra búsqueda o limpia el filtro.' : 'Agrega los responsables autorizados del evento.', state.contacts.length ? '<button class="btn btn-secondary" type="button" id="empty-clear-search">Limpiar búsqueda</button>' : ''));
       const clear = document.getElementById('empty-clear-search');
       if (clear) clear.addEventListener('click', clearContactSearch);
       return;
@@ -427,7 +427,7 @@
 
   function renderBatches() {
     if (!state.batches.length) {
-      renderMarkup(dom.batchesList, emptyState('No hay lotes registrados', 'Agrega cada grupo con su líder, cantidad prevista y ventana de llegada.', canEdit() ? '<button class="btn btn-primary" type="button" data-action="new-batch">＋ Agregar lote</button>' : ''));
+      renderMarkup(dom.batchesList, emptyState('👥 No hay lotes registrados', 'Agrega cada grupo con su líder, cantidad prevista y ventana de llegada.', canEdit() ? '<button class="btn btn-primary" type="button" data-action="new-batch">➕ Agregar lote</button>' : ''));
       return;
     }
     renderMarkup(dom.batchesList, state.batches.map(function (batch) {
@@ -480,8 +480,8 @@
     return field('Nombre del evento', 'title', item.title, 'text', true, '', 'field-full') +
       field('Fecha', 'event_date', item.event_date || new Date().toISOString().slice(0, 10), 'date', true) +
       field('Hora de inicio', 'start_time', timeInput(item.start_time), 'time', false) +
-      field('Ubicación o dirección', 'location', item.location, 'text', true, '', 'field-full', 'Ej.: Calle Real de Mare Abajo, frente al bulevar') +
-      field('Enlace de Google Maps (opcional)', 'maps_url', item.maps_url, 'url', false, 'url', 'field-full', 'Pega el enlace del punto exacto', 'Acepta enlaces de maps.google.com y maps.app.goo.gl.') +
+      field('📍 Dirección (opcional si agregas Maps)', 'location', item.location, 'text', false, '', 'field-full', 'Ej.: Calle Real de Mare Abajo, frente al bulevar', 'Puedes dejarla vacía si pegas el enlace de Google Maps.') +
+      field('🗺️ Enlace de Google Maps (opcional si agregas dirección)', 'maps_url', item.maps_url, 'url', false, 'url', 'field-full', 'Pega el enlace del punto exacto', 'Debes completar la dirección o este enlace. Acepta maps.google.com y maps.app.goo.gl.') +
       selectField('Estado', 'status', item.status || 'planned', EVENT_STATUS) +
       textareaField('Indicaciones y notas', 'notes', item.notes, 'field-full');
   }
@@ -558,7 +558,7 @@
     if (type === 'event') {
       if (!data.title.trim()) return issue('title', 'Escribe el nombre del evento.');
       if (!data.event_date) return issue('event_date', 'Selecciona la fecha del evento.');
-      if (!data.location.trim()) return issue('location', 'Indica la ubicación del evento.');
+      if (!data.location.trim() && !data.maps_url.trim()) return issue('location', 'Agrega una dirección o un enlace de Google Maps.');
       if (data.maps_url && !isGoogleMapsUrl(data.maps_url)) return issue('maps_url', 'Pega un enlace válido de Google Maps.');
     }
     if (type === 'inventory') {
@@ -684,7 +684,7 @@
   }
 
   function renderEventLocation(event) {
-    const location = event.location || 'Ubicación por confirmar';
+    const location = event.location || 'Punto compartido en Google Maps';
     const url = googleMapsUrl(event.maps_url, location);
     return '<p class="event-location"><span>⌖ ' + safe(location) + '</span><a class="maps-link" href="' + safe(url) + '" target="_blank" rel="noopener noreferrer" aria-label="Abrir ' + safe(location) + ' en Google Maps">↗ Abrir en Google Maps</a></p>';
   }
