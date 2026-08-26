@@ -81,25 +81,24 @@ alter table public.coalicion_events enable row level security;
 alter table public.coalicion_inventory enable row level security;
 alter table public.coalicion_batches enable row level security;
 
--- La vista pública de contactos nunca expone cédula, teléfono, correo o notas.
-create or replace view public.coalicion_contacts_public
-with (security_barrier = true)
-as
-select id, name, role, created_at, updated_at
-from public.coalicion_contacts
-where archived_at is null;
+-- Si existió una versión anterior, retiramos la vista que podía ejecutar con
+-- privilegios del propietario. La consulta pública usa permisos por columna.
+drop view if exists public.coalicion_contacts_public;
 
 revoke all on public.coalicion_settings from anon, authenticated;
 revoke all on public.coalicion_contacts from anon, authenticated;
 revoke all on public.coalicion_events from anon, authenticated;
 revoke all on public.coalicion_inventory from anon, authenticated;
 revoke all on public.coalicion_batches from anon, authenticated;
-revoke all on public.coalicion_contacts_public from public;
-
-grant select on public.coalicion_contacts_public to anon, authenticated;
+grant select (id, name, role, created_at, updated_at, archived_at)
+  on public.coalicion_contacts to anon, authenticated;
 grant select on public.coalicion_events to anon, authenticated;
 grant select on public.coalicion_inventory to anon, authenticated;
 grant select on public.coalicion_batches to anon, authenticated;
+
+drop policy if exists "coalicion contacts public read" on public.coalicion_contacts;
+create policy "coalicion contacts public read" on public.coalicion_contacts
+  for select to anon, authenticated using (archived_at is null);
 
 drop policy if exists "coalicion events public read" on public.coalicion_events;
 create policy "coalicion events public read" on public.coalicion_events

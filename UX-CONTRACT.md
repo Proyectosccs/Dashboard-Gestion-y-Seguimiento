@@ -52,7 +52,7 @@ The two surfaces share visual tokens and link to one another, but never share ev
 - The route is `evento-coalicion-venezuela.html`; the UCV route remains the repository default.
 - The HTML and JavaScript contain no real contact, identity, address, inventory, or batch data.
 - The dashboard opens directly without an account and supports narrow mobile viewports.
-- Events, inventory and aggregate batches are publicly readable. The public contacts view exposes only name and role.
+- Events, inventory and aggregate batches are publicly readable. Column-level grants expose only the contact name and role to public requests.
 - Cédula, phone, email and contact notes are returned only by a security-definer RPC after the edit key is verified.
 - Editing is activated with one shared operational key. Supabase stores only a bcrypt hash; the real key is never committed to GitHub.
 - Direct anonymous insert or update requests are denied. All writes pass through the allowlisted `coalicion_save_record` RPC, which verifies the key again on every mutation.

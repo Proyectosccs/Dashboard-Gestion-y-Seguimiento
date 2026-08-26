@@ -4,7 +4,7 @@
   const SUPABASE_URL = 'https://hcylkagvwfncdaaizutn.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_E-cV9DiNK9rctFCxzondvA_7OppBD7Y';
   const TABLES = {
-    contacts: 'coalicion_contacts_public',
+    contacts: 'coalicion_contacts',
     events: 'coalicion_events',
     inventory: 'coalicion_inventory',
     batches: 'coalicion_batches'
@@ -233,7 +233,7 @@
 
     const contactsRequest = state.editing
       ? state.client.rpc('coalicion_get_contacts', { p_key: state.editorKey })
-      : state.client.from(TABLES.contacts).select('*').order('name');
+      : state.client.from(TABLES.contacts).select('id,name,role,created_at,updated_at').is('archived_at', null).order('name');
     const results = await Promise.all([
       contactsRequest,
       state.client.from(TABLES.events).select('*').is('archived_at', null).order('event_date'),
