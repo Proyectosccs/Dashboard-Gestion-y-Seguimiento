@@ -1525,6 +1525,26 @@ const SUPABASE_KEY = 'sb_publishable_E-cV9DiNK9rctFCxzondvA_7OppBD7Y';
 const SUPABASE_TABLE = 'ucv_board_state';
 const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
+/* Alimentación desde el Panel de Networking (Fundación INGENIA): proyecto
+   Supabase distinto y de solo lectura para este tablero. Solo se leen los
+   contactos/tareas de INABIO UCV ya identificados como relevantes para las
+   jornadas UCV (mapa fijo abajo); nunca sobrescribe un dato que el equipo
+   ya haya editado a mano aquí, y nunca borra ni modifica el panel origen. */
+const NET_SUPABASE_URL = 'https://menznepoljvmkjdcghfy.supabase.co';
+const NET_SUPABASE_KEY = 'sb_publishable_sDGEkJ-4_77QK8d6opYHZg_BJQBmQBB';
+const sbNet = window.supabase ? window.supabase.createClient(NET_SUPABASE_URL, NET_SUPABASE_KEY) : null;
+const NET_CONTACT_MAP = {
+  'NET-532782': { contactId: 'c06' },
+  'NET-749835': { contactId: 'c08' },
+  'NET-103383': { contactId: 'c04' },
+  'NET-846608': { contactId: 'c15' },
+  'NET-981289': { contactId: 'c16' },
+  'NET-410502': { contactId: 'c17' },
+  'NET-996961': { contactId: 'c18' },
+  'NET-410501': { unit: 'odo-e', slot: 'support' }
+};
+const NET_CONTACT_IDS = Object.keys(NET_CONTACT_MAP);
+
 const STORE_KEY_TO_FIELD = {
   'ucv-contacts-v1': 'contacts',
   'ucv-interactions-v2': 'interactions',
@@ -1630,10 +1650,79 @@ class Component extends DCLogic {
     if (!sb) return;
     this._loadFromSupabase();
     this._subscribeRealtime();
-    this._onVisible = () => { if (document.visibilityState === 'visible') { this._loadFromSupabase(); this._subscribeRealtime(); } };
+    this._syncFromNetworkingPanel();
+    this._onVisible = () => { if (document.visibilityState === 'visible') { this._loadFromSupabase(); this._subscribeRealtime(); this._syncFromNetworkingPanel(); } };
     document.addEventListener('visibilitychange', this._onVisible);
     window.addEventListener('focus', this._onVisible);
-    this._pollTimer = setInterval(() => { if (document.visibilityState === 'visible') this._loadFromSupabase(); }, 45000);
+    this._pollTimer = setInterval(() => { if (document.visibilityState === 'visible') { this._loadFromSupabase(); this._syncFromNetworkingPanel(); } }, 45000);
+  }
+
+  async _syncFromNetworkingPanel() {
+    if (!sbNet) return;
+    try {
+      const resC = await sbNet.from('contactos_networking').select('id,payload').in('id', NET_CONTACT_IDS);
+      if (!resC.error && resC.data) this._mergeNetworkingContacts(resC.data);
+      const resT = await sbNet.from('tareas_networking').select('id,contacto_id,payload').in('contacto_id', NET_CONTACT_IDS);
+      if (!resT.error && resT.data) this._mergeNetworkingTasks(resT.data);
+    } catch (e) { console.error('Error al sincronizar con el panel de networking', e); }
+  }
+
+  _mergeNetworkingContacts(rows) {
+    const s = this.state;
+    let contacts = s.contacts.slice();
+    let unitInfo = Object.assign({}, s.unitInfo);
+    let changedContacts = false, changedUnits = false;
+    rows.forEach(row => {
+      const map = NET_CONTACT_MAP[row.id];
+      const p = (row.payload || {});
+      const phone = (p.telefono && p.telefono !== 'No disponible') ? p.telefono : '';
+      const email = p.correo || '';
+      if (!map) return;
+      if (map.contactId) {
+        const idx = contacts.findIndex(c => c.id === map.contactId);
+        if (idx === -1) return;
+        const c = contacts[idx];
+        const patch = {};
+        if ((!c.phone || c.phone === 'Por confirmar') && phone) patch.phone = phone;
+        if ((!c.email || c.email === 'Por confirmar') && email) patch.email = email;
+        if (Object.keys(patch).length) { contacts[idx] = Object.assign({}, c, patch); changedContacts = true; }
+      } else if (map.unit && map.slot === 'support') {
+        const info = unitInfo[map.unit] || {};
+        const patch = {};
+        if (!info.supportPhone && phone) patch.supportPhone = phone;
+        if (!info.supportEmail && email) patch.supportEmail = email;
+        if (Object.keys(patch).length) { unitInfo = Object.assign({}, unitInfo, { [map.unit]: Object.assign({}, info, patch) }); changedUnits = true; }
+      }
+    });
+    if (changedContacts) { writeStore('ucv-contacts-v1', contacts); this.setState({ contacts: contacts }); }
+    if (changedUnits) { writeStore('ucv-unit-info-v1', unitInfo); this.setState({ unitInfo: unitInfo }); }
+  }
+
+  _mergeNetworkingTasks(rows) {
+    const s = this.state;
+    const existingIds = {};
+    s.tasks.forEach(t => { existingIds[t.id] = true; });
+    const netStatus = { POR_HACER: 'pending', EN_PROCESO: 'following', COMPLETADA: 'executed' };
+    const added = [];
+    rows.forEach(row => {
+      const ucvId = 'net-' + row.id;
+      if (existingIds[ucvId]) return;
+      const p = row.payload || {};
+      const subtareas = Array.isArray(p.subtareas) ? p.subtareas : [];
+      const pending = subtareas.find(st => !st.hecha);
+      added.push({
+        id: ucvId, title: p.descripcion || 'Tarea sin título', area: 'Contactos',
+        owner: p.equipo || 'Equipo CONEKTADOS', status: netStatus[p.estado] || 'pending',
+        priority: 'medium', horizon: 'Por definir', dueDate: p.fechaLimite || '', organization: 'CONEKTADOS',
+        detail: subtareas.length ? subtareas.map(st => st.texto).join('; ') : 'Sin detalle registrado.',
+        nextAction: pending ? pending.texto : 'Definir próxima acción.'
+      });
+    });
+    if (added.length) {
+      const tasks = s.tasks.concat(added);
+      writeStore('ucv-tasks-v2', tasks);
+      this.setState({ tasks: tasks });
+    }
   }
 
   componentWillUnmount() {
