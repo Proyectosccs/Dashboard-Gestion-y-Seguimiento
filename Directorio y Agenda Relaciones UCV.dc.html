@@ -1651,6 +1651,9 @@ function writeStore(key, value) {
   sb.from(SUPABASE_TABLE).upsert({ key: key, value: value, updated_at: new Date().toISOString() }).then(function (res) {
     if (res.error) console.error('Error al sincronizar con Supabase (' + key + ')', res.error);
   });
+  sb.from('ucv_board_state_history').insert({ key: key, value: value }).then(function (res) {
+    if (res.error) console.error('Error al respaldar historial (' + key + ')', res.error);
+  });
 }
 
 function normalizeJourney(j) {
