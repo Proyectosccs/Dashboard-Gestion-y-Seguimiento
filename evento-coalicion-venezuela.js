@@ -23,6 +23,19 @@
     arrived: 'En el lugar',
     completed: 'Entrega completada'
   };
+  const AFFILIATIONS = {
+    '': 'Selecciona una opción',
+    'Coalicion con amor a Venezuela': 'Coalicion con amor a Venezuela',
+    'Fundacion Ingenia': 'Fundacion Ingenia',
+    'Voluntariado AVAA': 'Voluntariado AVAA',
+    'Voluntario Particular': 'Voluntario Particular'
+  };
+  const AFFILIATION_CLASSES = {
+    'Coalicion con amor a Venezuela': 'affiliation-coalicion',
+    'Fundacion Ingenia': 'affiliation-ingenia',
+    'Voluntariado AVAA': 'affiliation-avaa',
+    'Voluntario Particular': 'affiliation-particular'
+  };
   const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
@@ -157,17 +170,15 @@
 
   function requestSensitiveAccess(purpose, contactId) {
     const contact = contactId ? findById(state.contacts, contactId) : null;
-    const name = contact ? contact.name : 'un nuevo responsable';
+    const name = contact ? contact.name : 'este responsable';
     state.keyRequest = { purpose: purpose, contactId: contactId || null, token: ++state.keyRequestCounter };
     state.keyTrigger = document.activeElement;
     dom.keyDialogTitle.textContent = purpose === 'reveal'
       ? 'Ver datos de ' + name
-      : purpose === 'edit'
-        ? 'Editar a ' + name
-        : 'Agregar responsable';
+      : 'Editar a ' + name;
     dom.keyDialogCopy.textContent = purpose === 'reveal'
       ? 'Ingresa la clave para mostrar la cédula, el teléfono, el correo y las notas.'
-      : 'Ingresa la clave para acceder al formulario con información sensible.';
+      : 'Ingresa la clave para editar la información sensible de este responsable.';
     dom.keyError.hidden = true;
     dom.keyError.textContent = '';
     dom.editorKey.value = '';
@@ -195,13 +206,11 @@
     }
 
     setBusy(dom.keySubmit, true);
-    const result = request.purpose === 'new'
-      ? await callEditorApi('verify', { key: key })
-      : await callEditorApi('responsible', { key: key, id: request.contactId });
+    const result = await callEditorApi('responsible', { key: key, id: request.contactId });
     setBusy(dom.keySubmit, false);
     if (!state.keyRequest || state.keyRequest.token !== request.token) return;
 
-    if (result.error || (request.purpose === 'new' && result.data !== true)) {
+    if (result.error) {
       dom.keyError.textContent = 'La clave no es válida. Verifícala e inténtalo nuevamente.';
       dom.keyError.hidden = false;
       dom.editorKey.setAttribute('aria-invalid', 'true');
@@ -255,7 +264,7 @@
     dom.connectivityBanner.hidden = true;
 
     const contactsRequest = state.client.from(TABLES.contacts)
-      .select('id,name,role,created_at,updated_at')
+      .select('id,name,role,belongs_to,created_at,updated_at')
       .is('archived_at', null)
       .order('name');
     const results = await Promise.all([
@@ -327,7 +336,7 @@
   }
 
   function handleAction(action, id) {
-    if (action === 'new-contact') requestSensitiveAccess('new');
+    if (action === 'new-contact') openEditor('contact');
     if (action === 'edit-contact') requestSensitiveAccess('edit', id);
     if (action === 'reveal-contact') requestSensitiveAccess('reveal', id);
     if (action === 'hide-contact') hideContact(id);
@@ -428,7 +437,7 @@
   function renderContacts() {
     const query = normalize(state.query);
     const contacts = state.contacts.filter(function (contact) {
-      return !query || normalize([contact.name, contact.role].join(' ')).includes(query);
+      return !query || normalize([contact.name, contact.role, contact.belongs_to].join(' ')).includes(query);
     });
     dom.contactResultCount.textContent = contacts.length + ' de ' + state.contacts.length + ' responsables';
     dom.contactSearchClear.hidden = !state.query;
@@ -440,9 +449,9 @@
     }
     renderMarkup(dom.contactsList, contacts.map(function (contact) {
       const fullContact = state.revealedContacts[contact.id];
-      return '<article class="contact-card">' +
+      return '<article class="contact-card ' + safe(affiliationClass(contact.belongs_to)) + '">' +
         '<div class="contact-card-header"><div class="contact-avatar" aria-hidden="true">' + safe(initials(contact.name)) + '</div><div><h3>' + safe(contact.name) + '</h3><div class="contact-role">' + safe(contact.role || 'Responsable') + '</div></div></div>' +
-        '<span class="private-chip">🔐 Datos sensibles protegidos</span>' +
+        '<div class="contact-chips"><span class="affiliation-chip">🏷️ ' + safe(contact.belongs_to || 'Pertenencia por confirmar') + '</span><span class="private-chip">🔐 Datos sensibles protegidos</span></div>' +
         renderSensitiveDetails(fullContact) +
         '<div class="contact-card-actions">' +
           '<button class="btn btn-ghost privacy-eye" type="button" data-action="' + (fullContact ? 'hide-contact' : 'reveal-contact') + '" data-id="' + safe(contact.id) + '" aria-label="' + (fullContact ? 'Ocultar' : 'Ver') + ' datos sensibles de ' + safe(contact.name) + '">' + (fullContact ? '🙈 Ocultar datos' : '👁️ Ver datos') + '</button>' +
@@ -522,6 +531,7 @@
     const item = record || {};
     return field('Nombre completo', 'name', item.name, 'text', true) +
       field('Rol en el evento', 'role', item.role || 'Responsable', 'text', true) +
+      selectField('Pertenece a:', 'belongs_to', item.belongs_to || '', AFFILIATIONS, 'field-full') +
       field('Cédula', 'national_id', item.national_id, 'text', false, 'numeric') +
       field('Teléfono', 'phone', item.phone, 'tel', true, 'tel') +
       field('Correo electrónico', 'email', item.email, 'email', false, 'email') +
@@ -579,7 +589,7 @@
     const payload = normalizePayload(state.editor.type, data);
     setBusy(dom.dialogSave, true);
     const result = await callEditorApi('save', {
-      key: state.editor.type === 'contact' ? state.sensitiveEditorKey : undefined,
+      key: state.editor.type === 'contact' && state.editor.record ? state.sensitiveEditorKey : undefined,
       entity: state.editor.type,
       payload: payload,
       id: state.editor.record ? state.editor.record.id : null
@@ -605,6 +615,7 @@
     if (type === 'contact') {
       if (!data.name.trim()) return issue('name', 'Escribe el nombre completo del responsable.');
       if (!data.role.trim()) return issue('role', 'Indica el rol del responsable.');
+      if (!data.belongs_to) return issue('belongs_to', 'Selecciona a qué organización pertenece.');
       if (!data.phone.trim()) return issue('phone', 'Ingresa el teléfono del responsable.');
       if (data.email && !/^\S+@\S+\.\S+$/.test(data.email)) return issue('email', 'Corrige el formato del correo electrónico.');
     }
@@ -822,6 +833,10 @@
 
   function findById(list, id) {
     return list.find(function (item) { return String(item.id) === String(id); }) || null;
+  }
+
+  function affiliationClass(value) {
+    return AFFILIATION_CLASSES[value] || 'affiliation-unassigned';
   }
 
   function issue(fieldName, message) { return { field: fieldName, message: message }; }
