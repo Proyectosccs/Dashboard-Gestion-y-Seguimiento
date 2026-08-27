@@ -370,12 +370,22 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .search-clear:hover { background: var(--color-neutral-400); }
 .result-count { min-width: max-content; margin: 0; color: var(--color-neutral-600); font-size: 12px; }
 .contact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
-.contact-card { min-height: 250px; display: flex; flex-direction: column; gap: 12px; padding: 18px; border: 1px solid var(--color-neutral-300); border-radius: 26px; background: rgba(255,255,255,.82); box-shadow: var(--shadow-sm); }
+.contact-card { --affiliation-color: var(--color-neutral-500); min-height: 250px; position: relative; display: flex; flex-direction: column; gap: 12px; overflow: hidden; padding: 18px; border: 1px solid color-mix(in srgb, var(--affiliation-color) 42%, var(--color-neutral-300)); border-left: 7px solid var(--affiliation-color); border-radius: 26px; background: rgba(255,255,255,.88); box-shadow: var(--shadow-sm); }
+.contact-card::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(135deg, color-mix(in srgb, var(--affiliation-color) 11%, transparent), transparent 48%); }
+.contact-card > * { position: relative; z-index: 1; }
+.affiliation-coalicion { --affiliation-color: #2563eb; }
+.affiliation-ingenia { --affiliation-color: #d97706; }
+.affiliation-avaa { --affiliation-color: #7c3aed; }
+.affiliation-particular { --affiliation-color: #15803d; }
+.affiliation-unassigned { --affiliation-color: #64748b; }
 .contact-card-header { display: flex; align-items: center; gap: 11px; }
 .contact-avatar { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 17px 17px 17px 5px; background: var(--color-accent-100); color: var(--color-accent-800); font-family: var(--font-heading); font-size: 17px; }
 .contact-card h3 { margin: 0; font-size: 20px; }
 .contact-role { color: var(--color-neutral-600); font-size: 12px; }
-.private-chip { width: fit-content; padding: 4px 8px; border-radius: 999px; background: var(--coalition-blue-soft); color: var(--coalition-blue); font-size: 10px; font-weight: 700; }
+.contact-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.private-chip, .affiliation-chip { width: fit-content; padding: 4px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; }
+.private-chip { background: var(--coalition-blue-soft); color: var(--coalition-blue); }
+.affiliation-chip { background: color-mix(in srgb, var(--affiliation-color) 14%, white); color: color-mix(in srgb, var(--affiliation-color) 84%, #0f172a); border: 1px solid color-mix(in srgb, var(--affiliation-color) 28%, transparent); }
 .contact-details { display: grid; gap: 8px; font-size: 13px; }
 .contact-details a { overflow-wrap: anywhere; }
 .sensitive-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }

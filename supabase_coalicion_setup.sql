@@ -17,6 +17,7 @@ create table if not exists public.coalicion_contacts (
   phone text not null,
   email text,
   role text not null default 'Responsable',
+  belongs_to text,
   notes text,
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
@@ -68,6 +69,15 @@ create table if not exists public.coalicion_batches (
 
 -- Compatibilidad si se ejecutó una versión anterior basada en cuentas.
 alter table public.coalicion_contacts alter column created_by drop not null;
+alter table public.coalicion_contacts add column if not exists belongs_to text;
+alter table public.coalicion_contacts drop constraint if exists coalicion_contacts_belongs_to_check;
+alter table public.coalicion_contacts add constraint coalicion_contacts_belongs_to_check
+  check (belongs_to is null or belongs_to in (
+    'Coalicion con amor a Venezuela',
+    'Fundacion Ingenia',
+    'Voluntariado AVAA',
+    'Voluntario Particular'
+  ));
 alter table public.coalicion_events alter column created_by drop not null;
 alter table public.coalicion_events add column if not exists maps_url text;
 alter table public.coalicion_events alter column location drop not null;
@@ -97,7 +107,7 @@ revoke all on public.coalicion_contacts from anon, authenticated;
 revoke all on public.coalicion_events from anon, authenticated;
 revoke all on public.coalicion_inventory from anon, authenticated;
 revoke all on public.coalicion_batches from anon, authenticated;
-grant select (id, name, role, created_at, updated_at, archived_at)
+grant select (id, name, role, belongs_to, created_at, updated_at, archived_at)
   on public.coalicion_contacts to anon, authenticated;
 grant select on public.coalicion_events to anon, authenticated;
 grant select on public.coalicion_inventory to anon, authenticated;
@@ -177,6 +187,47 @@ begin
 end;
 $$;
 
+create or replace function public.coalicion_create_contact_public(
+  p_payload jsonb
+)
+returns jsonb
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+declare
+  saved jsonb;
+  affiliation text := nullif(trim(p_payload->>'belongs_to'), '');
+begin
+  if nullif(trim(p_payload->>'name'), '') is null or nullif(trim(p_payload->>'phone'), '') is null then
+    raise exception 'name and phone are required' using errcode = '22023';
+  end if;
+  if affiliation is null or affiliation not in (
+    'Coalicion con amor a Venezuela',
+    'Fundacion Ingenia',
+    'Voluntariado AVAA',
+    'Voluntario Particular'
+  ) then
+    raise exception 'valid affiliation is required' using errcode = '22023';
+  end if;
+
+  insert into public.coalicion_contacts (name, national_id, phone, email, role, belongs_to, notes)
+  values (
+    trim(p_payload->>'name'),
+    nullif(trim(p_payload->>'national_id'), ''),
+    trim(p_payload->>'phone'),
+    nullif(trim(p_payload->>'email'), ''),
+    coalesce(nullif(trim(p_payload->>'role'), ''), 'Responsable'),
+    affiliation,
+    nullif(trim(p_payload->>'notes'), '')
+  )
+  returning to_jsonb(coalicion_contacts) into saved;
+
+  return saved;
+end;
+$$;
+
 create or replace function public.coalicion_save_contact(
   p_key text,
   p_payload jsonb,
@@ -190,6 +241,7 @@ set search_path = ''
 as $$
 declare
   saved jsonb;
+  affiliation text := nullif(trim(p_payload->>'belongs_to'), '');
 begin
   if not public.coalicion_verify_editor_key(p_key) then
     raise exception 'invalid editor key' using errcode = '28000';
@@ -197,19 +249,28 @@ begin
   if nullif(trim(p_payload->>'name'), '') is null or nullif(trim(p_payload->>'phone'), '') is null then
     raise exception 'name and phone are required' using errcode = '22023';
   end if;
+  if affiliation is null or affiliation not in (
+    'Coalicion con amor a Venezuela',
+    'Fundacion Ingenia',
+    'Voluntariado AVAA',
+    'Voluntario Particular'
+  ) then
+    raise exception 'valid affiliation is required' using errcode = '22023';
+  end if;
+
   if p_id is null then
-    insert into public.coalicion_contacts (name, national_id, phone, email, role, notes)
+    insert into public.coalicion_contacts (name, national_id, phone, email, role, belongs_to, notes)
     values (
       trim(p_payload->>'name'), nullif(trim(p_payload->>'national_id'), ''), trim(p_payload->>'phone'),
       nullif(trim(p_payload->>'email'), ''), coalesce(nullif(trim(p_payload->>'role'), ''), 'Responsable'),
-      nullif(trim(p_payload->>'notes'), '')
+      affiliation, nullif(trim(p_payload->>'notes'), '')
     ) returning to_jsonb(coalicion_contacts) into saved;
   else
     update public.coalicion_contacts set
       name = trim(p_payload->>'name'), national_id = nullif(trim(p_payload->>'national_id'), ''),
       phone = trim(p_payload->>'phone'), email = nullif(trim(p_payload->>'email'), ''),
       role = coalesce(nullif(trim(p_payload->>'role'), ''), 'Responsable'),
-      notes = nullif(trim(p_payload->>'notes'), ''), updated_at = now()
+      belongs_to = affiliation, notes = nullif(trim(p_payload->>'notes'), ''), updated_at = now()
     where id = p_id and archived_at is null
     returning to_jsonb(coalicion_contacts) into saved;
   end if;
@@ -316,10 +377,12 @@ $$;
 
 revoke all on function public.coalicion_verify_editor_key(text) from public, anon, authenticated;
 revoke all on function public.coalicion_get_contacts(text) from public, anon, authenticated;
+revoke all on function public.coalicion_create_contact_public(jsonb) from public, anon, authenticated;
 revoke all on function public.coalicion_save_contact(text, jsonb, uuid) from public, anon, authenticated;
 revoke all on function public.coalicion_save_record_public(text, jsonb, uuid) from public, anon, authenticated;
 grant execute on function public.coalicion_verify_editor_key(text) to service_role;
 grant execute on function public.coalicion_get_contacts(text) to service_role;
+grant execute on function public.coalicion_create_contact_public(jsonb) to service_role;
 grant execute on function public.coalicion_save_contact(text, jsonb, uuid) to service_role;
 grant execute on function public.coalicion_save_record_public(text, jsonb, uuid) to service_role;
 

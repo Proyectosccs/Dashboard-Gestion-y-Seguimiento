@@ -52,11 +52,11 @@ The two surfaces share visual tokens and link to one another, but never share ev
 - The route is `evento-coalicion-venezuela.html`; the UCV route remains the repository default.
 - The HTML and JavaScript contain no real contact, identity, address, inventory, or batch data.
 - The dashboard opens directly without an account and supports narrow mobile viewports.
-- Events, inventory and aggregate batches are publicly readable. Column-level grants expose only the responsible name and role to direct public table requests.
+- Events, inventory and aggregate batches are publicly readable. Column-level grants expose only the responsible name, role, and organization affiliation to direct public table requests.
 - Cédula, phone, email and responsible notes render as fixed masks until the user selects the eye action and submits a valid key.
-- The key reveals only the selected responsible and is discarded immediately after verification. Creating or editing a responsible also requires the key, which remains in memory only until that form closes or saves.
+- The key reveals only the selected responsible and is discarded immediately after verification. Creating a responsible is direct; editing an existing responsible requires the key, which remains in memory only until that form closes or saves.
 - Event, inventory and batch editing is available immediately without an account or shared key.
-- Direct anonymous insert or update requests are denied. Operational writes pass through `coalicion_save_record_public`; responsible writes pass through the key-gated `coalicion_save_contact` function.
+- Direct anonymous table inserts and updates are denied. Operational writes pass through `coalicion_save_record_public`; responsible creation passes through `coalicion_create_contact_public`, while updates pass through the key-gated `coalicion_save_contact` function.
 - Events, responsible records, inventory, and lots wait for server confirmation before reporting a successful save.
 - Every event requires either a readable address or an HTTPS Google Maps URL; neither field is individually mandatory. The public event card opens the saved Maps point, or falls back to a Google Maps search using the address.
 - Failed saves keep the form and entered values available for correction or retry.
