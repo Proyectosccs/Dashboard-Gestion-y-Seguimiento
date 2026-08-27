@@ -5,7 +5,7 @@
 This repository contains two parallel coordination surfaces for Fundación Ingenia / CONEKTADOS:
 
 - The public UCV coordination artifact with its operational board, event calendar, hierarchy, contacts, and interaction history.
-- The public, mobile-first Coalición Venezuela event dashboard with summary, calendar, privacy-aware contacts, inventory, and beneficiary batches.
+- The public, mobile-first Coalición Venezuela event dashboard with summary, calendar, responsables, inventory, and beneficiary batches.
 
 The two surfaces share visual tokens and link to one another, but never share event records or private logistics data.
 
@@ -21,9 +21,9 @@ The two surfaces share visual tokens and link to one another, but never share ev
 | Calendar | Screen-owned month grid | This UX contract | Previous / next / today; day detail | Add event, navigate months, open a day, reload. |
 | App status | Hierarchy unit select | This UX contract | Developing / resolved / not started | Change status, reload. |
 | Personalization | Screen-owned editing dialog | This UX contract | Text, density, navigation order, board order | Edit draft, cancel, save, reload. |
-| Edit access | Hashed operational key via Supabase Edge Function | `supabase/functions/coalicion-editor/index.ts` | Public consultation / editing active | Invalid key, activate, lock and changed-key recovery. |
-| Authorization | Supabase grants + RLS + server-side key verification | SQL + Edge Function | Public read / key-gated write | Direct REST write rejection and server validation. |
-| Shared CRUD | Supabase tables + key-gated Edge Function | SQL + Edge Function | Contact / event / inventory / batch | Create, edit, reload, realtime refresh and server failure. |
+| Edit access | Direct operational editing + key-gated responsible details | `supabase/functions/coalicion-editor/index.ts` | Direct event/inventory/batch editing; protected responsible access | Open page, reveal, create, edit and reload. |
+| Authorization | Supabase grants + RLS + key verification for sensitive records | SQL + Edge Function | Public safe read / mediated operational write / key-gated responsible data | Direct REST write rejection, invalid key and server validation. |
+| Shared CRUD | Supabase tables + Edge Function | SQL + Edge Function | Responsible / event / inventory / batch | Create, edit, reload, realtime refresh and server failure. |
 
 ## Behavior
 
@@ -52,16 +52,16 @@ The two surfaces share visual tokens and link to one another, but never share ev
 - The route is `evento-coalicion-venezuela.html`; the UCV route remains the repository default.
 - The HTML and JavaScript contain no real contact, identity, address, inventory, or batch data.
 - The dashboard opens directly without an account and supports narrow mobile viewports.
-- Events, inventory and aggregate batches are publicly readable. Column-level grants expose only the contact name and role to public requests.
-- Cédula, phone, email and contact notes are returned only through the Edge Function after the edit key is verified server-side.
-- Editing is activated with one shared operational key. Supabase stores only a bcrypt hash; the real key is never committed to GitHub.
-- Direct anonymous insert or update requests are denied. All writes pass through the allowlisted Edge Function and the internal `coalicion_save_record` RPC, which verifies the key again on every mutation.
-- The key remains only in page memory and is cleared when editing is locked or the page reloads.
-- Events, contacts, inventory, and lots wait for server confirmation before reporting a successful save.
+- Events, inventory and aggregate batches are publicly readable. Column-level grants expose only the responsible name and role to direct public table requests.
+- Cédula, phone, email and responsible notes render as fixed masks until the user selects the eye action and submits a valid key.
+- The key reveals only the selected responsible and is discarded immediately after verification. Creating or editing a responsible also requires the key, which remains in memory only until that form closes or saves.
+- Event, inventory and batch editing is available immediately without an account or shared key.
+- Direct anonymous insert or update requests are denied. Operational writes pass through `coalicion_save_record_public`; responsible writes pass through the key-gated `coalicion_save_contact` function.
+- Events, responsible records, inventory, and lots wait for server confirmation before reporting a successful save.
 - Every event requires either a readable address or an HTTPS Google Maps URL; neither field is individually mandatory. The public event card opens the saved Maps point, or falls back to a Google Maps search using the address.
 - Failed saves keep the form and entered values available for correction or retry.
 - Forms use app-owned validation and protect unsaved changes inside the editor.
-- Contact search is local to the currently visible dataset, has an explicit clear control, and never places the query, key or private fields in the URL.
+- Responsible search is local to the currently visible dataset, has an explicit clear control, and never places the query or personal fields in the URL.
 - Beneficiary batches store aggregate quantity, leader, arrival window, status, and notes. They do not store beneficiary identities or medical information.
 - No hard-delete UI is provided in the first release. Records support an `archived_at` lifecycle for a future, explicitly governed archive flow.
 - Date and time controls remain native; platform-owned picker presentation is accepted for this portable Spanish-language artifact.

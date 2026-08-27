@@ -22,15 +22,14 @@
       </div>
       <div class="session-card">
         <span id="session-name" class="session-name">Acceso desde cualquier dispositivo</span>
-        <span id="session-role" class="role-badge">Vista pública</span>
-        <button id="edit-access-button" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)">🔑 Activar edición</button>
+        <span id="session-role" class="role-badge">✏️ Edición directa</span>
       </div>
     </header>
 
     <nav class="tab-nav" aria-label="Secciones del evento">
       <button class="tab-button" type="button" data-view="summary" aria-current="page" onclick="window.coalicionAction(event)">🏠 Resumen</button>
       <button class="tab-button" type="button" data-view="calendar" onclick="window.coalicionAction(event)">🗓️ Calendario</button>
-      <button class="tab-button" type="button" data-view="contacts" onclick="window.coalicionAction(event)">🤝 Contactos</button>
+      <button class="tab-button" type="button" data-view="contacts" onclick="window.coalicionAction(event)">🤝 Responsables</button>
       <button class="tab-button" type="button" data-view="batches" onclick="window.coalicionAction(event)">👥 Lotes</button>
       <a class="tab-link" href="./">🎓 Tablero UCV</a>
     </nav>
@@ -50,7 +49,7 @@
           <p class="eyebrow">📍 Vista del día</p>
           <h2 id="summary-title">💙 Pulso operativo</h2>
         </div>
-        <button class="btn btn-primary editable-only" type="button" data-action="new-event" onclick="window.coalicionAction(event)">➕ Agregar evento</button>
+        <button class="btn btn-primary" type="button" data-action="new-event" onclick="window.coalicionAction(event)">➕ Agregar evento</button>
       </div>
       <div id="kpi-grid" class="kpi-grid"></div>
       <div class="summary-grid">
@@ -61,7 +60,7 @@
               <p class="eyebrow">📦 Disponibilidad</p>
               <h3 id="inventory-title">🎁 Inventario del evento</h3>
             </div>
-            <button class="btn btn-secondary editable-only" type="button" data-action="new-inventory" onclick="window.coalicionAction(event)">➕ Artículo</button>
+            <button class="btn btn-secondary" type="button" data-action="new-inventory" onclick="window.coalicionAction(event)">➕ Artículo</button>
           </div>
           <div id="inventory-list" class="inventory-list"></div>
         </section>
@@ -88,7 +87,7 @@
           <p class="eyebrow">⏰ Agenda compartida</p>
           <h2 id="calendar-title">🗓️ Calendario del evento</h2>
         </div>
-        <button class="btn btn-primary editable-only" type="button" data-action="new-event" onclick="window.coalicionAction(event)">➕ Agregar evento</button>
+        <button class="btn btn-primary" type="button" data-action="new-event" onclick="window.coalicionAction(event)">➕ Agregar evento</button>
       </div>
       <div class="calendar-toolbar panel">
         <button id="calendar-prev" class="icon-button" type="button" aria-label="Mes anterior" onclick="window.coalicionAction(event)">‹</button>
@@ -102,16 +101,17 @@
     <section id="contacts-view" class="view" aria-labelledby="contacts-title" hidden>
       <div class="view-heading">
         <div>
-          <p class="eyebrow">🔐 Directorio privado</p>
-          <h2 id="contacts-title">🤝 Responsables y contactos</h2>
+          <p class="eyebrow">🤝 Equipo del evento</p>
+          <h2 id="contacts-title">🤝 Responsables</h2>
+          <p class="view-description">Los datos sensibles permanecen ocultos y requieren la clave para visualizarse o editarse.</p>
         </div>
-        <button class="btn btn-primary editable-only" type="button" data-action="new-contact" onclick="window.coalicionAction(event)">➕ Agregar contacto</button>
+        <button class="btn btn-primary" type="button" data-action="new-contact" onclick="window.coalicionAction(event)">➕ Agregar responsable</button>
       </div>
       <div class="list-toolbar panel">
         <div class="search-field">
-          <label class="sr-only" for="contact-search">Buscar contactos</label>
+          <label class="sr-only" for="contact-search">Buscar responsables</label>
           <span aria-hidden="true">⌕</span>
-          <input id="contact-search" type="text" placeholder="Buscar por nombre, rol o correo…" autocomplete="off">
+          <input id="contact-search" type="text" placeholder="Buscar por nombre o rol…" autocomplete="off">
           <button id="contact-search-clear" class="search-clear" type="button" aria-label="Limpiar búsqueda" onclick="window.coalicionAction(event)" hidden>×</button>
         </div>
         <p id="contact-result-count" class="result-count" aria-live="polite"></p>
@@ -126,7 +126,7 @@
           <h2 id="batches-title">👥 Lotes de beneficiarios</h2>
           <p class="view-description">Este módulo registra cantidades y coordinación del lote; no almacena datos médicos ni identidades de beneficiarios.</p>
         </div>
-        <button class="btn btn-primary editable-only" type="button" data-action="new-batch" onclick="window.coalicionAction(event)">➕ Agregar lote</button>
+        <button class="btn btn-primary" type="button" data-action="new-batch" onclick="window.coalicionAction(event)">➕ Agregar lote</button>
       </div>
       <div id="batches-list" class="batch-list"></div>
     </section>
@@ -136,28 +136,28 @@
     <form id="key-form" class="dialog-form" novalidate>
       <div class="dialog-header">
         <div>
-          <p class="eyebrow">Movilidad sin cuentas</p>
-          <h2 id="key-dialog-title">Activar modo edición</h2>
+          <p class="eyebrow">🔐 Información sensible</p>
+          <h2 id="key-dialog-title">Ver datos del responsable</h2>
         </div>
         <button id="key-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.coalicionAction(event)">×</button>
       </div>
       <div class="key-dialog-copy">
-        <p>La consulta es pública. Ingresa la clave operativa para editar y visualizar los datos completos de contacto.</p>
+        <p id="key-dialog-copy">Ingresa la clave operativa para continuar.</p>
       </div>
       <div id="key-error" class="notice notice-error" role="alert" hidden></div>
       <div class="dialog-fields key-fields">
         <div class="field field-full">
-          <label for="editor-key">Clave de edición</label>
+          <label for="editor-key">Clave</label>
           <div class="password-field">
-            <input id="editor-key" class="input" name="editor_key" type="password" autocomplete="off" required aria-describedby="key-error">
-            <button id="toggle-editor-key" class="password-toggle" type="button" aria-label="Mostrar clave de edición" aria-pressed="false" onclick="window.coalicionAction(event)">Mostrar</button>
+            <input id="editor-key" class="input" name="editor_key" type="password" autocomplete="current-password" required aria-describedby="key-error">
+            <button id="toggle-editor-key" class="password-toggle" type="button" aria-label="Mostrar clave" aria-pressed="false" onclick="window.coalicionAction(event)">Mostrar</button>
           </div>
         </div>
       </div>
       <div class="dialog-actions">
         <button id="key-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)">Cancelar</button>
         <button id="key-submit" class="btn btn-primary" type="submit">
-          <span class="button-label">Activar edición</span>
+          <span class="button-label">Continuar</span>
           <span class="button-spinner" aria-hidden="true"></span>
         </button>
       </div>

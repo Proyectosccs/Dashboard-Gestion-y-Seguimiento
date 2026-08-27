@@ -1,4 +1,4 @@
--- EVENTO COALICIÓN VENEZUELA — CONSULTA PÚBLICA + EDICIÓN CON CLAVE
+-- EVENTO COALICIÓN VENEZUELA — EDICIÓN OPERATIVA DIRECTA + DATOS SENSIBLES CON CLAVE
 -- Ejecutar en Supabase: SQL Editor -> New query -> pegar todo -> Run.
 -- Este archivo crea la estructura y las políticas, pero NO contiene la clave ni datos personales.
 
@@ -177,9 +177,8 @@ begin
 end;
 $$;
 
-create or replace function public.coalicion_save_record(
+create or replace function public.coalicion_save_contact(
   p_key text,
-  p_entity text,
   p_payload jsonb,
   p_id uuid default null
 )
@@ -195,29 +194,47 @@ begin
   if not public.coalicion_verify_editor_key(p_key) then
     raise exception 'invalid editor key' using errcode = '28000';
   end if;
+  if nullif(trim(p_payload->>'name'), '') is null or nullif(trim(p_payload->>'phone'), '') is null then
+    raise exception 'name and phone are required' using errcode = '22023';
+  end if;
+  if p_id is null then
+    insert into public.coalicion_contacts (name, national_id, phone, email, role, notes)
+    values (
+      trim(p_payload->>'name'), nullif(trim(p_payload->>'national_id'), ''), trim(p_payload->>'phone'),
+      nullif(trim(p_payload->>'email'), ''), coalesce(nullif(trim(p_payload->>'role'), ''), 'Responsable'),
+      nullif(trim(p_payload->>'notes'), '')
+    ) returning to_jsonb(coalicion_contacts) into saved;
+  else
+    update public.coalicion_contacts set
+      name = trim(p_payload->>'name'), national_id = nullif(trim(p_payload->>'national_id'), ''),
+      phone = trim(p_payload->>'phone'), email = nullif(trim(p_payload->>'email'), ''),
+      role = coalesce(nullif(trim(p_payload->>'role'), ''), 'Responsable'),
+      notes = nullif(trim(p_payload->>'notes'), ''), updated_at = now()
+    where id = p_id and archived_at is null
+    returning to_jsonb(coalicion_contacts) into saved;
+  end if;
+  if saved is null then
+    raise exception 'record not found' using errcode = 'P0002';
+  end if;
+  return saved;
+end;
+$$;
 
-  if p_entity = 'contact' then
-    if nullif(trim(p_payload->>'name'), '') is null or nullif(trim(p_payload->>'phone'), '') is null then
-      raise exception 'name and phone are required' using errcode = '22023';
-    end if;
-    if p_id is null then
-      insert into public.coalicion_contacts (name, national_id, phone, email, role, notes)
-      values (
-        trim(p_payload->>'name'), nullif(trim(p_payload->>'national_id'), ''), trim(p_payload->>'phone'),
-        nullif(trim(p_payload->>'email'), ''), coalesce(nullif(trim(p_payload->>'role'), ''), 'Responsable'),
-        nullif(trim(p_payload->>'notes'), '')
-      ) returning to_jsonb(coalicion_contacts) into saved;
-    else
-      update public.coalicion_contacts set
-        name = trim(p_payload->>'name'), national_id = nullif(trim(p_payload->>'national_id'), ''),
-        phone = trim(p_payload->>'phone'), email = nullif(trim(p_payload->>'email'), ''),
-        role = coalesce(nullif(trim(p_payload->>'role'), ''), 'Responsable'),
-        notes = nullif(trim(p_payload->>'notes'), ''), updated_at = now()
-      where id = p_id and archived_at is null
-      returning to_jsonb(coalicion_contacts) into saved;
-    end if;
-
-  elsif p_entity = 'event' then
+create or replace function public.coalicion_save_record_public(
+  p_entity text,
+  p_payload jsonb,
+  p_id uuid default null
+)
+returns jsonb
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $$
+declare
+  saved jsonb;
+begin
+  if p_entity = 'event' then
     if nullif(trim(p_payload->>'title'), '') is null then
       raise exception 'title is required' using errcode = '22023';
     end if;
@@ -297,15 +314,14 @@ begin
 end;
 $$;
 
-revoke all on function public.coalicion_verify_editor_key(text) from public;
-revoke all on function public.coalicion_get_contacts(text) from public;
-revoke all on function public.coalicion_save_record(text, text, jsonb, uuid) from public;
-revoke all on function public.coalicion_verify_editor_key(text) from anon, authenticated;
-revoke all on function public.coalicion_get_contacts(text) from anon, authenticated;
-revoke all on function public.coalicion_save_record(text, text, jsonb, uuid) from anon, authenticated;
+revoke all on function public.coalicion_verify_editor_key(text) from public, anon, authenticated;
+revoke all on function public.coalicion_get_contacts(text) from public, anon, authenticated;
+revoke all on function public.coalicion_save_contact(text, jsonb, uuid) from public, anon, authenticated;
+revoke all on function public.coalicion_save_record_public(text, jsonb, uuid) from public, anon, authenticated;
 grant execute on function public.coalicion_verify_editor_key(text) to service_role;
 grant execute on function public.coalicion_get_contacts(text) to service_role;
-grant execute on function public.coalicion_save_record(text, text, jsonb, uuid) to service_role;
+grant execute on function public.coalicion_save_contact(text, jsonb, uuid) to service_role;
+grant execute on function public.coalicion_save_record_public(text, jsonb, uuid) to service_role;
 
 do $$
 declare

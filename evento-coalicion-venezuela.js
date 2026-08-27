@@ -28,15 +28,18 @@
 
   const state = {
     client: null,
-    editing: false,
-    editorKey: '',
     view: 'summary',
     calendarMonth: new Date().toISOString().slice(0, 7),
     contacts: [],
+    revealedContacts: {},
     events: [],
     inventory: [],
     batches: [],
     query: '',
+    keyRequest: null,
+    keyRequestCounter: 0,
+    keyTrigger: null,
+    sensitiveEditorKey: '',
     editor: null,
     editorDirty: false,
     discardArmed: false,
@@ -55,7 +58,6 @@
     if (target.dataset.view) return setView(target.dataset.view);
     if (target.dataset.action) return handleAction(target.dataset.action, target.dataset.id);
     const actionsById = {
-      'edit-access-button': toggleEditAccess,
       'retry-load': loadAllData,
       'calendar-prev': function () { changeMonth(-1); },
       'calendar-next': function () { changeMonth(1); },
@@ -83,7 +85,6 @@
 
   function cacheDom() {
     dom.appShell = document.getElementById('app-shell');
-    dom.editAccessButton = document.getElementById('edit-access-button');
     dom.sessionName = document.getElementById('session-name');
     dom.sessionRole = document.getElementById('session-role');
     dom.loadingState = document.getElementById('loading-state');
@@ -101,6 +102,8 @@
     dom.batchesList = document.getElementById('batches-list');
     dom.keyDialog = document.getElementById('key-dialog');
     dom.keyForm = document.getElementById('key-form');
+    dom.keyDialogTitle = document.getElementById('key-dialog-title');
+    dom.keyDialogCopy = document.getElementById('key-dialog-copy');
     dom.editorKey = document.getElementById('editor-key');
     dom.keyError = document.getElementById('key-error');
     dom.keySubmit = document.getElementById('key-submit');
@@ -120,7 +123,7 @@
   function bindStaticEvents() {
     dom.appShell.addEventListener('click', handleAppAction);
     dom.contactSearch.addEventListener('input', handleContactSearch);
-    dom.keyForm.addEventListener('submit', activateEditing);
+    dom.keyForm.addEventListener('submit', authorizeSensitiveAccess);
     dom.keyDialog.addEventListener('cancel', function (event) {
       event.preventDefault();
       closeKeyDialog();
@@ -146,32 +149,43 @@
     });
   }
 
-  function toggleEditAccess() {
-    if (!state.editing) {
-      dom.keyError.hidden = true;
-      dom.keyError.textContent = '';
-      dom.editorKey.value = '';
-      dom.keyDialog.showModal();
-      dom.editorKey.focus();
-      return;
-    }
-    lockEditing();
-    loadAllData(true);
-    toast('Modo edición desactivado.', 'success');
+  function showConnectionFailure() {
+    dom.loadingState.hidden = true;
+    dom.connectivityBanner.textContent = 'La conexión de datos no está disponible. Revisa la configuración de Supabase.';
+    dom.connectivityBanner.hidden = false;
   }
 
-  function lockEditing() {
-    state.editing = false;
-    state.editorKey = '';
-    document.body.classList.remove('is-editing');
-    dom.sessionRole.textContent = 'Vista pública';
-    dom.editAccessButton.textContent = '🔑 Activar edición';
+  function requestSensitiveAccess(purpose, contactId) {
+    const contact = contactId ? findById(state.contacts, contactId) : null;
+    const name = contact ? contact.name : 'un nuevo responsable';
+    state.keyRequest = { purpose: purpose, contactId: contactId || null, token: ++state.keyRequestCounter };
+    state.keyTrigger = document.activeElement;
+    dom.keyDialogTitle.textContent = purpose === 'reveal'
+      ? 'Ver datos de ' + name
+      : purpose === 'edit'
+        ? 'Editar a ' + name
+        : 'Agregar responsable';
+    dom.keyDialogCopy.textContent = purpose === 'reveal'
+      ? 'Ingresa la clave para mostrar la cédula, el teléfono, el correo y las notas.'
+      : 'Ingresa la clave para acceder al formulario con información sensible.';
+    dom.keyError.hidden = true;
+    dom.keyError.textContent = '';
+    dom.editorKey.value = '';
+    dom.editorKey.type = 'password';
+    dom.toggleEditorKey.textContent = 'Mostrar';
+    dom.toggleEditorKey.setAttribute('aria-label', 'Mostrar clave');
+    dom.toggleEditorKey.setAttribute('aria-pressed', 'false');
+    dom.keyDialog.showModal();
+    dom.editorKey.focus();
   }
 
-  async function activateEditing(event) {
+  async function authorizeSensitiveAccess(event) {
     event.preventDefault();
+    const request = state.keyRequest;
     const key = dom.editorKey.value;
     dom.keyError.hidden = true;
+    dom.editorKey.removeAttribute('aria-invalid');
+    if (!request) return;
     if (key.length < 12) {
       dom.keyError.textContent = 'La clave debe tener al menos 12 caracteres.';
       dom.keyError.hidden = false;
@@ -179,51 +193,59 @@
       dom.editorKey.focus();
       return;
     }
+
     setBusy(dom.keySubmit, true);
-    const result = await callEditorApi('verify', { key: key });
+    const result = request.purpose === 'new'
+      ? await callEditorApi('verify', { key: key })
+      : await callEditorApi('responsible', { key: key, id: request.contactId });
     setBusy(dom.keySubmit, false);
-    if (result.error || result.data !== true) {
+    if (!state.keyRequest || state.keyRequest.token !== request.token) return;
+
+    if (result.error || (request.purpose === 'new' && result.data !== true)) {
       dom.keyError.textContent = 'La clave no es válida. Verifícala e inténtalo nuevamente.';
       dom.keyError.hidden = false;
       dom.editorKey.setAttribute('aria-invalid', 'true');
       dom.editorKey.select();
       return;
     }
-    state.editing = true;
-    state.editorKey = key;
-    document.body.classList.add('is-editing');
-    dom.sessionRole.textContent = 'Edición activa';
-    dom.editAccessButton.textContent = 'Bloquear edición';
-    dom.editorKey.removeAttribute('aria-invalid');
-    closeKeyDialog();
-    await loadAllData(true);
-    toast('Modo edición activado.', 'success');
+
+    if (request.purpose === 'reveal') {
+      state.revealedContacts[request.contactId] = result.data;
+      closeKeyDialog(false);
+      renderContacts();
+      const hideButton = dom.contactsList.querySelector('[data-action="hide-contact"][data-id="' + request.contactId + '"]');
+      if (hideButton) hideButton.focus();
+      toast('Datos sensibles visibles para este responsable.', 'success');
+      return;
+    }
+
+    state.sensitiveEditorKey = key;
+    const record = request.purpose === 'edit' ? result.data : null;
+    closeKeyDialog(false);
+    openEditor('contact', record);
   }
 
-  function closeKeyDialog() {
+  function closeKeyDialog(restoreFocus) {
     dom.editorKey.value = '';
     dom.editorKey.type = 'password';
     dom.toggleEditorKey.textContent = 'Mostrar';
-    dom.toggleEditorKey.setAttribute('aria-label', 'Mostrar clave de edición');
+    dom.toggleEditorKey.setAttribute('aria-label', 'Mostrar clave');
     dom.toggleEditorKey.setAttribute('aria-pressed', 'false');
     dom.keyError.hidden = true;
     if (dom.keyDialog.open) dom.keyDialog.close();
-    dom.editAccessButton.focus();
+    const trigger = state.keyTrigger;
+    state.keyRequest = null;
+    state.keyTrigger = null;
+    if (restoreFocus !== false && trigger && typeof trigger.focus === 'function') trigger.focus();
   }
 
   function toggleEditorKey() {
     const revealing = dom.editorKey.type === 'password';
     dom.editorKey.type = revealing ? 'text' : 'password';
     dom.toggleEditorKey.textContent = revealing ? 'Ocultar' : 'Mostrar';
-    dom.toggleEditorKey.setAttribute('aria-label', revealing ? 'Ocultar clave de edición' : 'Mostrar clave de edición');
+    dom.toggleEditorKey.setAttribute('aria-label', revealing ? 'Ocultar clave' : 'Mostrar clave');
     dom.toggleEditorKey.setAttribute('aria-pressed', String(revealing));
     dom.editorKey.focus();
-  }
-
-  function showConnectionFailure() {
-    dom.loadingState.hidden = true;
-    dom.connectivityBanner.textContent = 'La conexión de datos no está disponible. Revisa la configuración de Supabase.';
-    dom.connectivityBanner.hidden = false;
   }
 
   async function loadAllData(background) {
@@ -232,9 +254,10 @@
     if (!background) dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
 
-    const contactsRequest = state.editing
-      ? callEditorApi('contacts', { key: state.editorKey })
-      : state.client.from(TABLES.contacts).select('id,name,role,created_at,updated_at').is('archived_at', null).order('name');
+    const contactsRequest = state.client.from(TABLES.contacts)
+      .select('id,name,role,created_at,updated_at')
+      .is('archived_at', null)
+      .order('name');
     const results = await Promise.all([
       contactsRequest,
       state.client.from(TABLES.events).select('*').is('archived_at', null).order('event_date'),
@@ -245,17 +268,13 @@
     if (loadId !== state.loadId) return;
     const failed = results.find(function (result) { return result.error; });
     if (failed) {
-      if (state.editing && results[0].error) {
-        lockEditing();
-        toast('La clave dejó de ser válida. Volvimos a la vista pública.', 'error');
-        return loadAllData(true);
-      }
       dom.loadingState.hidden = true;
       dom.connectivityBanner.hidden = false;
       return;
     }
 
     state.contacts = results[0].data || [];
+    state.revealedContacts = {};
     state.events = results[1].data || [];
     state.inventory = results[2].data || [];
     state.batches = results[3].data || [];
@@ -285,7 +304,7 @@
     const titles = {
       summary: 'Resumen — Evento Coalición Venezuela',
       calendar: 'Calendario — Evento Coalición Venezuela',
-      contacts: 'Contactos — Evento Coalición Venezuela',
+      contacts: 'Responsables — Evento Coalición Venezuela',
       batches: 'Lotes — Evento Coalición Venezuela'
     };
     document.querySelectorAll('.tab-button').forEach(function (button) {
@@ -308,14 +327,23 @@
   }
 
   function handleAction(action, id) {
-    if (action === 'new-contact') openEditor('contact');
-    if (action === 'edit-contact') openEditor('contact', findById(state.contacts, id));
+    if (action === 'new-contact') requestSensitiveAccess('new');
+    if (action === 'edit-contact') requestSensitiveAccess('edit', id);
+    if (action === 'reveal-contact') requestSensitiveAccess('reveal', id);
+    if (action === 'hide-contact') hideContact(id);
     if (action === 'new-event') openEditor('event');
     if (action === 'edit-event') openEditor('event', findById(state.events, id));
     if (action === 'new-inventory') openEditor('inventory');
     if (action === 'edit-inventory') openEditor('inventory', findById(state.inventory, id));
     if (action === 'new-batch') openEditor('batch');
     if (action === 'edit-batch') openEditor('batch', findById(state.batches, id));
+  }
+
+  function hideContact(id) {
+    delete state.revealedContacts[id];
+    renderContacts();
+    const revealButton = dom.contactsList.querySelector('[data-action="reveal-contact"][data-id="' + id + '"]');
+    if (revealButton) revealButton.focus();
   }
 
   function renderAll() {
@@ -340,7 +368,7 @@
 
     const next = nextEvent();
     if (!next) {
-      renderMarkup(dom.nextEventCard, emptyState('🗓️ Sin evento registrado', 'Agrega la fecha, una dirección o un enlace de Maps para activar el pulso operativo.', canEdit() ? '<button class="btn btn-primary" type="button" data-action="new-event">➕ Agregar evento</button>' : ''));
+      renderMarkup(dom.nextEventCard, emptyState('🗓️ Sin evento registrado', 'Agrega la fecha, una dirección o un enlace de Maps para activar el pulso operativo.', '<button class="btn btn-primary" type="button" data-action="new-event">➕ Agregar evento</button>'));
     } else {
       const date = dateParts(next.event_date);
       renderMarkup(dom.nextEventCard,
@@ -349,7 +377,7 @@
           '<h3>' + safe(next.title) + '</h3>' +
           '<div class="event-meta"><p>◷ ' + safe(formatTime(next.start_time)) + '</p>' + renderEventLocation(next) + (next.notes ? '<p>↳ ' + safe(next.notes) + '</p>' : '') + '</div>' +
         '</div>' +
-        (canEdit() ? '<div class="event-actions"><button class="btn btn-secondary" type="button" data-action="edit-event" data-id="' + safe(next.id) + '">Editar evento</button></div>' : '')
+        '<div class="event-actions"><button class="btn btn-secondary" type="button" data-action="edit-event" data-id="' + safe(next.id) + '">Editar evento</button></div>'
       );
     }
 
@@ -365,7 +393,7 @@
           '<div class="inventory-top"><span class="inventory-name">' + safe(item.name) + '</span><span class="inventory-count">' + available + '</span></div>' +
           '<div class="progress-track" role="progressbar" aria-label="Distribución de ' + safe(item.name) + '" aria-valuemin="0" aria-valuemax="' + total + '" aria-valuenow="' + distributed + '"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
           '<div class="inventory-meta"><span>' + distributed + ' distribuidas</span><span>' + total + ' ' + safe(item.unit || 'unidades') + '</span></div>' +
-          (canEdit() ? '<button class="btn btn-ghost" type="button" data-action="edit-inventory" data-id="' + safe(item.id) + '">Actualizar</button>' : '') +
+          '<button class="btn btn-ghost" type="button" data-action="edit-inventory" data-id="' + safe(item.id) + '">Actualizar</button>' +
         '</article>';
       }).join(''));
     }
@@ -391,7 +419,7 @@
       markup += '<div class="calendar-day' + (iso === today ? ' is-today' : '') + '">' +
         '<span class="calendar-number">' + day + '</span>' +
         dayEvents.map(function (item) {
-          return '<button class="calendar-event" type="button" data-action="edit-event" data-id="' + safe(item.id) + '"' + (canEdit() ? '' : ' disabled') + '>' + safe(formatTime(item.start_time) + ' · ' + item.title) + '</button>';
+          return '<button class="calendar-event" type="button" data-action="edit-event" data-id="' + safe(item.id) + '">' + safe(formatTime(item.start_time) + ' · ' + item.title) + '</button>';
         }).join('') + '</div>';
     }
     renderMarkup(dom.calendarGrid, markup);
@@ -400,9 +428,9 @@
   function renderContacts() {
     const query = normalize(state.query);
     const contacts = state.contacts.filter(function (contact) {
-      return !query || normalize([contact.name, contact.role, contact.email, contact.phone].join(' ')).includes(query);
+      return !query || normalize([contact.name, contact.role].join(' ')).includes(query);
     });
-    dom.contactResultCount.textContent = contacts.length + ' de ' + state.contacts.length + ' contactos';
+    dom.contactResultCount.textContent = contacts.length + ' de ' + state.contacts.length + ' responsables';
     dom.contactSearchClear.hidden = !state.query;
     if (!contacts.length) {
       renderMarkup(dom.contactsList, emptyState(state.contacts.length ? '🔎 Sin coincidencias' : '🤝 Directorio vacío', state.contacts.length ? 'Prueba otra búsqueda o limpia el filtro.' : 'Agrega los responsables autorizados del evento.', state.contacts.length ? '<button class="btn btn-secondary" type="button" id="empty-clear-search">Limpiar búsqueda</button>' : ''));
@@ -411,23 +439,49 @@
       return;
     }
     renderMarkup(dom.contactsList, contacts.map(function (contact) {
+      const fullContact = state.revealedContacts[contact.id];
       return '<article class="contact-card">' +
         '<div class="contact-card-header"><div class="contact-avatar" aria-hidden="true">' + safe(initials(contact.name)) + '</div><div><h3>' + safe(contact.name) + '</h3><div class="contact-role">' + safe(contact.role || 'Responsable') + '</div></div></div>' +
-        '<span class="private-chip">Información protegida</span>' +
-        (canEdit() ? '<div class="contact-details">' +
-          '<div>▣ Cédula: <strong>' + safe(contact.national_id || 'Por confirmar') + '</strong></div>' +
-          '<div>◉ <a href="tel:' + safe(contact.phone || '') + '">' + safe(contact.phone || 'Por confirmar') + '</a></div>' +
-          '<div>✉ <a href="mailto:' + safe(contact.email || '') + '">' + safe(contact.email || 'Por confirmar') + '</a></div>' +
-          (contact.notes ? '<div>↳ ' + safe(contact.notes) + '</div>' : '') +
-        '</div>' : '<div class="notice notice-warning">Activa el modo edición para visualizar los datos completos de contacto.</div>') +
-        (canEdit() ? '<div class="contact-card-actions"><button class="btn btn-secondary" type="button" data-action="edit-contact" data-id="' + safe(contact.id) + '">Editar contacto</button></div>' : '') +
+        '<span class="private-chip">🔐 Datos sensibles protegidos</span>' +
+        renderSensitiveDetails(fullContact) +
+        '<div class="contact-card-actions">' +
+          '<button class="btn btn-ghost privacy-eye" type="button" data-action="' + (fullContact ? 'hide-contact' : 'reveal-contact') + '" data-id="' + safe(contact.id) + '" aria-label="' + (fullContact ? 'Ocultar' : 'Ver') + ' datos sensibles de ' + safe(contact.name) + '">' + (fullContact ? '🙈 Ocultar datos' : '👁️ Ver datos') + '</button>' +
+          '<button class="btn btn-secondary" type="button" data-action="edit-contact" data-id="' + safe(contact.id) + '">Editar responsable</button>' +
+        '</div>' +
       '</article>';
     }).join(''));
   }
 
+  function renderSensitiveDetails(contact) {
+    if (!contact) {
+      return '<div class="contact-details" aria-label="Datos sensibles ocultos">' +
+        sensitiveRow('▣ Cédula', '<span class="masked-value" aria-label="Oculto">••••••••</span>') +
+        sensitiveRow('◉ Teléfono', '<span class="masked-value" aria-label="Oculto">•••• ••••</span>') +
+        sensitiveRow('✉ Correo', '<span class="masked-value" aria-label="Oculto">••••••@••••.•••</span>') +
+        sensitiveRow('↳ Notas', '<span class="masked-value" aria-label="Oculto">••••••••••</span>') +
+      '</div>';
+    }
+    const phone = contact.phone
+      ? '<a href="tel:' + safe(contact.phone) + '">' + safe(contact.phone) + '</a>'
+      : 'Por confirmar';
+    const email = contact.email
+      ? '<a href="mailto:' + safe(contact.email) + '">' + safe(contact.email) + '</a>'
+      : 'Por confirmar';
+    return '<div class="contact-details">' +
+      sensitiveRow('▣ Cédula', '<strong>' + safe(contact.national_id || 'Por confirmar') + '</strong>') +
+      sensitiveRow('◉ Teléfono', phone) +
+      sensitiveRow('✉ Correo', email) +
+      sensitiveRow('↳ Notas', safe(contact.notes || 'Por confirmar')) +
+    '</div>';
+  }
+
+  function sensitiveRow(label, value) {
+    return '<div class="sensitive-row"><span class="sensitive-label">' + safe(label) + '</span><span class="sensitive-value">' + value + '</span></div>';
+  }
+
   function renderBatches() {
     if (!state.batches.length) {
-      renderMarkup(dom.batchesList, emptyState('👥 No hay lotes registrados', 'Agrega cada grupo con su líder, cantidad prevista y ventana de llegada.', canEdit() ? '<button class="btn btn-primary" type="button" data-action="new-batch">➕ Agregar lote</button>' : ''));
+      renderMarkup(dom.batchesList, emptyState('👥 No hay lotes registrados', 'Agrega cada grupo con su líder, cantidad prevista y ventana de llegada.', '<button class="btn btn-primary" type="button" data-action="new-batch">➕ Agregar lote</button>'));
       return;
     }
     renderMarkup(dom.batchesList, state.batches.map(function (batch) {
@@ -438,20 +492,19 @@
         '<div class="batch-value"><span>Personas</span><strong>' + Number(batch.expected_count || 0) + '</strong></div>' +
         '<div class="batch-value"><span>Llegada</span><strong>' + safe(batch.arrival_window || 'Por confirmar') + '</strong></div>' +
         '<div class="batch-value"><span>Evento</span><strong>' + safe(event ? event.title : 'Por asignar') + '</strong></div>' +
-        (canEdit() ? '<button class="btn btn-secondary" type="button" data-action="edit-batch" data-id="' + safe(batch.id) + '">Editar</button>' : '') +
+        '<button class="btn btn-secondary" type="button" data-action="edit-batch" data-id="' + safe(batch.id) + '">Editar</button>' +
       '</article>';
     }).join(''));
   }
 
   function openEditor(type, record) {
-    if (!canEdit()) return;
     state.editor = { type: type, record: record || null };
     state.editorDirty = false;
     state.discardArmed = false;
     dom.dialogCancel.textContent = 'Cancelar';
     hideDialogError();
     const configs = {
-      contact: { eyebrow: 'Directorio privado', title: record ? 'Editar contacto' : 'Agregar contacto', fields: contactFields(record) },
+      contact: { eyebrow: 'Equipo del evento', title: record ? 'Editar responsable' : 'Agregar responsable', fields: contactFields(record) },
       event: { eyebrow: 'Agenda compartida', title: record ? 'Editar evento' : 'Agregar evento', fields: eventFields(record) },
       inventory: { eyebrow: 'Control de existencias', title: record ? 'Actualizar inventario' : 'Agregar artículo', fields: inventoryFields(record) },
       batch: { eyebrow: 'Recepción por grupos', title: record ? 'Editar lote' : 'Agregar lote', fields: batchFields(record) }
@@ -508,7 +561,7 @@
 
   async function saveEditor(event) {
     event.preventDefault();
-    if (!state.editor || !canEdit()) return;
+    if (!state.editor) return;
     hideDialogError();
     const data = Object.fromEntries(new FormData(dom.editorForm).entries());
     const validation = validateEditor(state.editor.type, data);
@@ -526,16 +579,16 @@
     const payload = normalizePayload(state.editor.type, data);
     setBusy(dom.dialogSave, true);
     const result = await callEditorApi('save', {
-      key: state.editorKey,
+      key: state.editor.type === 'contact' ? state.sensitiveEditorKey : undefined,
       entity: state.editor.type,
       payload: payload,
       id: state.editor.record ? state.editor.record.id : null
     });
     setBusy(dom.dialogSave, false);
     if (result.error) {
-      if (result.error.code === '28000' || String(result.error.message || '').includes('invalid editor key')) {
-        lockEditing();
-        showDialogError('La clave de edición dejó de ser válida. Cierra este formulario y actívala nuevamente.');
+      if (state.editor.type === 'contact' && result.error.code === '28000') {
+        state.sensitiveEditorKey = '';
+        showDialogError('La clave dejó de ser válida. Cierra el formulario e inténtalo nuevamente.');
         return;
       }
       showDialogError('No pudimos guardar los cambios. Revisa tu conexión y vuelve a intentarlo.');
@@ -550,9 +603,9 @@
 
   function validateEditor(type, data) {
     if (type === 'contact') {
-      if (!data.name.trim()) return issue('name', 'Escribe el nombre completo del contacto.');
-      if (!data.role.trim()) return issue('role', 'Indica el rol del contacto.');
-      if (!data.phone.trim()) return issue('phone', 'Ingresa un teléfono de contacto.');
+      if (!data.name.trim()) return issue('name', 'Escribe el nombre completo del responsable.');
+      if (!data.role.trim()) return issue('role', 'Indica el rol del responsable.');
+      if (!data.phone.trim()) return issue('phone', 'Ingresa el teléfono del responsable.');
       if (data.email && !/^\S+@\S+\.\S+$/.test(data.email)) return issue('email', 'Corrige el formato del correo electrónico.');
     }
     if (type === 'event') {
@@ -609,6 +662,7 @@
   function closeEditor() {
     if (dom.editorDialog.open) dom.editorDialog.close();
     state.editor = null;
+    state.sensitiveEditorKey = '';
     state.editorDirty = false;
     state.discardArmed = false;
     dom.dialogCancel.textContent = 'Cancelar';
@@ -631,10 +685,6 @@
     const date = new Date(Date.UTC(parts[0], parts[1] - 1 + delta, 1));
     state.calendarMonth = date.toISOString().slice(0, 7);
     renderCalendar();
-  }
-
-  function canEdit() {
-    return state.editing && !!state.editorKey;
   }
 
   async function callEditorApi(action, payload) {

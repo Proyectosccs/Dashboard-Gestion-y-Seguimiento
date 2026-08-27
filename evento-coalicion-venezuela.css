@@ -64,8 +64,6 @@ html {
 *::-webkit-scrollbar-thumb:active { background: var(--color-neutral-700); }
 
 [hidden] { display: none !important; }
-.editable-only { display: none !important; }
-body.is-editing .editable-only { display: inline-flex !important; }
 button, input, select, textarea { font: inherit; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--color-accent) 65%, white);
@@ -380,7 +378,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .private-chip { width: fit-content; padding: 4px 8px; border-radius: 999px; background: var(--coalition-blue-soft); color: var(--coalition-blue); font-size: 10px; font-weight: 700; }
 .contact-details { display: grid; gap: 8px; font-size: 13px; }
 .contact-details a { overflow-wrap: anywhere; }
-.contact-card-actions { display: flex; justify-content: flex-end; margin-top: auto; }
+.sensitive-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.sensitive-label { color: var(--color-neutral-600); }
+.sensitive-value { min-width: 0; overflow-wrap: anywhere; text-align: right; }
+.masked-value { color: var(--color-neutral-500); letter-spacing: .11em; }
+.contact-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: auto; }
+.privacy-eye { min-width: 124px; }
 
 .batch-list { display: grid; gap: 10px; }
 .batch-card { display: grid; grid-template-columns: minmax(180px, 1.4fr) repeat(3, minmax(120px, .6fr)) auto; align-items: center; gap: 14px; padding: 16px 18px; border: 1px solid var(--color-neutral-300); border-radius: 22px; background: rgba(255,255,255,.82); }
