@@ -22,7 +22,7 @@ La función `supabase/functions/coalicion-editor/index.ts` debe desplegarse con 
 - **Edición directa:** cualquier persona que abra la página puede crear o modificar eventos, inventario y lotes.
 - **Responsables:** la pestaña muestra públicamente nombre y rol. Cédula, teléfono, correo y notas aparecen enmascarados.
 - **Botón de ojo:** solicita la clave y revela únicamente el responsable seleccionado.
-- **Crear o editar responsable:** también solicita la clave porque el formulario contiene datos sensibles.
+- **Crear responsable:** abre directamente y exige seleccionar **Pertenece a**. **Editar** un responsable existente conserva la clave.
 - **Tablas:** las escrituras anónimas directas permanecen bloqueadas; el dashboard guarda mediante la función de borde.
 
 Este modelo combina movilidad operativa con protección de los datos personales.
@@ -31,7 +31,7 @@ Este modelo combina movilidad operativa con protección de los datos personales.
 
 1. Abrir el dashboard desde el teléfono o computadora.
 2. Agregar el evento con fecha, hora, dirección o enlace de Maps, estado e indicaciones.
-3. Ingresar la clave y agregar el equipo en **Responsables**.
+3. Agregar el equipo en **Responsables**. La clave solo se solicita al revelar o editar un registro existente.
 4. Registrar los artículos y cantidades en **Inventario del evento**.
 5. Crear los grupos en **Lotes**, con un mínimo de 15 personas por lote.
 
