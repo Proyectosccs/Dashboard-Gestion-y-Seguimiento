@@ -99,11 +99,15 @@ Deno.serve(async (request: Request) => {
         return jsonResponse(origin, 400, { error: 'invalid payload' });
       }
       const saved = body.entity === 'contact'
-        ? await callRpc('coalicion_save_contact', {
-          p_key: key,
-          p_payload: body.payload,
-          p_id: body.id || null
-        })
+        ? body.id
+          ? await callRpc('coalicion_save_contact', {
+            p_key: key,
+            p_payload: body.payload,
+            p_id: body.id
+          })
+          : await callRpc('coalicion_create_contact_public', {
+            p_payload: body.payload
+          })
         : await callRpc('coalicion_save_record_public', {
           p_entity: body.entity,
           p_payload: body.payload,
