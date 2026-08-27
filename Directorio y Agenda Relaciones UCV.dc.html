@@ -1729,13 +1729,12 @@ class Component extends DCLogic {
 
   componentDidMount() {
     if (!sb) return;
-    this._loadFromSupabase();
+    this._loadFromSupabase().then(ok => { if (ok) this._syncFromNetworkingPanel(); });
     this._subscribeRealtime();
-    this._syncFromNetworkingPanel();
-    this._onVisible = () => { if (document.visibilityState === 'visible') { this._loadFromSupabase(); this._subscribeRealtime(); this._syncFromNetworkingPanel(); } };
+    this._onVisible = () => { if (document.visibilityState === 'visible') { this._loadFromSupabase().then(ok => { if (ok) this._syncFromNetworkingPanel(); }); this._subscribeRealtime(); } };
     document.addEventListener('visibilitychange', this._onVisible);
     window.addEventListener('focus', this._onVisible);
-    this._pollTimer = setInterval(() => { if (document.visibilityState === 'visible') { this._loadFromSupabase(); this._syncFromNetworkingPanel(); } }, 45000);
+    this._pollTimer = setInterval(() => { if (document.visibilityState === 'visible') { this._loadFromSupabase().then(ok => { if (ok) this._syncFromNetworkingPanel(); }); } }, 45000);
   }
 
   async _syncFromNetworkingPanel() {
@@ -1847,7 +1846,7 @@ class Component extends DCLogic {
 
   async _loadFromSupabase() {
     const res = await sb.from(SUPABASE_TABLE).select('key,value');
-    if (res.error) { console.error('Error al cargar datos de Supabase', res.error); return; }
+    if (res.error) { console.error('Error al cargar datos de Supabase', res.error); return false; }
     const patch = {};
     (res.data || []).forEach(row => {
       const field = STORE_KEY_TO_FIELD[row.key];
@@ -1860,6 +1859,8 @@ class Component extends DCLogic {
       patch[field] = v;
     });
     if (Object.keys(patch).length) this.setState(patch);
+    this._contactsLoaded = true;
+    return true;
   }
 
   unitIndex() {
