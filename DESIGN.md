@@ -27,11 +27,28 @@ spacing:
   large: "26.4px"
 components:
   task-card:
-    backgroundColor: "#ffffff"
-    borderRadius: "16px"
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.medium}"
   kanban-column:
-    backgroundColor: "#f9f4ed"
-    borderRadius: "28px"
+    backgroundColor: "{colors.background}"
+    rounded: "{rounded.large}"
+  danger-notice:
+    textColor: "{colors.danger}"
+    rounded: "{rounded.small}"
+  coalicion-page:
+    backgroundColor: "{colors.coalicionBackground}"
+    textColor: "{colors.coalicionNavy}"
+    typography: "{typography.body}"
+  coalicion-panel:
+    backgroundColor: "{colors.coalicionSurface}"
+    rounded: "{rounded.medium}"
+  coalicion-action:
+    backgroundColor: "{colors.coalicionPrimary}"
+    textColor: "{colors.coalicionSurface}"
+    rounded: "{rounded.small}"
+  coalicion-highlight:
+    textColor: "{colors.coalicionSky}"
 ---
 
 ## Overview
@@ -52,7 +69,7 @@ Caprasimo is reserved for page and section headings. Figtree carries controls, t
 
 The UCV application uses a wide responsive workspace with five peer views: operational board, calendar, hierarchy, contacts, and interactions. The Kanban scrolls horizontally on narrow screens rather than compressing cards below a usable width. The monthly calendar keeps seven readable columns and uses compact event chips. Filters and summary metrics wrap naturally.
 
-Coalición Venezuela lives on a separate public, mobile-first route instead of becoming another UCV tab. It keeps the shared typography and component behavior but overrides the Organic colors with a route-owned blue palette. Its information architecture is purpose-built for one field event: operational pulse, calendar, contacts, inventory, and beneficiary batches. Consultation opens without an account; editing and full contact details require the shared operational key. Its signature is the four-stage delivery route, which explains the group flow without storing beneficiary identities.
+Coalición Venezuela lives on a separate public, mobile-first route instead of becoming another UCV tab. It keeps the shared typography and component behavior but overrides the Organic colors with a route-owned blue palette. Its information architecture is purpose-built for one field event: operational pulse, calendar, responsables, inventory, and beneficiary batches. Consultation and operational editing open directly; sensitive responsible data remains masked and requires the shared key to reveal or edit. Its signature is the four-stage delivery route, which explains the group flow without storing beneficiary identities.
 
 The built-in editing mode may reorder navigation views and the three primary board blocks. Reordering changes information placement, not the underlying visual hierarchy: color roles, typography families and semantic status treatments remain canonical.
 
@@ -66,7 +83,7 @@ Containers are generously rounded. Controls and compact status markers use pill 
 
 ## Components
 
-Task cards show category, priority, owner, time horizon, next action, and movement controls. Event cards show type, date, time, location, status and completion out of five internal-audit checks. On the Coalición route, an event requires either a readable address or a verified Google Maps link, but not both; when only an address exists, the interface opens a Maps search. Functional emojis reinforce navigation, operational metrics and field actions without replacing text labels. Calendar day cells open a focused list and the event editor. Each hierarchy unit shows an editable app-development status beside its title: En desarrollo, Desarrollo de la app resuelto or Sin desarrollar aún. Contact cards show only confirmed information; unknown details read "Por confirmar" and are never fabricated. Native select, date and time controls are accepted for this portable artifact; the browser owns their popup geometry.
+Task cards show category, priority, owner, time horizon, next action, and movement controls. Event cards show type, date, time, location, status and completion out of five internal-audit checks. On the Coalición route, an event requires either a readable address or a verified Google Maps link, but not both; when only an address exists, the interface opens a Maps search. Functional emojis reinforce navigation, operational metrics and field actions without replacing text labels. Calendar day cells open a focused list and the event editor. Each hierarchy unit shows an editable app-development status beside its title: En desarrollo, Desarrollo de la app resuelto or Sin desarrollar aún. Responsible cards expose name and role, represent sensitive values with fixed masks, and use an eye action that requests the operational key before revealing one record. Unknown revealed details read "Por confirmar" and are never fabricated. Native select, date and time controls are accepted for this portable artifact; the browser owns their popup geometry.
 
 The editing panel owns three density variants—compact, normal and large—for KPI cards, journey bubbles, contact bubbles and calendar event chips. It also owns a restrained three-step scale for the principal title. These are layout variants, not new design tokens.
 
