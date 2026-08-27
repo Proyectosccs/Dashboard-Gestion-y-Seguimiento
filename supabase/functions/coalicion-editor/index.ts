@@ -49,7 +49,7 @@ async function callRpc(functionName: string, payload: Record<string, unknown>) {
   const data = await response.json().catch(() => null);
   if (!response.ok) {
     const error = new Error('database operation failed');
-    error.name = response.status === 401 || data?.code === '28000' ? 'InvalidKey' : 'DatabaseError';
+    error.name = data?.code === '28000' ? 'InvalidKey' : 'DatabaseError';
     throw error;
   }
   return data;
@@ -58,28 +58,37 @@ async function callRpc(functionName: string, payload: Record<string, unknown>) {
 Deno.serve(async (request: Request) => {
   const origin = request.headers.get('origin');
   if (request.method === 'OPTIONS') {
-    if (origin && !allowedOrigins.has(origin)) return jsonResponse(origin, 403, { error: 'origin not allowed' });
+    if (!origin || !allowedOrigins.has(origin)) return jsonResponse(origin, 403, { error: 'origin not allowed' });
     return new Response('ok', { headers: responseHeaders(origin) });
   }
   if (request.method !== 'POST') return jsonResponse(origin, 405, { error: 'method not allowed' });
-  if (origin && !allowedOrigins.has(origin)) return jsonResponse(origin, 403, { error: 'origin not allowed' });
+  if (!origin || !allowedOrigins.has(origin)) return jsonResponse(origin, 403, { error: 'origin not allowed' });
 
   try {
     const body = await request.json();
     const action = typeof body?.action === 'string' ? body.action : '';
     const key = typeof body?.key === 'string' ? body.key : '';
-    if (key.length < 12) return jsonResponse(origin, 401, { error: 'invalid editor key' });
 
     if (action === 'verify') {
+      if (key.length < 12) return jsonResponse(origin, 401, { error: 'invalid editor key' });
       const valid = await callRpc('coalicion_verify_editor_key', { p_key: key });
       return valid === true
         ? jsonResponse(origin, 200, { data: true })
         : jsonResponse(origin, 401, { error: 'invalid editor key' });
     }
 
-    if (action === 'contacts') {
-      const contacts = await callRpc('coalicion_get_contacts', { p_key: key });
-      return jsonResponse(origin, 200, { data: contacts });
+    if (action === 'responsible') {
+      if (key.length < 12) return jsonResponse(origin, 401, { error: 'invalid editor key' });
+      if (typeof body?.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(body.id)) {
+        return jsonResponse(origin, 400, { error: 'invalid responsible id' });
+      }
+      const responsibles = await callRpc('coalicion_get_contacts', { p_key: key });
+      const responsible = Array.isArray(responsibles)
+        ? responsibles.find((item) => item?.id === body.id)
+        : null;
+      return responsible
+        ? jsonResponse(origin, 200, { data: responsible })
+        : jsonResponse(origin, 404, { error: 'responsible not found' });
     }
 
     if (action === 'save') {
@@ -89,12 +98,17 @@ Deno.serve(async (request: Request) => {
       if (!body?.payload || typeof body.payload !== 'object' || Array.isArray(body.payload)) {
         return jsonResponse(origin, 400, { error: 'invalid payload' });
       }
-      const saved = await callRpc('coalicion_save_record', {
-        p_key: key,
-        p_entity: body.entity,
-        p_payload: body.payload,
-        p_id: body.id || null
-      });
+      const saved = body.entity === 'contact'
+        ? await callRpc('coalicion_save_contact', {
+          p_key: key,
+          p_payload: body.payload,
+          p_id: body.id || null
+        })
+        : await callRpc('coalicion_save_record_public', {
+          p_entity: body.entity,
+          p_payload: body.payload,
+          p_id: body.id || null
+        });
       return jsonResponse(origin, 200, { data: saved });
     }
 
