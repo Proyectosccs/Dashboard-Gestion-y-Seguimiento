@@ -217,6 +217,10 @@
     <sc-if value="{{ isHierarchy }}" hint-placeholder-val="{{ true }}">
       <div style="display: flex; flex-direction: column; gap: 0; align-items: stretch">
 
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 10px">
+          <button type="button" onClick="{{ onToggleAppStatus }}" style="{{ appStatusToggleStyle }}">{{ appStatusToggleLabel }}</button>
+        </div>
+
         <div style="display: flex; justify-content: center">
           <div style="background: var(--color-neutral-900); color: #fff; border-radius: 24px; padding: 18px 34px; display: flex; align-items: center; gap: 16px; box-shadow: var(--shadow-md)">
             <span style="font-size: 30px">🎓</span>
@@ -257,11 +261,21 @@
           <div style="flex: 2 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
             <sc-for list="{{ medCards }}" as="f" hint-placeholder-count="1">
               <div style="{{ f.cardStyle }}">
-                <div style="display: flex; align-items: center; gap: 10px; padding: 11px 14px 12px">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 11px 14px 12px; flex-wrap: wrap">
                   <div style="width: 30px; height: 30px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-family: var(--font-heading); font-size: 16px; flex: none; background: rgba(255,255,255,.22); color: #fff">{{ f.num }}</div>
                   <div style="font-weight: 700; font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: #fff; line-height: 1.25">{{ f.name }}</div>
+                  <select aria-label="{{ f.facultyStatusLabel }}" value="{{ f.facultyStatusValue }}" onChange="{{ f.onFacultyStatus }}" style="{{ f.facultyStatusStyle }}">
+                    <option value="active">✅ Activo</option>
+                    <option value="not_contacted">⚠️ No contactado</option>
+                    <option value="inactive">❌ No activo</option>
+                    <option value="following">🔄 En seguimiento</option>
+                    <option value="pending_info">🟠 Pendiente de información</option>
+                  </select>
                   <div style="margin-left: auto; background: rgba(255,255,255,.22); color: #fff; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 700; flex: none">{{ f.count }}</div>
                 </div>
+                <sc-if value="{{ f.facultyInactive }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding: 0 14px 10px; font-size: 11px; color: #fff; opacity: .85">{{ f.facultyInactiveNote }}</div>
+                </sc-if>
                 <div style="{{ f.colsStyle }}">
                   <sc-for list="{{ f.cols }}" as="col" hint-placeholder-count="1">
                     <div style="display: flex; flex-direction: column; gap: 8px">
@@ -289,14 +303,16 @@
                                   <option value="following">🔄 En seguimiento</option>
                                   <option value="pending_info">🟠 Pendiente de información</option>
                                 </select>
-                                <label style="display: inline-flex; align-items: center; gap: 4px; min-width: 0" title="Estado del desarrollo de la app">
-                                  <span aria-hidden="true">📱</span>
-                                  <select aria-label="{{ u.appLabel }}" value="{{ u.appStatus }}" onChange="{{ u.onAppStatus }}" style="{{ u.appStatusStyle }}">
-                                    <option value="developing">En desarrollo</option>
-                                    <option value="resolved">Desarrollo de la app resuelto</option>
-                                    <option value="not_started">Sin desarrollar aún</option>
-                                  </select>
-                                </label>
+                                <sc-if value="{{ appStatusVisible }}" hint-placeholder-val="{{ true }}">
+                                  <label style="display: inline-flex; align-items: center; gap: 4px; min-width: 0" title="Estado del desarrollo de la app">
+                                    <span aria-hidden="true">📱</span>
+                                    <select aria-label="{{ u.appLabel }}" value="{{ u.appStatus }}" onChange="{{ u.onAppStatus }}" style="{{ u.appStatusStyle }}">
+                                      <option value="developing">En desarrollo</option>
+                                      <option value="resolved">Desarrollo de la app resuelto</option>
+                                      <option value="not_started">Sin desarrollar aún</option>
+                                    </select>
+                                  </label>
+                                </sc-if>
                                 <button type="button" aria-label="Editar responsable, apoyo y triaje" title="Editar responsable, apoyo y triaje" onClick="{{ u.editUnit }}" style="{{ u.editIconStyle }}">✏️</button>
                               </div>
                               <div style="font-size: 10.5px; color: var(--color-neutral-600); line-height: 1.3; margin-top: 2px">{{ u.note }}</div>
@@ -329,11 +345,21 @@
           <div style="flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
             <sc-for list="{{ otherCards }}" as="f" hint-placeholder-count="6">
               <div style="{{ f.cardStyle }}">
-                <div style="display: flex; align-items: center; gap: 10px; padding: 11px 14px 12px">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 11px 14px 12px; flex-wrap: wrap">
                   <div style="width: 30px; height: 30px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-family: var(--font-heading); font-size: 16px; flex: none; background: rgba(255,255,255,.22); color: #fff">{{ f.num }}</div>
                   <div style="font-weight: 700; font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: #fff; line-height: 1.25">{{ f.name }}</div>
+                  <select aria-label="{{ f.facultyStatusLabel }}" value="{{ f.facultyStatusValue }}" onChange="{{ f.onFacultyStatus }}" style="{{ f.facultyStatusStyle }}">
+                    <option value="active">✅ Activo</option>
+                    <option value="not_contacted">⚠️ No contactado</option>
+                    <option value="inactive">❌ No activo</option>
+                    <option value="following">🔄 En seguimiento</option>
+                    <option value="pending_info">🟠 Pendiente de información</option>
+                  </select>
                   <div style="margin-left: auto; background: rgba(255,255,255,.22); color: #fff; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 700; flex: none">{{ f.count }}</div>
                 </div>
+                <sc-if value="{{ f.facultyInactive }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding: 0 14px 10px; font-size: 11px; color: #fff; opacity: .85">{{ f.facultyInactiveNote }}</div>
+                </sc-if>
                 <div style="{{ f.colsStyle }}">
                   <sc-for list="{{ f.cols }}" as="col" hint-placeholder-count="1">
                     <div style="display: flex; flex-direction: column; gap: 8px">
@@ -361,14 +387,16 @@
                                   <option value="following">🔄 En seguimiento</option>
                                   <option value="pending_info">🟠 Pendiente de información</option>
                                 </select>
-                                <label style="display: inline-flex; align-items: center; gap: 4px; min-width: 0" title="Estado del desarrollo de la app">
-                                  <span aria-hidden="true">📱</span>
-                                  <select aria-label="{{ u.appLabel }}" value="{{ u.appStatus }}" onChange="{{ u.onAppStatus }}" style="{{ u.appStatusStyle }}">
-                                    <option value="developing">En desarrollo</option>
-                                    <option value="resolved">Desarrollo de la app resuelto</option>
-                                    <option value="not_started">Sin desarrollar aún</option>
-                                  </select>
-                                </label>
+                                <sc-if value="{{ appStatusVisible }}" hint-placeholder-val="{{ true }}">
+                                  <label style="display: inline-flex; align-items: center; gap: 4px; min-width: 0" title="Estado del desarrollo de la app">
+                                    <span aria-hidden="true">📱</span>
+                                    <select aria-label="{{ u.appLabel }}" value="{{ u.appStatus }}" onChange="{{ u.onAppStatus }}" style="{{ u.appStatusStyle }}">
+                                      <option value="developing">En desarrollo</option>
+                                      <option value="resolved">Desarrollo de la app resuelto</option>
+                                      <option value="not_started">Sin desarrollar aún</option>
+                                    </select>
+                                  </label>
+                                </sc-if>
                                 <button type="button" aria-label="Editar responsable, apoyo y triaje" title="Editar responsable, apoyo y triaje" onClick="{{ u.editUnit }}" style="{{ u.editIconStyle }}">✏️</button>
                               </div>
                               <div style="font-size: 10.5px; color: var(--color-neutral-600); line-height: 1.3; margin-top: 2px">{{ u.note }}</div>
@@ -1393,7 +1421,6 @@ const FACULTIES = [
     id: 'med', num: '1', name: 'Facultad de Medicina', color: '#3b2f8f', soft: '#efecfb', wide: true,
     cols: [
       {
-        title: 'Medicina', note: 'Medicina se maneja como un área operativa única para CONEKTADOS, organizada por especialidad clínica.',
         units: [
           { id: 'sp-mg', name: 'Medicina general', emoji: '🩺' },
           { id: 'sp-mi', name: 'Medicina interna', emoji: '🩻' },
@@ -1408,11 +1435,7 @@ const FACULTIES = [
           { id: 'sp-end', name: 'Endocrinología', emoji: '🧪' },
           { id: 'sp-der', name: 'Dermatología', emoji: '🧴' },
           { id: 'sp-oft', name: 'Oftalmología', emoji: '👁️' },
-          { id: 'sp-uro', name: 'Urología', emoji: '💧' }
-        ]
-      },
-      {
-        units: [
+          { id: 'sp-uro', name: 'Urología', emoji: '💧' },
           { id: 'bio', name: 'Escuela de Bioanálisis', emoji: '🔬', note: 'Bioanalistas' },
           { id: 'nut', name: 'Escuela de Nutrición y Dietética', emoji: '🍎', note: 'Nutricionistas y dietistas' },
           { id: 'sal-fis', name: 'Escuela de Salud Pública · Fisioterapia', emoji: '🧘' },
@@ -1558,7 +1581,7 @@ const DEFAULT_UI = {
   questionsTitle: 'Checklist de auditoría interna por evento',
   upcomingTitle: 'Próximos eventos',
   calendarTitle: 'Calendario de eventos',
-  bubbleSize: 'normal', titleSize: '40',
+  bubbleSize: 'normal', titleSize: '40', showAppStatus: true,
   tabOrder: ['board', 'calendar', 'hierarchy', 'list', 'timeline', 'volunteers'],
   boardOrder: ['intro', 'upcoming', 'kanban']
 };
@@ -2245,6 +2268,13 @@ class Component extends DCLogic {
     this.setState({ unitInfo: info });
   }
 
+  toggleAppStatusVisible = () => {
+    const ui = cloneUI(this.state.ui);
+    ui.showAppStatus = !ui.showAppStatus;
+    writeStore('ucv-ui-v1', ui);
+    this.setState({ ui });
+  };
+
   openUnitModal(unitId, unitName) {
     const info = this.state.unitInfo[unitId] || {};
     this.setState({
@@ -2761,6 +2791,8 @@ class Component extends DCLogic {
       return respMatch || suppMatch;
     };
     const isInvolved = unitId => (s.unitInfo[unitId] || {}).involved !== 'no';
+    const isInactiveStatus = unitId => (s.unitInfo[unitId] || {}).specialtyStatus === 'inactive';
+    const facultyInactive = facultyId => (s.unitInfo[facultyId] || {}).specialtyStatus === 'inactive';
     const STATUS_PRIORITY = { active: 0, following: 1, pending_info: 2, not_contacted: 3, inactive: 4 };
     const statusRank = unitId => {
       const st = (s.unitInfo[unitId] || {}).specialtyStatus || 'not_contacted';
@@ -2770,25 +2802,22 @@ class Component extends DCLogic {
     const buildFacultyCard = f => {
       const cols = f.cols.map(col => {
         let unitsSource = col.units;
-        if (f.id === 'med' && col.title) {
+        if (f.id === 'med') {
           unitsSource = unitsSource.slice().sort((a, b) => {
             const rankDiff = statusRank(a.id) - statusRank(b.id);
             if (rankDiff !== 0) return rankDiff;
-            const aHas = hasMedicalPerson(a.id) ? 0 : 1;
-            const bHas = hasMedicalPerson(b.id) ? 0 : 1;
-            return aHas - bHas;
-          });
-        } else if (f.id === 'med' && !col.title) {
-          unitsSource = unitsSource.slice().sort((a, b) => {
-            const aHas = shown.some(c => belongsToUnit(c, a.id)) ? 0 : 1;
-            const bHas = shown.some(c => belongsToUnit(c, b.id)) ? 0 : 1;
+            const aHas = (hasMedicalPerson(a.id) || shown.some(c => belongsToUnit(c, a.id))) ? 0 : 1;
+            const bHas = (hasMedicalPerson(b.id) || shown.some(c => belongsToUnit(c, b.id))) ? 0 : 1;
             return aHas - bHas;
           });
         }
-        unitsSource = unitsSource.slice().sort((a, b) => (isInvolved(a.id) ? 0 : 1) - (isInvolved(b.id) ? 0 : 1));
+        unitsSource = unitsSource.slice().sort((a, b) => {
+          const rank = id => isInvolved(id) ? (isInactiveStatus(id) ? 1 : 0) : 2;
+          return rank(a.id) - rank(b.id);
+        });
         return {
         hasTitle: !!col.title, title: col.title || '', note: col.note || '',
-        unitsStyle: { display: 'grid', gap: 8, alignItems: 'start', gridTemplateColumns: col.units.length > 3 ? 'repeat(auto-fit, minmax(140px, 1fr))' : '1fr' },
+        unitsStyle: { display: 'grid', gap: 8, alignItems: 'start', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' },
         units: unitsSource.map(u => {
           const appKey = s.appStatuses[u.id] || 'not_started';
           const appMeta = APP_STATUS[appKey] || APP_STATUS.not_started;
@@ -2809,7 +2838,7 @@ class Component extends DCLogic {
           addContact: () => this.newContactForUnit(u.id),
           notInvolved: notInvolved,
           notInvolvedStyle: { border: '1px solid #a0252555', borderRadius: 999, padding: '3px 7px', fontSize: 9.5, fontWeight: 700, background: '#fdebeb', color: '#a02525' },
-          boxStyle: Object.assign({}, unitBox, { borderColor: f.color + '33' }, isOver ? { outline: '2px dashed ' + f.color, outlineOffset: -2, background: f.soft } : {}, notInvolved ? { opacity: .55 } : {}),
+          boxStyle: Object.assign({}, unitBox, { borderColor: f.color + '33' }, isOver ? { outline: '2px dashed ' + f.color, outlineOffset: -2, background: f.soft } : {}, (notInvolved || info.specialtyStatus === 'inactive') ? { opacity: .55 } : {}),
           titleStyle: { fontSize: 12.5, fontWeight: 700, lineHeight: 1.25, color: f.color },
           editIconStyle: { border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, flex: 'none', opacity: .6 },
           editUnit: () => this.openUnitModal(u.id, u.name),
@@ -2834,15 +2863,26 @@ class Component extends DCLogic {
         }; })
       }; });
       const total = shown.filter(c => c.meta.facultyId === f.id).length;
+      const facInfo = s.unitInfo[f.id] || {};
+      const facInactive = facInfo.specialtyStatus === 'inactive';
       return {
         num: f.num, name: f.name, count: total, cols: cols,
-        cardStyle: { borderRadius: 22, padding: 5, boxShadow: 'var(--shadow-md)', overflow: 'hidden', background: f.color, width: '100%' },
+        facultyStatusValue: facInfo.specialtyStatus || 'not_contacted',
+        facultyStatusLabel: 'Estado general de ' + f.name,
+        onFacultyStatus: e => this.setSpecialtyStatus(f.id, e.target.value),
+        facultyStatusStyle: { maxWidth: '100%', minWidth: 0, border: '1px solid rgba(255,255,255,.55)', borderRadius: 999, padding: '3px 8px', fontSize: 10.5, fontWeight: 700, background: 'rgba(255,255,255,.22)', color: '#fff', cursor: 'pointer', flex: 'none' },
+        facultyInactive: facInactive,
+        facultyInactiveNote: 'No participa actualmente en estos eventos',
+        cardStyle: Object.assign({ borderRadius: 22, padding: 5, boxShadow: 'var(--shadow-md)', overflow: 'hidden', background: f.color, width: '100%' }, facInactive ? { opacity: .55 } : {}),
         colsStyle: { display: 'grid', gap: 10, gridTemplateColumns: f.wide ? 'repeat(auto-fit, minmax(210px, 1fr))' : '1fr' }
       };
     };
     const medFacultyRaw = FACULTIES.find(f => f.id === 'med');
     const medCards = medFacultyRaw ? [buildFacultyCard(medFacultyRaw)] : [];
-    const otherCards = FACULTIES.filter(f => f.id !== 'med').map(buildFacultyCard);
+    const otherCards = FACULTIES.filter(f => f.id !== 'med')
+      .slice()
+      .sort((a, b) => (facultyInactive(a.id) ? 1 : 0) - (facultyInactive(b.id) ? 1 : 0))
+      .map(buildFacultyCard);
 
     const adminUnits = ADMIN.map(a => {
       const isOver = s.dragOverUnit === a.id;
@@ -2982,6 +3022,10 @@ class Component extends DCLogic {
       customizeOpen: s.customizeOpen, customizeForm: draftUI, customizeTabs: customizeTabs, customizeSections: customizeSections,
       timelineEmpty: timeline.length === 0,
       isBoard: s.view === 'board', isCalendar: s.view === 'calendar', showContactFilters: ['hierarchy', 'list', 'timeline'].indexOf(s.view) > -1, isHierarchy: s.view === 'hierarchy', isList: s.view === 'list', isTimeline: s.view === 'timeline', isVolunteers: s.view === 'volunteers',
+      appStatusVisible: !!ui.showAppStatus,
+      appStatusToggleLabel: ui.showAppStatus ? '📱 Estado de app: visible' : '📱 Estado de app: oculto',
+      onToggleAppStatus: this.toggleAppStatusVisible,
+      appStatusToggleStyle: { border: '1px solid var(--color-neutral-300)', background: ui.showAppStatus ? '#eaf1fc' : '#fff', color: ui.showAppStatus ? '#315a9d' : 'var(--color-neutral-700)', borderRadius: 999, padding: '7px 14px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' },
       volunteerCards: volunteerCards, volunteersEmpty: volunteersEmpty,
       volunteerJourneys: volunteerJourneys, volunteerJourneysEmpty: volunteerJourneysEmpty,
       newVolunteer: this.newVolunteer,
