@@ -54,6 +54,18 @@
         <button class="btn btn-primary" type="button" data-action="new-event" onclick="window.coalicionAction(event)">➕ Agregar evento</button>
       </div>
       <div id="kpi-grid" class="kpi-grid"></div>
+
+      <section id="summary-results" class="panel summary-results-panel" aria-labelledby="summary-results-title" hidden>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">📦 Love Box · conektados Lite</p>
+            <h3 id="summary-results-title">Resultados de hoy</h3>
+          </div>
+          <button class="btn btn-secondary" type="button" data-view="results" onclick="window.coalicionAction(event)">Ver detalle completo →</button>
+        </div>
+        <div id="summary-results-grid" class="summary-results-grid"></div>
+      </section>
+
       <div class="summary-grid">
         <article id="next-event-card" class="event-hero panel"></article>
         <section class="panel" aria-labelledby="inventory-title">
@@ -67,6 +79,17 @@
           <div id="inventory-list" class="inventory-list"></div>
         </section>
       </div>
+
+      <section class="panel" aria-labelledby="summary-team-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">🤝 Equipo del evento</p>
+            <h3 id="summary-team-title">Equipo de hoy</h3>
+          </div>
+          <button class="btn btn-secondary" type="button" data-view="contacts" onclick="window.coalicionAction(event)">Ver todos →</button>
+        </div>
+        <div id="summary-team-list" class="summary-team-list"></div>
+      </section>
       <section class="panel flow-panel" aria-labelledby="flow-title">
         <div class="panel-heading">
           <div>

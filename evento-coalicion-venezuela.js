@@ -62,7 +62,7 @@
     discardArmed: false,
     realtime: null,
     loadId: 0,
-    results: { loading: false, error: null, loaded: false, entregas: [], semaforoFilter: null },
+    results: { loading: false, error: null, loaded: false, entregas: [], envios: [], semaforoFilter: null },
     map: null,
     mapMarkers: null
   };
@@ -101,6 +101,7 @@
     state.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     loadAllData();
     subscribeRealtime();
+    fetchResultados(false);
   }
 
   function cacheDom() {
@@ -111,6 +112,9 @@
     dom.connectivityBanner = document.getElementById('connectivity-banner');
     dom.retryLoad = document.getElementById('retry-load');
     dom.kpiGrid = document.getElementById('kpi-grid');
+    dom.summaryResults = document.getElementById('summary-results');
+    dom.summaryResultsGrid = document.getElementById('summary-results-grid');
+    dom.summaryTeamList = document.getElementById('summary-team-list');
     dom.nextEventCard = document.getElementById('next-event-card');
     dom.inventoryList = document.getElementById('inventory-list');
     dom.calendarMonthLabel = document.getElementById('calendar-month-label');
@@ -375,6 +379,8 @@
     renderSummary();
     renderCalendar();
     renderContacts();
+    renderSummaryResults();
+    renderSummaryTeam();
   }
 
   function renderSummary() {
@@ -386,6 +392,7 @@
       kpi('kpi-blue', state.contacts.length, '🤝 Responsables') +
       kpi('kpi-sky', inventoryAvailable, '📦 Unidades disponibles')
     );
+    renderSummaryTeam();
 
     const next = nextEvent();
     if (!next) {
@@ -418,6 +425,66 @@
         '</article>';
       }).join(''));
     }
+  }
+
+  function renderSummaryResults() {
+    if (!dom.summaryResults) return;
+    if (!state.results.loaded || !state.results.entregas.length) {
+      dom.summaryResults.hidden = true;
+      return;
+    }
+    dom.summaryResults.hidden = false;
+    const m = computeResultsMetrics(state.results.entregas);
+    const envioTotals = state.results.envios.reduce(function (acc, e) {
+      acc.total += Number(e.totalCajas || 0);
+      acc.entregado += Number(e.totalEntregado || 0);
+      return acc;
+    }, { total: 0, entregado: 0 });
+
+    const tiles = [
+      { icon: '📦', value: m.totalCajas, label: 'Love Boxes entregadas' },
+      { icon: '👨‍👩‍👧‍👦', value: m.totalEntregas, label: 'Familias atendidas' },
+      { icon: '🫶', value: m.personas, label: 'Personas beneficiadas' }
+    ];
+    let progressTile;
+    if (envioTotals.total > 0) {
+      const pct = Math.min(100, Math.round(envioTotals.entregado / envioTotals.total * 100));
+      progressTile = '<div class="summary-result-tile summary-result-progress">' +
+        '<span class="srt-icon">🎯</span>' +
+        '<span class="srt-value">' + envioTotals.entregado + ' <small>de ' + envioTotals.total + '</small></span>' +
+        '<span class="srt-label">Progreso del envío de hoy</span>' +
+        '<div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="' + envioTotals.total + '" aria-valuenow="' + envioTotals.entregado + '"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
+      '</div>';
+    } else {
+      progressTile = '<div class="summary-result-tile summary-result-progress">' +
+        '<span class="srt-icon">🎯</span>' +
+        '<span class="srt-value">—</span>' +
+        '<span class="srt-label">Sin envíos registrados hoy</span>' +
+      '</div>';
+    }
+
+    renderMarkup(dom.summaryResultsGrid, tiles.map(function (t) {
+      return '<div class="summary-result-tile">' +
+        '<span class="srt-icon">' + t.icon + '</span>' +
+        '<span class="srt-value">' + Number(t.value || 0) + '</span>' +
+        '<span class="srt-label">' + safe(t.label) + '</span>' +
+      '</div>';
+    }).join('') + progressTile);
+  }
+
+  function renderSummaryTeam() {
+    if (!dom.summaryTeamList) return;
+    if (!state.contacts.length) {
+      renderMarkup(dom.summaryTeamList, emptyState('🤝 Sin equipo registrado', 'Agrega a los responsables del evento en la pestaña Responsables.', ''));
+      return;
+    }
+    const preview = state.contacts.slice(0, 8);
+    renderMarkup(dom.summaryTeamList, preview.map(function (contact) {
+      return '<div class="summary-team-chip ' + safe(affiliationClass(contact.belongs_to)) + '">' +
+        '<span class="summary-team-avatar" aria-hidden="true">' + safe(initials(contact.name)) + '</span>' +
+        '<span class="summary-team-info"><strong>' + safe(contact.name) + '</strong><small>' + safe(contact.role || 'Responsable') + '</small></span>' +
+      '</div>';
+    }).join(''));
   }
 
   function renderCalendar() {
@@ -534,7 +601,11 @@
       dom.resultsBody.hidden = true;
       dom.resultsEmpty.hidden = true;
     }
-    const result = await callLiteApi('entregas', {});
+    const today = new Date().toISOString().slice(0, 10);
+    const [result, enviosResult] = await Promise.all([
+      callLiteApi('entregas', {}),
+      callLiteApi('envios', { desde: today, hasta: today })
+    ]);
     state.results.loading = false;
     if (result.error) {
       state.results.error = result.error;
@@ -544,12 +615,15 @@
         ? 'La conexión con conektados Lite todavía no está configurada (falta el token o el dominio).'
         : 'No pudimos traer los resultados de conektados Lite. ' + (result.error.message || '') + ' — intenta actualizar en un momento.';
       dom.resultsBody.hidden = true;
+      renderSummaryResults();
       return;
     }
     state.results.loaded = true;
     state.results.entregas = (result.data && result.data.entregas) || [];
+    state.results.envios = (enviosResult.data && enviosResult.data.envios) || [];
     dom.resultsStatus.hidden = true;
     renderResultados();
+    renderSummaryResults();
   }
 
   function toggleSemaforoFilter(colorKey) {
