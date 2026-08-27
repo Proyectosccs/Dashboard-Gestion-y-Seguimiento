@@ -7,7 +7,9 @@
   <title>Resumen — Evento Coalición Venezuela</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
   <link rel="stylesheet" href="./evento-coalicion-venezuela.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
   <script src="./evento-coalicion-venezuela.js" defer></script>
 </head>
 <body>
@@ -18,7 +20,7 @@
       <div class="header-copy">
         <p class="eyebrow">🚚 Operación móvil · Fundación Ingenia</p>
         <h1>Evento Coalición Venezuela</h1>
-        <p>Control compartido de responsables, calendario, inventario y recepción por lotes.</p>
+        <p>Control compartido de responsables, calendario, inventario y resultados de la jornada.</p>
       </div>
       <div class="session-card">
         <span id="session-name" class="session-name">Acceso desde cualquier dispositivo</span>
@@ -30,7 +32,7 @@
       <button class="tab-button" type="button" data-view="summary" aria-current="page" onclick="window.coalicionAction(event)">🏠 Resumen</button>
       <button class="tab-button" type="button" data-view="calendar" onclick="window.coalicionAction(event)">🗓️ Calendario</button>
       <button class="tab-button" type="button" data-view="contacts" onclick="window.coalicionAction(event)">🤝 Responsables</button>
-      <button class="tab-button" type="button" data-view="batches" onclick="window.coalicionAction(event)">👥 Lotes</button>
+      <button class="tab-button" type="button" data-view="results" onclick="window.coalicionAction(event)">📊 Resultados</button>
       <a class="tab-link" href="./" target="_blank" rel="noopener noreferrer" aria-label="Abrir Tablero UCV en otra pestaña">🎓 Tablero UCV ↗</a>
     </nav>
 
@@ -119,16 +121,59 @@
       <div id="contacts-list" class="contact-grid"></div>
     </section>
 
-    <section id="batches-view" class="view" aria-labelledby="batches-title" hidden>
+    <section id="results-view" class="view" aria-labelledby="results-title" hidden>
       <div class="view-heading">
         <div>
-          <p class="eyebrow">🧭 Recepción por grupos</p>
-          <h2 id="batches-title">👥 Lotes de beneficiarios</h2>
-          <p class="view-description">Este módulo registra cantidades y coordinación del lote; no almacena datos médicos ni identidades de beneficiarios.</p>
+          <p class="eyebrow">📦 Love Box · conektados Lite</p>
+          <h2 id="results-title">📊 Resultados de la jornada</h2>
+          <p class="view-description">Lo que conektados Lite tiene registrado — en vivo, vía la API externa de solo lectura.</p>
         </div>
-        <button class="btn btn-primary" type="button" data-action="new-batch" onclick="window.coalicionAction(event)">➕ Agregar lote</button>
+        <button class="btn btn-secondary" type="button" id="results-refresh" data-action="refresh-results" onclick="window.coalicionAction(event)">🔄 Actualizar</button>
       </div>
-      <div id="batches-list" class="batch-list"></div>
+
+      <div id="results-status" class="notice notice-warning page-notice" role="status" hidden></div>
+      <div id="results-empty" hidden></div>
+
+      <div id="results-body" hidden>
+        <div class="kpi-grid" id="results-kpi-grid"></div>
+
+        <div class="results-card">
+          <div class="results-card-head">
+            <h3>🚦 Estado de la vivienda</h3>
+            <p>Rojo = colapsado · Amarillo = inhabitable pero de pie · Verde = habitable. Clasificación oficial post-terremoto. Toca un color para filtrar el resto de la pantalla.</p>
+          </div>
+          <div class="semaforo-row" id="results-semaforo"></div>
+          <div class="semaforo-bar" id="results-semaforo-bar"></div>
+          <div class="filter-pill" id="results-filter-pill" hidden></div>
+        </div>
+
+        <div class="results-card">
+          <div class="results-card-head">
+            <h3>📍 Zonas atendidas</h3>
+            <p><code>ubicacionActual</code> agrupada por texto (aproximado — el formulario aún no usa una lista fija de zonas). El mapa usa las coordenadas reales cuando la entrega las trae.</p>
+          </div>
+          <div class="results-zone-layout">
+            <div id="results-zone-list" class="zone-list"></div>
+            <div id="results-map" class="results-map"></div>
+          </div>
+        </div>
+
+        <div class="results-card">
+          <div class="results-card-head">
+            <h3>🥫 Necesidad principal</h3>
+            <p>Una necesidad por entrega, tal como la expone hoy la API.</p>
+          </div>
+          <div id="results-needs" class="need-list"></div>
+        </div>
+
+        <div class="results-card">
+          <div class="results-card-head">
+            <h3>👨‍👩‍👧‍👦 Núcleo familiar</h3>
+            <p>Cuántas personas trae cada núcleo y cuántas cajas recibió, agrupado por tamaño.</p>
+          </div>
+          <div id="results-nucleos" class="nucleo-grid"></div>
+        </div>
+      </div>
     </section>
   </div>
 

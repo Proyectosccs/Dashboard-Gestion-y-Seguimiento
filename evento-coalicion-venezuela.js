@@ -4,24 +4,29 @@
   const SUPABASE_URL = 'https://hcylkagvwfncdaaizutn.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_E-cV9DiNK9rctFCxzondvA_7OppBD7Y';
   const EDITOR_FUNCTION_URL = SUPABASE_URL + '/functions/v1/coalicion-editor';
+  const LITE_FUNCTION_URL = SUPABASE_URL + '/functions/v1/lite-resultados';
   const TABLES = {
     contacts: 'coalicion_contacts',
     events: 'coalicion_events',
-    inventory: 'coalicion_inventory',
-    batches: 'coalicion_batches'
+    inventory: 'coalicion_inventory'
   };
+  const SEMAFORO_META = {
+    Rojo: { key: 'rojo', label: 'Rojo · colapsado', color: 'var(--coalition-danger)', soft: 'var(--coalition-danger-soft)' },
+    Amarillo: { key: 'amarillo', label: 'Amarillo · inhabitable (de pie)', color: 'var(--coalition-warning)', soft: 'var(--coalition-warning-soft)' },
+    Verde: { key: 'verde', label: 'Verde · habitable', color: 'var(--coalition-good)', soft: 'var(--coalition-good-soft)' }
+  };
+  const NUCLEO_BRACKETS = [
+    { key: '1-2', label: '1–2 personas', test: function (t) { return t <= 2; } },
+    { key: '3-4', label: '3–4 personas', test: function (t) { return t >= 3 && t <= 4; } },
+    { key: '5-6', label: '5–6 personas', test: function (t) { return t >= 5 && t <= 6; } },
+    { key: '7+', label: '7 o más', test: function (t) { return t >= 7; } }
+  ];
 
   const EVENT_STATUS = {
     planned: 'Planificado',
     confirmed: 'Confirmado',
     in_progress: 'En ejecución',
     completed: 'Completado'
-  };
-  const BATCH_STATUS = {
-    planned: 'Planificado',
-    confirmed: 'Confirmado',
-    arrived: 'En el lugar',
-    completed: 'Entrega completada'
   };
   const AFFILIATIONS = {
     '': 'Selecciona una opción',
@@ -47,7 +52,6 @@
     revealedContacts: {},
     events: [],
     inventory: [],
-    batches: [],
     query: '',
     keyRequest: null,
     keyRequestCounter: 0,
@@ -57,7 +61,10 @@
     editorDirty: false,
     discardArmed: false,
     realtime: null,
-    loadId: 0
+    loadId: 0,
+    results: { loading: false, error: null, loaded: false, entregas: [], semaforoFilter: null },
+    map: null,
+    mapMarkers: null
   };
 
   const dom = {};
@@ -112,7 +119,18 @@
     dom.contactSearchClear = document.getElementById('contact-search-clear');
     dom.contactResultCount = document.getElementById('contact-result-count');
     dom.contactsList = document.getElementById('contacts-list');
-    dom.batchesList = document.getElementById('batches-list');
+    dom.resultsStatus = document.getElementById('results-status');
+    dom.resultsEmpty = document.getElementById('results-empty');
+    dom.resultsBody = document.getElementById('results-body');
+    dom.resultsRefresh = document.getElementById('results-refresh');
+    dom.resultsKpiGrid = document.getElementById('results-kpi-grid');
+    dom.resultsSemaforo = document.getElementById('results-semaforo');
+    dom.resultsSemaforoBar = document.getElementById('results-semaforo-bar');
+    dom.resultsFilterPill = document.getElementById('results-filter-pill');
+    dom.resultsZoneList = document.getElementById('results-zone-list');
+    dom.resultsMap = document.getElementById('results-map');
+    dom.resultsNeeds = document.getElementById('results-needs');
+    dom.resultsNucleos = document.getElementById('results-nucleos');
     dom.keyDialog = document.getElementById('key-dialog');
     dom.keyForm = document.getElementById('key-form');
     dom.keyDialogTitle = document.getElementById('key-dialog-title');
@@ -270,8 +288,7 @@
     const results = await Promise.all([
       contactsRequest,
       state.client.from(TABLES.events).select('*').is('archived_at', null).order('event_date'),
-      state.client.from(TABLES.inventory).select('*').is('archived_at', null).order('name'),
-      state.client.from(TABLES.batches).select('*').is('archived_at', null).order('created_at')
+      state.client.from(TABLES.inventory).select('*').is('archived_at', null).order('name')
     ]);
 
     if (loadId !== state.loadId) return;
@@ -286,7 +303,6 @@
     state.revealedContacts = {};
     state.events = results[1].data || [];
     state.inventory = results[2].data || [];
-    state.batches = results[3].data || [];
     dom.loadingState.hidden = true;
     renderAll();
     if (!background) setView(state.view);
@@ -295,7 +311,7 @@
   function subscribeRealtime() {
     teardownRealtime();
     let channel = state.client.channel('coalicion-evento-publico');
-    [TABLES.events, TABLES.inventory, TABLES.batches].forEach(function (table) {
+    [TABLES.events, TABLES.inventory].forEach(function (table) {
       channel = channel.on('postgres_changes', { event: '*', schema: 'public', table: table }, function () {
         loadAllData(true);
       });
@@ -314,7 +330,7 @@
       summary: 'Resumen — Evento Coalición Venezuela',
       calendar: 'Calendario — Evento Coalición Venezuela',
       contacts: 'Responsables — Evento Coalición Venezuela',
-      batches: 'Lotes — Evento Coalición Venezuela'
+      results: 'Resultados — Evento Coalición Venezuela'
     };
     document.querySelectorAll('.tab-button').forEach(function (button) {
       if (button.dataset.view === viewName) button.setAttribute('aria-current', 'page');
@@ -326,7 +342,7 @@
     document.title = titles[viewName] || titles.summary;
     if (viewName === 'calendar') renderCalendar();
     if (viewName === 'contacts') renderContacts();
-    if (viewName === 'batches') renderBatches();
+    if (viewName === 'results') loadResultsIfNeeded();
   }
 
   function handleAppAction(event) {
@@ -344,8 +360,8 @@
     if (action === 'edit-event') openEditor('event', findById(state.events, id));
     if (action === 'new-inventory') openEditor('inventory');
     if (action === 'edit-inventory') openEditor('inventory', findById(state.inventory, id));
-    if (action === 'new-batch') openEditor('batch');
-    if (action === 'edit-batch') openEditor('batch', findById(state.batches, id));
+    if (action === 'refresh-results') fetchResultados(true);
+    if (action === 'filter-semaforo') toggleSemaforoFilter(id);
   }
 
   function hideContact(id) {
@@ -359,20 +375,16 @@
     renderSummary();
     renderCalendar();
     renderContacts();
-    renderBatches();
   }
 
   function renderSummary() {
-    const plannedPeople = state.batches.reduce(function (sum, batch) { return sum + Number(batch.expected_count || 0); }, 0);
     const inventoryAvailable = state.inventory.reduce(function (sum, item) {
       return sum + Math.max(0, Number(item.total_quantity || 0) - Number(item.distributed_quantity || 0));
     }, 0);
-    const completeBatches = state.batches.filter(function (batch) { return batch.status === 'completed'; }).length;
     renderMarkup(dom.kpiGrid,
       kpi('kpi-primary', state.events.length, '🗓️ Eventos registrados') +
       kpi('kpi-blue', state.contacts.length, '🤝 Responsables') +
-      kpi('kpi-sky', inventoryAvailable, '📦 Unidades disponibles') +
-      kpi('kpi-indigo', plannedPeople, '👥 Personas previstas')
+      kpi('kpi-sky', inventoryAvailable, '📦 Unidades disponibles')
     );
 
     const next = nextEvent();
@@ -406,9 +418,6 @@
         '</article>';
       }).join(''));
     }
-
-    const finalKpi = dom.kpiGrid.lastElementChild;
-    if (finalKpi) finalKpi.setAttribute('title', completeBatches + ' lotes completados');
   }
 
   function renderCalendar() {
@@ -488,21 +497,247 @@
     return '<div class="sensitive-row"><span class="sensitive-label">' + safe(label) + '</span><span class="sensitive-value">' + value + '</span></div>';
   }
 
-  function renderBatches() {
-    if (!state.batches.length) {
-      renderMarkup(dom.batchesList, emptyState('👥 No hay lotes registrados', 'Agrega cada grupo con su líder, cantidad prevista y ventana de llegada.', '<button class="btn btn-primary" type="button" data-action="new-batch">➕ Agregar lote</button>'));
+  // ---------- Resultados de la jornada (conektados Lite) ----------
+
+  function loadResultsIfNeeded() {
+    if (state.results.loaded || state.results.loading) {
+      if (state.results.loaded) renderResultados();
       return;
     }
-    renderMarkup(dom.batchesList, state.batches.map(function (batch) {
-      const event = findById(state.events, batch.event_id);
-      return '<article class="batch-card">' +
-        '<div><h3>' + safe(batch.label) + '</h3><div class="status-pill status-' + safe(batch.status) + '">' + safe(BATCH_STATUS[batch.status] || 'Planificado') + '</div></div>' +
-        '<div class="batch-value"><span>Líder</span><strong>' + safe(batch.leader_name || 'Por confirmar') + '</strong></div>' +
-        '<div class="batch-value"><span>Personas</span><strong>' + Number(batch.expected_count || 0) + '</strong></div>' +
-        '<div class="batch-value"><span>Llegada</span><strong>' + safe(batch.arrival_window || 'Por confirmar') + '</strong></div>' +
-        '<div class="batch-value"><span>Evento</span><strong>' + safe(event ? event.title : 'Por asignar') + '</strong></div>' +
-        '<button class="btn btn-secondary" type="button" data-action="edit-batch" data-id="' + safe(batch.id) + '">Editar</button>' +
-      '</article>';
+    fetchResultados(false);
+  }
+
+  async function callLiteApi(resource, params) {
+    try {
+      const response = await fetch(LITE_FUNCTION_URL, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resource: resource, params: params || {} })
+      });
+      const body = await response.json().catch(function () { return {}; });
+      if (!response.ok) {
+        return { data: null, error: { status: response.status, message: body.error || 'operation unavailable' } };
+      }
+      return { data: body.data, error: null };
+    } catch (_error) {
+      return { data: null, error: { status: 0, message: 'network unavailable' } };
+    }
+  }
+
+  async function fetchResultados(userTriggered) {
+    state.results.loading = true;
+    state.results.error = null;
+    if (userTriggered || !state.results.loaded) {
+      dom.resultsStatus.hidden = false;
+      dom.resultsStatus.className = 'notice notice-warning page-notice';
+      dom.resultsStatus.textContent = 'Cargando resultados de conektados Lite…';
+      dom.resultsBody.hidden = true;
+      dom.resultsEmpty.hidden = true;
+    }
+    const result = await callLiteApi('entregas', {});
+    state.results.loading = false;
+    if (result.error) {
+      state.results.error = result.error;
+      dom.resultsStatus.hidden = false;
+      dom.resultsStatus.className = 'notice notice-error page-notice';
+      dom.resultsStatus.textContent = result.error.status === 401
+        ? 'La conexión con conektados Lite todavía no está configurada (falta el token o el dominio).'
+        : 'No pudimos traer los resultados de conektados Lite. ' + (result.error.message || '') + ' — intenta actualizar en un momento.';
+      dom.resultsBody.hidden = true;
+      return;
+    }
+    state.results.loaded = true;
+    state.results.entregas = (result.data && result.data.entregas) || [];
+    dom.resultsStatus.hidden = true;
+    renderResultados();
+  }
+
+  function toggleSemaforoFilter(colorKey) {
+    state.results.semaforoFilter = state.results.semaforoFilter === colorKey ? null : colorKey;
+    renderResultados();
+  }
+
+  function normalizeZoneName(raw) {
+    const text = String(raw || '').trim();
+    if (!text) return 'Sin especificar';
+    const stripped = text.toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/^(barrio|sector|urbanizacion|urb\.?|calle|avenida|av\.?|zona)\s+/i, '')
+      .replace(/\s+/g, ' ').trim();
+    return stripped ? stripped.charAt(0).toUpperCase() + stripped.slice(1) : text;
+  }
+
+  function computeResultsMetrics(entregas) {
+    const totalCajas = entregas.reduce(function (sum, e) { return sum + Number(e.cantidadPaquetes || 0); }, 0);
+    const totalAdultos = entregas.reduce(function (sum, e) { return sum + Number(e.composicionAdultos || 0); }, 0);
+    const totalNinos = entregas.reduce(function (sum, e) { return sum + Number(e.composicionNinos || 0); }, 0);
+    const confirmadas = entregas.filter(function (e) { return e.confirmadoRecibido === true; }).length;
+    const pendientes = entregas.filter(function (e) { return e.confirmadoRecibido === null || e.confirmadoRecibido === undefined; }).length;
+
+    const semaforo = { Rojo: 0, Amarillo: 0, Verde: 0 };
+    entregas.forEach(function (e) {
+      const status = Array.isArray(e.statusVivienda) ? e.statusVivienda[0] : e.statusVivienda;
+      if (semaforo[status] != null) semaforo[status] += 1;
+    });
+
+    const zoneMap = {};
+    entregas.forEach(function (e) {
+      const zone = normalizeZoneName(e.ubicacionActual);
+      if (!zoneMap[zone]) zoneMap[zone] = { name: zone, count: 0, lat: null, lng: null, semaforo: { Rojo: 0, Amarillo: 0, Verde: 0 } };
+      zoneMap[zone].count += 1;
+      const status = Array.isArray(e.statusVivienda) ? e.statusVivienda[0] : e.statusVivienda;
+      if (zoneMap[zone].semaforo[status] != null) zoneMap[zone].semaforo[status] += 1;
+      if (zoneMap[zone].lat == null && typeof e.ubicacionLat === 'number') { zoneMap[zone].lat = e.ubicacionLat; zoneMap[zone].lng = e.ubicacionLng; }
+    });
+    const zones = Object.keys(zoneMap).map(function (k) { return zoneMap[k]; }).sort(function (a, b) { return b.count - a.count; });
+
+    const needMap = {};
+    entregas.forEach(function (e) {
+      const need = e.necesidad || 'Sin especificar';
+      needMap[need] = (needMap[need] || 0) + 1;
+    });
+    const needs = Object.keys(needMap).map(function (k) { return { name: k, count: needMap[k] }; }).sort(function (a, b) { return b.count - a.count; });
+
+    const nucleos = NUCLEO_BRACKETS.map(function (bracket) {
+      const matching = entregas.filter(function (e) {
+        const total = Number(e.composicionAdultos || 0) + Number(e.composicionNinos || 0);
+        return bracket.test(total);
+      });
+      const cajas = matching.reduce(function (sum, e) { return sum + Number(e.cantidadPaquetes || 0); }, 0);
+      return { key: bracket.key, label: bracket.label, count: matching.length, cajas: cajas, avgCajas: matching.length ? (cajas / matching.length) : 0 };
+    });
+
+    return {
+      totalEntregas: entregas.length, totalCajas: totalCajas,
+      totalAdultos: totalAdultos, totalNinos: totalNinos, personas: totalAdultos + totalNinos,
+      confirmadas: confirmadas, pendientes: pendientes, semaforo: semaforo, zones: zones, needs: needs, nucleos: nucleos
+    };
+  }
+
+  function renderResultados() {
+    const filter = state.results.semaforoFilter;
+    const all = state.results.entregas;
+    const filtered = filter
+      ? all.filter(function (e) { const s = Array.isArray(e.statusVivienda) ? e.statusVivienda[0] : e.statusVivienda; return s === filter; })
+      : all;
+
+    if (!all.length) {
+      dom.resultsBody.hidden = true;
+      dom.resultsEmpty.hidden = false;
+      renderMarkup(dom.resultsEmpty, emptyState('📦 Aún no hay entregas registradas', 'En cuanto el equipo empiece a registrar en conektados Lite, esta pantalla se llena sola.', ''));
+      return;
+    }
+    dom.resultsEmpty.hidden = true;
+    dom.resultsBody.hidden = false;
+
+    const m = computeResultsMetrics(filtered);
+
+    renderMarkup(dom.resultsKpiGrid,
+      kpi('kpi-primary', m.totalCajas, '📦 Cajas entregadas') +
+      kpi('kpi-blue', m.totalEntregas, '🫂 Entregas registradas') +
+      kpi('kpi-sky', m.personas, '👥 Personas beneficiadas') +
+      kpi('kpi-indigo', m.confirmadas, '✅ Confirmadas por QR')
+    );
+
+    renderSemaforoBlock(m.semaforo, all.length);
+    renderZonesBlock(m.zones);
+    renderNeedsBlock(m.needs);
+    renderNucleosBlock(m.nucleos);
+  }
+
+  function renderSemaforoBlock(semaforo) {
+    const total = semaforo.Rojo + semaforo.Amarillo + semaforo.Verde;
+    const filter = state.results.semaforoFilter;
+    renderMarkup(dom.resultsSemaforo, ['Rojo', 'Amarillo', 'Verde'].map(function (key) {
+      const meta = SEMAFORO_META[key];
+      const count = semaforo[key];
+      const pct = total ? Math.round(count / total * 100) : 0;
+      const active = !filter || filter === key;
+      return '<button type="button" class="semaforo-chip' + (active ? ' active' : '') + '" data-action="filter-semaforo" data-id="' + key + '" style="--chip-color:' + meta.color + ';--chip-soft:' + meta.soft + '">' +
+        '<span class="semaforo-dot"></span><span class="semaforo-num">' + count + '</span><span class="semaforo-label">' + meta.label + '</span><span class="semaforo-pct">' + pct + '%</span>' +
+      '</button>';
+    }).join(''));
+
+    renderMarkup(dom.resultsSemaforoBar, ['Rojo', 'Amarillo', 'Verde'].map(function (key) {
+      const meta = SEMAFORO_META[key];
+      const pct = total ? (semaforo[key] / total * 100) : 0;
+      return '<span style="width:' + pct + '%;background:' + meta.color + '"></span>';
+    }).join(''));
+
+    if (filter) {
+      dom.resultsFilterPill.hidden = false;
+      renderMarkup(dom.resultsFilterPill, '🔎 Mostrando solo <strong>' + SEMAFORO_META[filter].label + '</strong> · <button type="button" data-action="filter-semaforo" data-id="' + filter + '">ver todas</button>');
+    } else {
+      dom.resultsFilterPill.hidden = true;
+    }
+  }
+
+  function renderZonesBlock(zones) {
+    if (!zones.length) {
+      renderMarkup(dom.resultsZoneList, emptyState('📍 Sin ubicaciones', 'Las entregas todavía no traen ubicación.', ''));
+      dom.resultsMap.innerHTML = '';
+      return;
+    }
+    const maxCount = zones[0].count;
+    renderMarkup(dom.resultsZoneList, zones.slice(0, 10).map(function (z) {
+      const pct = maxCount ? Math.round(z.count / maxCount * 100) : 0;
+      return '<div class="zone-row"><span class="zone-name">' + safe(z.name) + '</span><span class="zone-count">' + z.count + '</span>' +
+        '<span class="zone-track"><span class="zone-fill" style="width:' + pct + '%"></span></span></div>';
+    }).join(''));
+
+    renderResultsMap(zones);
+  }
+
+  function renderResultsMap(zones) {
+    if (!window.L || !dom.resultsMap) return;
+    const withCoords = zones.filter(function (z) { return typeof z.lat === 'number' && typeof z.lng === 'number'; });
+    if (!state.map) {
+      state.map = window.L.map(dom.resultsMap, { attributionControl: true, zoomControl: true, scrollWheelZoom: false });
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '© OpenStreetMap'
+      }).addTo(state.map);
+      state.mapMarkers = window.L.layerGroup().addTo(state.map);
+    }
+    state.mapMarkers.clearLayers();
+    if (!withCoords.length) {
+      state.map.setView([10.5, -66.9], 9);
+      return;
+    }
+    const SEMAFORO_HEX = { Rojo: '#a02525', Amarillo: '#b8790a', Verde: '#0f7a3d' };
+    const bounds = [];
+    withCoords.forEach(function (z) {
+      const dominant = ['Rojo', 'Amarillo', 'Verde'].reduce(function (best, key) { return z.semaforo[key] > z.semaforo[best] ? key : best; }, 'Verde');
+      const color = SEMAFORO_HEX[dominant] || '#1d4ed8';
+      const marker = window.L.circleMarker([z.lat, z.lng], { radius: Math.min(20, 6 + z.count), color: '#fff', weight: 2, fillColor: color, fillOpacity: .85 });
+      marker.bindTooltip(safe(z.name) + ' · ' + z.count);
+      marker.addTo(state.mapMarkers);
+      bounds.push([z.lat, z.lng]);
+    });
+    state.map.fitBounds(bounds, { padding: [24, 24], maxZoom: 14 });
+    setTimeout(function () { if (state.map) state.map.invalidateSize(); }, 60);
+  }
+
+  function renderNeedsBlock(needs) {
+    if (!needs.length) {
+      renderMarkup(dom.resultsNeeds, emptyState('🥫 Sin necesidades registradas', '', ''));
+      return;
+    }
+    const total = needs.reduce(function (sum, n) { return sum + n.count; }, 0);
+    const max = needs[0].count;
+    renderMarkup(dom.resultsNeeds, needs.map(function (n) {
+      const pct = max ? Math.round(n.count / max * 100) : 0;
+      const share = total ? Math.round(n.count / total * 100) : 0;
+      return '<div class="need-row"><span class="need-label">' + safe(n.name) + '</span>' +
+        '<span class="need-track"><span class="need-fill" style="width:' + pct + '%"></span></span>' +
+        '<span class="need-val">' + n.count + ' · ' + share + '%</span></div>';
+    }).join(''));
+  }
+
+  function renderNucleosBlock(nucleos) {
+    renderMarkup(dom.resultsNucleos, nucleos.map(function (n) {
+      return '<div class="nucleo-card"><strong>' + n.count + '</strong><span>' + safe(n.label) + '</span>' +
+        '<div class="nucleo-meta">' + n.cajas + ' cajas · ' + n.avgCajas.toFixed(1) + ' prom.</div></div>';
     }).join(''));
   }
 
@@ -515,8 +750,7 @@
     const configs = {
       contact: { eyebrow: 'Equipo del evento', title: record ? 'Editar responsable' : 'Agregar responsable', fields: contactFields(record) },
       event: { eyebrow: 'Agenda compartida', title: record ? 'Editar evento' : 'Agregar evento', fields: eventFields(record) },
-      inventory: { eyebrow: 'Control de existencias', title: record ? 'Actualizar inventario' : 'Agregar artículo', fields: inventoryFields(record) },
-      batch: { eyebrow: 'Recepción por grupos', title: record ? 'Editar lote' : 'Agregar lote', fields: batchFields(record) }
+      inventory: { eyebrow: 'Control de existencias', title: record ? 'Actualizar inventario' : 'Agregar artículo', fields: inventoryFields(record) }
     };
     const config = configs[type];
     dom.dialogEyebrow.textContent = config.eyebrow;
@@ -555,18 +789,6 @@
       field('Cantidad total', 'total_quantity', item.total_quantity || 0, 'number', true, 'numeric') +
       field('Cantidad distribuida', 'distributed_quantity', item.distributed_quantity || 0, 'number', true, 'numeric') +
       field('Unidad de medida', 'unit', item.unit || 'unidades', 'text', true, '', 'field-full');
-  }
-
-  function batchFields(record) {
-    const item = record || {};
-    const eventOptions = state.events.reduce(function (acc, event) { acc[event.id] = event.title + ' · ' + formatDate(event.event_date); return acc; }, { '': 'Por asignar' });
-    return field('Identificación del lote', 'label', item.label, 'text', true, '', 'field-full') +
-      field('Líder responsable', 'leader_name', item.leader_name, 'text', true) +
-      field('Cantidad prevista (mínimo 15)', 'expected_count', item.expected_count || 15, 'number', true, 'numeric') +
-      field('Ventana de llegada', 'arrival_window', item.arrival_window, 'text', false) +
-      selectField('Estado', 'status', item.status || 'planned', BATCH_STATUS) +
-      selectField('Evento', 'event_id', item.event_id || '', eventOptions, 'field-full') +
-      textareaField('Notas del lote', 'notes', item.notes, 'field-full');
   }
 
   async function saveEditor(event) {
@@ -631,11 +853,6 @@
       if (Number(data.distributed_quantity) < 0) return issue('distributed_quantity', 'La cantidad distribuida no puede ser negativa.');
       if (Number(data.distributed_quantity) > Number(data.total_quantity)) return issue('distributed_quantity', 'La cantidad distribuida no puede superar el total.');
     }
-    if (type === 'batch') {
-      if (!data.label.trim()) return issue('label', 'Identifica el lote.');
-      if (!data.leader_name.trim()) return issue('leader_name', 'Indica el líder responsable.');
-      if (Number(data.expected_count) < 15) return issue('expected_count', 'Cada lote debe incluir al menos 15 personas.');
-    }
     return null;
   }
 
@@ -645,10 +862,6 @@
     if (type === 'inventory') {
       trimmed.total_quantity = Number(trimmed.total_quantity);
       trimmed.distributed_quantity = Number(trimmed.distributed_quantity);
-    }
-    if (type === 'batch') {
-      trimmed.expected_count = Number(trimmed.expected_count);
-      trimmed.event_id = trimmed.event_id || null;
     }
     if (type === 'event') trimmed.start_time = trimmed.start_time || null;
     return trimmed;
