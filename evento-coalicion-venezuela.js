@@ -667,8 +667,14 @@
 
     const needMap = {};
     entregas.forEach(function (e) {
-      const need = e.necesidad || 'Sin especificar';
-      needMap[need] = (needMap[need] || 0) + 1;
+      // necesidad es una lista (una persona puede pedir varias cosas a la
+      // vez); cada una suma en su propio bucket. Se acepta también un string
+      // suelto por compatibilidad con datos antiguos, igual que statusVivienda.
+      const needs = Array.isArray(e.necesidad) ? e.necesidad : (e.necesidad ? [e.necesidad] : []);
+      if (!needs.length) needs.push('Sin especificar');
+      needs.forEach(function (need) {
+        needMap[need] = (needMap[need] || 0) + 1;
+      });
     });
     const needs = Object.keys(needMap).map(function (k) { return { name: k, count: needMap[k] }; }).sort(function (a, b) { return b.count - a.count; });
 
