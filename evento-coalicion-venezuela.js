@@ -50,7 +50,7 @@
   // Snapshot estático de conektados Lite en producción (2026-08-28T12:55:55Z).
   // Nombre, cédula y teléfono de los beneficiarios NUNCA se incluyen aquí — esta
   // pantalla tampoco los muestra en ningún lado, así que no hacía falta guardarlos.
-  const USE_STATIC_DEMO_DATA = true;
+  const USE_STATIC_DEMO_DATA = false;
   const STATIC_DEMO_ENVIOS = [
     { totalCajas: 100, totalEntregado: 10, estadoPaquete: 'despachado' },
     { totalCajas: 200, totalEntregado: 200, estadoPaquete: 'entregado' }

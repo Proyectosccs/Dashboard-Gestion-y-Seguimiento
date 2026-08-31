@@ -32,9 +32,10 @@
     <nav class="tab-nav" aria-label="Secciones del evento">
       <button class="tab-button" type="button" data-view="summary" aria-current="page" onclick="window.coalicionAction(event)">🏠 Resumen</button>
       <button class="tab-button" type="button" data-view="results" onclick="window.coalicionAction(event)">📊 Resultados</button>
-      <button class="tab-button" type="button" data-view="contacts" onclick="window.coalicionAction(event)">🤝 Responsables</button>
-      <button class="tab-button" type="button" data-view="calendar" onclick="window.coalicionAction(event)">🗓️ Calendario</button>
-      <a class="tab-link" href="./" target="_blank" rel="noopener noreferrer" aria-label="Abrir Tablero UCV en otra pestaña">🎓 Tablero UCV ↗</a>
+      <!-- Ocultos temporalmente para la reunión de hoy — quitar el `hidden` para reactivarlos -->
+      <button class="tab-button" type="button" data-view="contacts" onclick="window.coalicionAction(event)" hidden>🤝 Responsables</button>
+      <button class="tab-button" type="button" data-view="calendar" onclick="window.coalicionAction(event)" hidden>🗓️ Calendario</button>
+      <a class="tab-link" href="./" target="_blank" rel="noopener noreferrer" aria-label="Abrir Tablero UCV en otra pestaña" hidden>🎓 Tablero UCV ↗</a>
     </nav>
 
     <div id="connectivity-banner" class="notice notice-warning page-notice" role="status" hidden>
