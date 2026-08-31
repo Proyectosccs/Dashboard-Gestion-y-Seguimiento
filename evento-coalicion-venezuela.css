@@ -47,6 +47,8 @@
   --coalition-good-soft: #e6f6ec;
   --coalition-warning: #d69e00;
   --coalition-warning-soft: #fdf3d6;
+  --coalition-collapse: #1c1c1c;
+  --coalition-collapse-soft: #e6e6e6;
   --shadow-sm: 0 1px 3px color-mix(in srgb, #0f2742 13%, transparent);
   --shadow-md: 0 4px 14px color-mix(in srgb, #0f2742 16%, transparent);
   --shadow-lg: 0 18px 42px color-mix(in srgb, #0f2742 22%, transparent);
@@ -415,7 +417,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .results-card-head p { margin: 4px 0 0; font-size: 12.5px; color: var(--color-neutral-600); max-width: 68ch; }
 .results-card-head code { font-family: monospace; font-size: 11px; background: var(--color-neutral-200); padding: 1px 5px; border-radius: 5px; }
 
-.semaforo-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.semaforo-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 @media (max-width: 640px) { .semaforo-row { grid-template-columns: 1fr; } }
 .semaforo-chip { display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; border-radius: 16px; border: 1.5px solid var(--color-neutral-300); background: #fff; cursor: pointer; text-align: left; font: inherit; color: var(--color-text); opacity: .45; transition: opacity .15s, border-color .15s; }
 .semaforo-chip.active { opacity: 1; border-color: var(--chip-color); background: var(--chip-soft); }

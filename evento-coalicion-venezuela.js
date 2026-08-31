@@ -10,10 +10,21 @@
     events: 'coalicion_events'
   };
   const SEMAFORO_META = {
-    Rojo: { key: 'rojo', label: 'Rojo · colapsado', color: 'var(--coalition-danger)', soft: 'var(--coalition-danger-soft)' },
-    Amarillo: { key: 'amarillo', label: 'Amarillo · inhabitable (de pie)', color: 'var(--coalition-warning)', soft: 'var(--coalition-warning-soft)' },
-    Verde: { key: 'verde', label: 'Verde · habitable', color: 'var(--coalition-good)', soft: 'var(--coalition-good-soft)' }
+    Verde: { key: 'verde', label: 'Verde · Habitable', color: 'var(--coalition-good)', soft: 'var(--coalition-good-soft)' },
+    Amarillo: { key: 'amarillo', label: 'Amarillo · Riesgo moderado/restringido. Se puede reparar', color: 'var(--coalition-warning)', soft: 'var(--coalition-warning-soft)' },
+    Rojo: { key: 'rojo', label: 'Rojo · Inseguro/demolición. Pérdida total', color: 'var(--coalition-danger)', soft: 'var(--coalition-danger-soft)' },
+    Colapso: { key: 'colapso', label: '⚫ Colapso · La edificación colapsó', color: 'var(--coalition-collapse)', soft: 'var(--coalition-collapse-soft)' }
   };
+  const SEMAFORO_KEYS = ['Verde', 'Amarillo', 'Rojo', 'Colapso'];
+  // El estatus real llega como texto libre ("sin inspección", "casa destruida"...)
+  // además de los 3 colores oficiales — cuando alguien reporta que la
+  // edificación colapsó, se cuenta aparte en vez de mezclarse con "Rojo".
+  function classifySemaforo(rawStatus) {
+    const status = Array.isArray(rawStatus) ? rawStatus[0] : rawStatus;
+    const text = String(status || '');
+    if (/colaps/i.test(text)) return 'Colapso';
+    return SEMAFORO_META[status] ? status : null;
+  }
   // Categorías generales para condensar el texto libre de "necesidad" — cada
   // entrega puede pedir varias cosas distintas y con errores de tipeo, así que
   // agrupamos por palabras clave en vez de mostrar cada frase suelta. El orden
@@ -927,19 +938,19 @@
     const confirmadas = entregas.filter(function (e) { return e.confirmadoRecibido === true; }).length;
     const pendientes = entregas.filter(function (e) { return e.confirmadoRecibido === null || e.confirmadoRecibido === undefined; }).length;
 
-    const semaforo = { Rojo: 0, Amarillo: 0, Verde: 0 };
+    const semaforo = { Verde: 0, Amarillo: 0, Rojo: 0, Colapso: 0 };
     entregas.forEach(function (e) {
-      const status = Array.isArray(e.statusVivienda) ? e.statusVivienda[0] : e.statusVivienda;
-      if (semaforo[status] != null) semaforo[status] += 1;
+      const status = classifySemaforo(e.statusVivienda);
+      if (status) semaforo[status] += 1;
     });
 
     const zoneMap = {};
     entregas.forEach(function (e) {
       const zone = normalizeZoneName(e.ubicacionActual);
-      if (!zoneMap[zone]) zoneMap[zone] = { name: zone, count: 0, lat: null, lng: null, semaforo: { Rojo: 0, Amarillo: 0, Verde: 0 } };
+      if (!zoneMap[zone]) zoneMap[zone] = { name: zone, count: 0, lat: null, lng: null, semaforo: { Verde: 0, Amarillo: 0, Rojo: 0, Colapso: 0 } };
       zoneMap[zone].count += 1;
-      const status = Array.isArray(e.statusVivienda) ? e.statusVivienda[0] : e.statusVivienda;
-      if (zoneMap[zone].semaforo[status] != null) zoneMap[zone].semaforo[status] += 1;
+      const status = classifySemaforo(e.statusVivienda);
+      if (status) zoneMap[zone].semaforo[status] += 1;
       if (zoneMap[zone].lat == null && typeof e.ubicacionLat === 'number') { zoneMap[zone].lat = e.ubicacionLat; zoneMap[zone].lng = e.ubicacionLng; }
       if (zoneMap[zone].lat == null && STATIC_ZONE_COORDS[zone]) { zoneMap[zone].lat = STATIC_ZONE_COORDS[zone][0]; zoneMap[zone].lng = STATIC_ZONE_COORDS[zone][1]; }
     });
@@ -1018,9 +1029,9 @@
   }
 
   function renderSemaforoBlock(semaforo) {
-    const total = semaforo.Rojo + semaforo.Amarillo + semaforo.Verde;
+    const total = semaforo.Verde + semaforo.Amarillo + semaforo.Rojo + semaforo.Colapso;
     const filter = state.results.semaforoFilter;
-    renderMarkup(dom.resultsSemaforo, ['Rojo', 'Amarillo', 'Verde'].map(function (key) {
+    renderMarkup(dom.resultsSemaforo, SEMAFORO_KEYS.map(function (key) {
       const meta = SEMAFORO_META[key];
       const count = semaforo[key];
       const pct = total ? Math.round(count / total * 100) : 0;
@@ -1031,7 +1042,7 @@
       '</button>';
     }).join(''));
 
-    renderMarkup(dom.resultsSemaforoBar, ['Rojo', 'Amarillo', 'Verde'].map(function (key) {
+    renderMarkup(dom.resultsSemaforoBar, SEMAFORO_KEYS.map(function (key) {
       const meta = SEMAFORO_META[key];
       const pct = total ? (semaforo[key] / total * 100) : 0;
       return '<span style="width:' + pct + '%;background:' + meta.color + '"></span>';
@@ -1081,14 +1092,14 @@
       state.map.setView([10.5, -66.9], 9);
       return;
     }
-    const SEMAFORO_HEX = { Rojo: '#a02525', Amarillo: '#d69e00', Verde: '#0f7a3d' };
+    const SEMAFORO_HEX = { Verde: '#0f7a3d', Amarillo: '#d69e00', Rojo: '#a02525', Colapso: '#1c1c1c' };
     const bounds = [];
     // El grueso de las entregas cae en esta caja (Vargas / Catia La Mar); unos pocos puntos
     // sueltos y con datos errados quedan muy lejos y arruinarían el zoom si los usamos para encuadrar.
     const CORE_BOX = { latMin: 10.4, latMax: 10.75, lngMin: -67.15, lngMax: -66.6 };
     const coreBounds = [];
     withCoords.forEach(function (z) {
-      const dominant = ['Rojo', 'Amarillo', 'Verde'].reduce(function (best, key) { return z.semaforo[key] > z.semaforo[best] ? key : best; }, 'Verde');
+      const dominant = SEMAFORO_KEYS.reduce(function (best, key) { return z.semaforo[key] > z.semaforo[best] ? key : best; }, 'Verde');
       const color = SEMAFORO_HEX[dominant] || '#1d4ed8';
       const marker = window.L.circleMarker([z.lat, z.lng], { radius: Math.min(20, 6 + z.count), color: '#fff', weight: 2, fillColor: color, fillOpacity: .85 });
       marker.bindTooltip(safe(z.name) + ' · ' + z.count);
