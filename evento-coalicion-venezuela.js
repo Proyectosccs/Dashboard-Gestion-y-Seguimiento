@@ -914,7 +914,9 @@
       if (zoneMap[zone].semaforo[status] != null) zoneMap[zone].semaforo[status] += 1;
       if (zoneMap[zone].lat == null && typeof e.ubicacionLat === 'number') { zoneMap[zone].lat = e.ubicacionLat; zoneMap[zone].lng = e.ubicacionLng; }
     });
-    const zones = Object.keys(zoneMap).map(function (k) { return zoneMap[k]; }).sort(function (a, b) { return b.count - a.count; });
+    const zones = Object.keys(zoneMap).map(function (k) { return zoneMap[k]; })
+      .filter(function (z) { return z.name !== 'Sin especificar'; })
+      .sort(function (a, b) { return b.count - a.count; });
 
     const needCategoryMap = {};
     entregas.forEach(function (e) {
