@@ -20,7 +20,8 @@
       <div class="header-copy">
         <p class="eyebrow">🚚 Operación móvil · Fundación Ingenia</p>
         <h1>Evento Coalición Venezuela</h1>
-        <p>Control compartido de responsables, calendario, inventario y resultados de la jornada.</p>
+        <p id="header-event-datetime" class="header-event-datetime"></p>
+        <p>Control compartido de responsables, calendario y resultados de la jornada.</p>
       </div>
       <div class="session-card">
         <span id="session-name" class="session-name">Acceso desde cualquier dispositivo</span>
@@ -30,9 +31,9 @@
 
     <nav class="tab-nav" aria-label="Secciones del evento">
       <button class="tab-button" type="button" data-view="summary" aria-current="page" onclick="window.coalicionAction(event)">🏠 Resumen</button>
-      <button class="tab-button" type="button" data-view="calendar" onclick="window.coalicionAction(event)">🗓️ Calendario</button>
-      <button class="tab-button" type="button" data-view="contacts" onclick="window.coalicionAction(event)">🤝 Responsables</button>
       <button class="tab-button" type="button" data-view="results" onclick="window.coalicionAction(event)">📊 Resultados</button>
+      <button class="tab-button" type="button" data-view="contacts" onclick="window.coalicionAction(event)">🤝 Responsables</button>
+      <button class="tab-button" type="button" data-view="calendar" onclick="window.coalicionAction(event)">🗓️ Calendario</button>
       <a class="tab-link" href="./" target="_blank" rel="noopener noreferrer" aria-label="Abrir Tablero UCV en otra pestaña">🎓 Tablero UCV ↗</a>
     </nav>
 
@@ -49,61 +50,35 @@
       <div class="view-heading">
         <div>
           <p class="eyebrow">📍 Vista del día</p>
-          <h2 id="summary-title">💙 Entrega de ayuda</h2>
+          <h2 id="summary-title">💙 Entrega de ayuda en Mareabajo</h2>
         </div>
         <button class="btn btn-primary" type="button" data-action="new-event" onclick="window.coalicionAction(event)">➕ Agregar evento</button>
       </div>
-      <div id="kpi-grid" class="kpi-grid"></div>
-
       <section id="summary-results" class="panel summary-results-panel" aria-labelledby="summary-results-title" hidden>
         <div class="panel-heading">
           <div>
             <p class="eyebrow">📦 Love Box · conektados Lite</p>
-            <h3 id="summary-results-title">Resultados de hoy</h3>
+            <h3 id="summary-results-title">Resultados de la jornada</h3>
           </div>
           <button class="btn btn-secondary" type="button" data-view="results" onclick="window.coalicionAction(event)">Ver detalle completo →</button>
         </div>
-        <div id="summary-results-grid" class="summary-results-grid"></div>
+        <div class="summary-results-body">
+          <div id="summary-results-grid" class="summary-results-grid"></div>
+          <img class="results-hero-art" src="./assets/donacion-dibujo.png" alt="" aria-hidden="true">
+        </div>
       </section>
-
-      <div class="summary-grid">
-        <article id="next-event-card" class="event-hero panel"></article>
-        <section class="panel" aria-labelledby="inventory-title">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">📦 Disponibilidad</p>
-              <h3 id="inventory-title">🎁 Inventario del evento</h3>
-            </div>
-            <button class="btn btn-secondary" type="button" data-action="new-inventory" onclick="window.coalicionAction(event)">➕ Artículo</button>
-          </div>
-          <div id="inventory-list" class="inventory-list"></div>
-        </section>
-      </div>
 
       <section class="panel" aria-labelledby="summary-team-title">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">🤝 Equipo del evento</p>
-            <h3 id="summary-team-title">Equipo de hoy</h3>
+            <p class="eyebrow">🤝 Quiénes hacen esto posible</p>
+            <h3 id="summary-team-title">Equipo y colaboradores</h3>
           </div>
           <button class="btn btn-secondary" type="button" data-view="contacts" onclick="window.coalicionAction(event)">Ver todos →</button>
         </div>
-        <div id="summary-team-list" class="summary-team-list"></div>
+        <div id="summary-team-list" class="collaborators-list"></div>
       </section>
-      <section class="panel flow-panel" aria-labelledby="flow-title">
-        <div class="panel-heading">
-          <div>
-            <p class="eyebrow">🚶 Recepción ordenada</p>
-            <h3 id="flow-title">🔄 Ruta de entrega por lotes</h3>
-          </div>
-        </div>
-        <ol class="delivery-flow">
-          <li><span>1</span><strong>📣 Líder agrupa</strong><small>Convoca un lote de 15 o más personas.</small></li>
-          <li><span>2</span><strong>🚶 Llegada conjunta</strong><small>El lote se presenta en su horario acordado.</small></li>
-          <li><span>3</span><strong>✅ Validación</strong><small>El equipo confirma lote y disponibilidad.</small></li>
-          <li><span>4</span><strong>🎁 Entrega y salida</strong><small>Se registra la cantidad entregada y el grupo se retira.</small></li>
-        </ol>
-      </section>
+
     </section>
 
     <section id="calendar-view" class="view" aria-labelledby="calendar-title" hidden>
@@ -162,8 +137,22 @@
 
         <div class="results-card">
           <div class="results-card-head">
+            <h3>👨‍👩‍👧‍👦 Núcleo familiar</h3>
+            <p>Número de personas por núcleo y número de cajas recibidas.</p>
+          </div>
+          <div id="results-nucleos" class="nucleo-grid"></div>
+        </div>
+
+        <div class="results-card">
+          <div class="results-card-head">
+            <h3>🥫 Necesidades reportadas</h3>
+          </div>
+          <div id="results-needs"></div>
+        </div>
+
+        <div class="results-card">
+          <div class="results-card-head">
             <h3>🚦 Estado de la vivienda</h3>
-            <p>Rojo = colapsado · Amarillo = inhabitable pero de pie · Verde = habitable. Clasificación oficial post-terremoto. Toca un color para filtrar el resto de la pantalla.</p>
           </div>
           <div class="semaforo-row" id="results-semaforo"></div>
           <div class="semaforo-bar" id="results-semaforo-bar"></div>
@@ -172,29 +161,12 @@
 
         <div class="results-card">
           <div class="results-card-head">
-            <h3>📍 Zonas atendidas</h3>
-            <p><code>ubicacionActual</code> agrupada por texto (aproximado — el formulario aún no usa una lista fija de zonas). El mapa usa las coordenadas reales cuando la entrega las trae.</p>
+            <h3>📍 Ubicación actual</h3>
           </div>
           <div class="results-zone-layout">
             <div id="results-zone-list" class="zone-list"></div>
             <div id="results-map" class="results-map"></div>
           </div>
-        </div>
-
-        <div class="results-card">
-          <div class="results-card-head">
-            <h3>🥫 Necesidades reportadas</h3>
-            <p>Cada entrega puede marcar varias — una misma persona puede aparecer en más de una categoría.</p>
-          </div>
-          <div id="results-needs" class="need-list"></div>
-        </div>
-
-        <div class="results-card">
-          <div class="results-card-head">
-            <h3>👨‍👩‍👧‍👦 Núcleo familiar</h3>
-            <p>Cuántas personas trae cada núcleo y cuántas cajas recibió, agrupado por tamaño.</p>
-          </div>
-          <div id="results-nucleos" class="nucleo-grid"></div>
         </div>
       </div>
     </section>

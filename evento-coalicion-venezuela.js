@@ -7,20 +7,274 @@
   const LITE_FUNCTION_URL = SUPABASE_URL + '/functions/v1/lite-resultados';
   const TABLES = {
     contacts: 'coalicion_contacts',
-    events: 'coalicion_events',
-    inventory: 'coalicion_inventory'
+    events: 'coalicion_events'
   };
   const SEMAFORO_META = {
     Rojo: { key: 'rojo', label: 'Rojo · colapsado', color: 'var(--coalition-danger)', soft: 'var(--coalition-danger-soft)' },
     Amarillo: { key: 'amarillo', label: 'Amarillo · inhabitable (de pie)', color: 'var(--coalition-warning)', soft: 'var(--coalition-warning-soft)' },
     Verde: { key: 'verde', label: 'Verde · habitable', color: 'var(--coalition-good)', soft: 'var(--coalition-good-soft)' }
   };
+  // Categorías generales para condensar el texto libre de "necesidad" — cada
+  // entrega puede pedir varias cosas distintas y con errores de tipeo, así que
+  // agrupamos por palabras clave en vez de mostrar cada frase suelta. El orden
+  // importa: se evalúan de arriba a abajo y gana la primera que coincida.
+  const NEED_CATEGORIES = [
+    { key: 'vivienda', icon: '🏠', label: 'Vivienda y refugio', test: /vivienda|donde vivir|carpa|inspeccion|rancho|colchoneta/i },
+    { key: 'salud', icon: '🩺', label: 'Salud y medicamentos', test: /hipertensi|ipertension|losartan|diclofenac|asma|nebulizador|basartan|mecformina|amputaci|enfermedad|medicamento/i },
+    { key: 'discapacidad', icon: '♿', label: 'Discapacidad y movilidad', test: /discapacita|silla de ruedas|autista|bast[oó]n|cardiac/i },
+    { key: 'adultos-mayores', icon: '👴', label: 'Adultos mayores', test: /adultos? mayor/i },
+    { key: 'materno-infantil', icon: '🤰', label: 'Salud mental, embarazo y bebés', test: /salud mental|embarazo|beb[eé]|pa[ñn]al/i },
+    { key: 'alimentacion', icon: '🍲', label: 'Alimentación y agua', test: /aliment|comida|agua/i },
+    { key: 'higiene', icon: '🧴', label: 'Higiene y cuidado personal', test: /higiene|personal/i },
+    { key: 'infantil', icon: '👶', label: 'Cuidado infantil', test: /ni[ñn][ao] de|cuidados para ni[ñn]/i },
+    { key: 'sin-necesidad', icon: '✅', label: 'Sin necesidad reportada', test: /^ninguna$|^sin especificar$/i },
+    { key: 'otras', icon: '📋', label: 'Otras necesidades', test: /^/ }
+  ];
+
+  function classifyNeed(text) {
+    for (let i = 0; i < NEED_CATEGORIES.length; i++) {
+      if (NEED_CATEGORIES[i].test.test(text)) return NEED_CATEGORIES[i];
+    }
+    return NEED_CATEGORIES[NEED_CATEGORIES.length - 1];
+  }
+
   const NUCLEO_BRACKETS = [
     { key: '1-2', label: '1–2 personas', test: function (t) { return t <= 2; } },
     { key: '3-4', label: '3–4 personas', test: function (t) { return t >= 3 && t <= 4; } },
     { key: '5-6', label: '5–6 personas', test: function (t) { return t >= 5 && t <= 6; } },
     { key: '7+', label: '7 o más', test: function (t) { return t >= 7; } }
   ];
+
+  // === BLOQUE TEMPORAL DE DEMOSTRACIÓN — quitar junto con USE_STATIC_DEMO_DATA
+  // cuando el departamento de IT despliegue la conexión real a la API de Lite ===
+  // Snapshot estático de conektados Lite en producción (2026-08-28T12:55:55Z).
+  // Nombre, cédula y teléfono de los beneficiarios NUNCA se incluyen aquí — esta
+  // pantalla tampoco los muestra en ningún lado, así que no hacía falta guardarlos.
+  const USE_STATIC_DEMO_DATA = true;
+  const STATIC_DEMO_ENVIOS = [
+    { totalCajas: 100, totalEntregado: 10, estadoPaquete: 'despachado' },
+    { totalCajas: 200, totalEntregado: 200, estadoPaquete: 'entregado' }
+  ];
+  // Cada fila: [adultos, niños, cajas, confirmadoRecibido, necesidades[], ubicacionActual, statusVivienda]
+  // statusVivienda tal como lo registró quien hizo el levantamiento — muchas filas usan texto libre
+  // ("sin inspección", "casa destruida"...) en vez de Rojo/Amarillo/Verde; no se corrigió ese texto.
+  const STATIC_DEMO_ENTREGAS_RAW = [
+    [2,0,1,true,["Ayuda reparando vivienda actual"],"","Amarillo"],
+    [2,0,1,true,["En búsqueda de lugar donde vivir","Necesitan una colchoneta"],"Avenida Bicentenaria, Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [3,1,1,true,["En búsqueda de lugar donde vivir","Ayuda con tratamiento para la hipertensión"],"","Sin inspección"],
+    [4,2,1,true,["Ayuda reparando vivienda actual","Alimentos"],"Parroquia Naiguatá, Municipio Vargas, Estado Vargas, 1166, Venezuela","No ha sido inspeccionado"],
+    [2,0,1,null,["Cuidados de Enfermedades post terremoto"],"Avenida Catia La Mar, Las Angustias, La Páez, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [4,1,1,null,["Alimentos","Ayuda reparando vivienda actual"],"","Amarillo"],
+    [2,2,1,true,["Alimentos"],"Maiquetía, Parroquia Maiquetía, Municipio Vargas, Estado Vargas, 1161, Venezuela","Verde"],
+    [2,2,1,true,["Alimentos","Necesidades de salud mental o Embarazo"],"Playa Grande, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [1,1,1,null,["En búsqueda de lugar donde vivir"],"","Rojo"],
+    [2,4,1,null,["Cuidados de Enfermedades post terremoto"],"La sublete la guaira","Rojo"],
+    [2,1,1,null,["Alimentos"],"La Páez, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Sin inspeccionar"],
+    [2,3,1,null,["Ayuda reparando vivienda actual"],"Calle Real de Playa Verde, Ciudad Chávez, Playa Grande, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,0,1,true,["Necesidades de salud mental o Embarazo","Ropa y cosas para el bebé esposa embarazada"],"Avenida Bicentenaria, Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [3,3,1,null,["Alimentos"],"Barrio Aeropuerto, Mantecal, Parroquia Mantecal, Municipio Muñoz, Estado Apure, Venezuela","Amarillo"],
+    [3,3,1,true,["Ayuda reparando vivienda actual"],"Canaima, Parroquia Carlos Soublette, Municipio Vargas, Estado Vargas, Venezuela","Amarillo"],
+    [4,0,1,null,["Persona autista y persona con problemas cardiacos"],"La Lucha, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","No inspeccionada"],
+    [1,1,1,null,["Alimentos"],"Sector la esperanza la guiara","Verde"],
+    [2,2,1,true,["Ayuda reparando vivienda actual","Necesidades de salud mental o Embarazo","En búsqueda de lugar donde vivir"],"Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [9,5,1,null,["Alimentos"],"Plaza los negros la guaira","Amarillo"],
+    [1,3,1,null,["Alimentos","En búsqueda de lugar donde vivir"],"Barrio aeropuerto la guaira","Verde"],
+    [3,3,1,null,["Cuidados de Enfermedades post terremoto"],"Las Angustias, La Páez, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,1,1,null,["Ayuda reparando vivienda actual","Alimentos"],"Parroquia Naiguatá, Municipio Vargas, Estado Vargas, 1166, Venezuela","Verde"],
+    [6,5,1,true,["Ayuda reparando vivienda actual"],"","Rojo"],
+    [4,5,1,null,["Ayuda reparando vivienda actual"],"Avenida Tacagua, Las Angustias, La Páez, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,2,1,null,["Alimentos","Cuidado personal de amputación o de familiar amputado"],"Playa Grande, Parroquia Bolívar, Municipio Bermúdez, Estado Sucre, 0294, Venezuela","Rojo"],
+    [1,0,1,null,["Alimentos"],"Feria de Frutas Verduras y Horralizas, Calle 9, La Atlántida, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,1,1,null,["Ayuda reparando vivienda actual"],"","Amarillo"],
+    [10,6,4,null,["Alimentos"],"Mare abajo sector casa blanca","Verde"],
+    [2,2,1,null,["En búsqueda de lugar donde vivir"],"Ciudad Chávez, Playa Grande, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rancho precario"],
+    [2,3,1,null,["Cuidados de Enfermedades post terremoto","Alimentos"],"Brisas del Aeropuerto, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [1,2,1,true,["Alimentos","Ayuda reparando vivienda actual","Comida sin gluten"],"","Amarillo"],
+    [2,2,1,null,["En búsqueda de lugar donde vivir"],"","Rojo"],
+    [2,1,1,null,["Alimentos"],"Farmatodo, Avenida Central de Playa Grande, Ciudad Chávez, Playa Grande, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [1,0,1,null,["Alimentos"],"Marea bajo plaza los negros","Rojo"],
+    [5,1,1,null,["Alimentos","Necesidades de salud mental o Embarazo"],"Miraban la guaira","Verde"],
+    [4,2,1,true,["En búsqueda de lugar donde vivir"],"Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [3,0,1,null,["Alimentos"],"Ciudad Chávez, La Lucha, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,0,1,null,["Alimentos"],"Guaracarumbo, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [3,0,1,null,["Alimentos","Cuidados para adultos mayores"],"Guaracaru la guaria","Amarillo"],
+    [1,3,1,true,["Alimentos","Ayuda reparando vivienda actual"],"Avenida Bicentenaria, Urbanización José María Vargas, Pariata, Parroquia Carlos Soublette, Municipio Vargas, Estado Vargas, Venezuela","Rojo"],
+    [4,2,1,null,["En búsqueda de lugar donde vivir"],"Estadio César Nieves, Pasarela, Las Angustias, La Páez, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [1,1,1,null,["Alimentos"],"Guaracarumbo, Week-End, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [3,5,2,null,["Alimentos"],"Avenida Bicentenaria, Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Colapsada"],
+    [3,0,1,null,["Ayuda reparando vivienda actual","Alimentos"],"Avenida Bicentenaria, Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [1,0,1,true,["Alimentos"],"El Respiro, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [2,2,1,null,["En búsqueda de lugar donde vivir"],"Avenida Principal de Playa Grande, Ciudad Chávez, Playa Grande, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","casa destruida"],
+    [1,3,1,null,["Alimentos"],"Marea bajo la guaira","Rojo"],
+    [1,0,1,null,["Alimentos","Ayuda reparando vivienda actual"],"Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [1,0,1,null,["Alimentos","Envases de agua"],"Avenida Bicentenaria, Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [3,3,1,null,["Alimentos"],"Calle real barrio abajo la guaira","Amarillo"],
+    [4,1,1,null,["Alimentos"],"La Veguita, Week-End, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [3,0,1,null,["Alimentos"],"Casa blanca la guaira","Verde"],
+    [2,1,1,true,["En búsqueda de lugar donde vivir"],"Avenida Bicentenaria, Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [2,0,1,null,["Ipertension"],"Caracas, Urbanización Kennedy, Parroquia Macarao, Municipio Libertador, Distrito Metropolitano de Caracas, Distrito Capital, 1000, Venezuela","Rojo"],
+    [1,1,1,null,["Alimentos"],"Casa blanca la guaira","Amarillo"],
+    [2,0,1,null,["Alimentos","Ayuda reparando vivienda actual","Necesita inspeccionar su casa urgente"],"Parte alta de Canaima mayongo","Sin etiqueta pero graves condiciones"],
+    [3,1,1,true,["Alimentos","Necesidades de salud mental o Embarazo"],"Parada Barrio Aeropuerto, Avenida La Armada, Brisas del Aeropuerto, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Ninguna certificación, la vivienda está bien"],
+    [2,0,1,true,["Ayuda reparando vivienda actual"],"","Amarillo"],
+    [4,3,1,null,["mecformina y basartan 80 ml"],"Summa, Vía Alterna a Playa Grande, Ciudad Chávez, La Lucha, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","sin inspeccionar"],
+    [2,1,1,true,["Alimentos"],"Campamento transitorio república salvador","Desplomada"],
+    [4,2,1,true,["Alimentos","Ayuda reparando vivienda actual"],"","Sin inspección"],
+    [3,0,1,null,["Alimentos"],"Calle 6, Ciudad Chávez, Playa Grande, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","sin inspeccionar"],
+    [6,1,1,true,["Alimentos"],"Brisas del Aeropuerto, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,0,1,null,["Alimentos"],"Barrio aeropuerto la guaira","Amarillo"],
+    [2,1,1,null,["Ayuda reparando vivienda actual"],"La Esperanza, Terrazas de Alto Picure, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","casa no inspeccionada"],
+    [1,1,1,true,["Alimentos","Pañales para bebé de dos años"],"San Miguel arcángel, el barrio lo puerto","No tiene certificación pero tiene grietas la vivienda"],
+    [1,2,1,null,["Alimentos"],"Barrio aeropuerto","Amarillo"],
+    [2,2,1,null,["niños asmaticos"],"Caracas, Ciudad Caribia, Parroquia Carayaca, Municipio Vargas, Distrito Metropolitano de Caracas, Estado Vargas, 1167, Venezuela","rancho precario"],
+    [3,1,1,null,["Ayuda reparando vivienda actual","Alimentos","Artículos de uso personal"],"","Sin inspección"],
+    [2,1,1,null,["Rancho precario"],"Valle La Cruz, Ezequiel Zamora, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rancho precario"],
+    [2,4,1,null,["Alimentos"],"Brisas del Aeropuerto, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Verde"],
+    [1,3,1,true,["Alimentos"],"Brisas del Aeropuerto, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,4,1,null,["En búsqueda de lugar donde vivir"],"Caracas, Monte Alto, Parroquia El Junquito, Municipio Libertador, Distrito Metropolitano de Caracas, Distrito Capital, 1000, Venezuela","vivienda precaria"],
+    [2,2,1,null,["En búsqueda de lugar donde vivir"],"Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [3,2,1,null,["En búsqueda de lugar donde vivir"],"El Piache, Terrazas de Alto Picure, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","casa destruida"],
+    [4,0,1,true,["Alimentos"],"","Amarillo"],
+    [2,3,1,true,["Alimentos"],"Macuto, Parroquia Macuto, Municipio Vargas, Estado Vargas, 1164, Venezuela","Amarillo"],
+    [3,0,1,null,["Alimentos"],"Carallaca la guaira","Verde"],
+    [2,1,1,null,["Alimentos"],"Caracas, Parroquia Sucre, Municipio Libertador, Distrito Metropolitano de Caracas, Distrito Capital, Venezuela","Verde"],
+    [2,1,1,true,["Alimentos"],"Sector cardonal la guaira","Verde"],
+    [1,2,1,true,["En búsqueda de lugar donde vivir","Alimentos"],"","Sin inspección"],
+    [3,2,1,true,["Alimentos","En búsqueda de lugar donde vivir"],"Automac, Urbanización Caribe, Caraballeda, Parroquia Caraballeda, Municipio Vargas, Estado Vargas, 1165, Venezuela","Rojo"],
+    [2,0,1,true,["En búsqueda de lugar donde vivir"],"","Sin inspección"],
+    [4,0,1,null,["Alimentos"],"La Aviación, El Trébol, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Verde"],
+    [4,3,1,null,["Necesidades de salud mental o Embarazo"],"El Piache, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","sin inspeccionar"],
+    [2,2,1,true,["Alimentos"],"Maiquetía, Parroquia Maiquetía, Municipio Vargas, Estado Vargas, 1161, Venezuela","Amarillo"],
+    [1,2,1,null,["ninguna"],"","sin inspeccionar"],
+    [1,2,1,true,["Alimentos","Necesidades de salud mental o Embarazo","Niña autista no verbal necesita terapia"],"Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,3,1,null,["Alimentos","En búsqueda de lugar donde vivir"],"Refugio hospital naval","Desplomada"],
+    [1,2,1,null,["Alimentos"],"Carayaca, Parroquia Carayaca, Municipio Vargas, Estado Vargas, 1167, Venezuela","Verde"],
+    [7,6,1,null,["Necesidades de salud mental o Embarazo","Cuidados de Enfermedades post terremoto"],"Los Olivos, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","no inspeccionada"],
+    [3,1,1,true,["Alimentos","Suministros de higiene personal"],"Hospital San José, Calle Real de Maiquetía, Casco Central de Maiquetía, El Rincón, Maiquetía, Parroquia Maiquetía, Municipio Vargas, Estado Vargas, 1161, Venezuela","Ninguna certificación, se encuentra bien"],
+    [2,2,1,true,["Alimentos"],"","Verde"],
+    [2,1,1,null,["Necesidades de salud mental o Embarazo"],"Grupo Médico Catia La Mar, Calle 11, Las Angustias, La Atlántida, Catia La Mar, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Verde"],
+    [1,3,1,null,["Alimentos"],"Sector el plan la guaira","Amarillo"],
+    [2,2,1,true,["Alimentos","Cuidados de Enfermedades post terremoto"],"La guaira quebrada de german","Amarillo"],
+    [2,5,1,null,["En búsqueda de lugar donde vivir"],"La Roraima, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [2,6,1,true,["Alimentos","Ayuda reparando vivienda actual"],"Navarrete la guaira","Rojo"],
+    [5,3,1,true,["Alimentos","Ayuda reparando vivienda actual"],"","Sin inspección"],
+    [1,1,1,null,["Cuidados de Enfermedades post terremoto"],"Caracas, Parroquia Sucre, Municipio Libertador, Distrito Metropolitano de Caracas, Distrito Capital, Venezuela","Amarillo"],
+    [3,6,2,null,["Alimentos"],"Barrio el aeropuerto la guaira","Amarillo"],
+    [2,3,1,null,["En búsqueda de lugar donde vivir","3 asmaticos"],"Oripia, Los Cujíes, Parroquia Tácata, Municipio Guaicaipuro, Estado Miranda, 1211, Venezuela","Rojo"],
+    [3,1,1,null,["Ayuda reparando vivienda actual","Alimentos","Diclofenac"],"Casa blanca, la Guaira","Rojo"],
+    [5,2,1,null,["Alimentos"],"","Sin inspección"],
+    [8,4,1,true,["Alimentos","Ayuda reparando vivienda actual"],"Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [1,2,1,null,["Alimentos"],"Carallaca la guaira","Verde"],
+    [1,0,1,null,["Alimentos","Ayuda reparando vivienda actual"],"Avenida Bicentenaria, Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,1,1,true,["Ayuda reparando vivienda actual"],"Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [2,3,1,true,["Alimentos"],"Casa blanca la guaira","Amarillo"],
+    [2,0,1,null,["Alimentos","Ayuda para adultos mayores"],"Barrio aeropuerto la guaira","Casa desplomada"],
+    [2,3,1,true,["En búsqueda de lugar donde vivir","Necesita carpa"],"Avenida Bicentenaria, Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [3,1,1,null,["Ayuda reparando vivienda actual"],"Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [3,4,1,null,["Cuidados de Enfermedades post terremoto","Losartan, astorbastartina, clopidogel y clorotisida"],"El Piache, Terrazas de Alto Picure, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","no inspeccionada"],
+    [3,2,1,null,["Alimentos"],"Casa blanca la guaira","Rojo"],
+    [3,1,1,null,["En búsqueda de lugar donde vivir"],"","Verde"],
+    [2,0,1,null,["Alimentos"],"Plaza los negros la guaira","Rojo"],
+    [4,3,1,null,["Alimentos"],"Avenida Carlos Soublette","Amarillo"],
+    [1,2,1,null,["Alimentos","Cuidados personales"],"Santa eduviges la guaira","Amarillo"],
+    [2,3,1,null,["Necesidades de salud mental o Embarazo","En búsqueda de lugar donde vivir"],"Guaremal, Parroquia Guaremal, Municipio Guaicaipuro, Estado Miranda, 1201, Venezuela","sin casa"],
+    [2,0,1,null,["Ayuda reparando vivienda actual"],"Avenida Bicentenaria, Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [3,0,1,null,["Cuidados de Enfermedades post terremoto"],"Paso Morocho, Parroquia San Casimiro, Municipio San Casimiro, Estado Aragua, Venezuela","Rojo"],
+    [2,4,1,true,["Alimentos"],"Brisas del Aeropuerto, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,3,1,null,["Ayuda reparando vivienda actual"],"Carretera Vieja Caracas - La Guaira, Pedro García, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,2,1,null,["Alimentos","Necesidades de salud mental o Embarazo"],"Maiquetía, Parroquia Maiquetía, Municipio Vargas, Estado Vargas, 1161, Venezuela","Amarillo"],
+    [2,4,1,true,["Alimentos"],"","Sin inspección"],
+    [3,0,1,null,["Alimentos"],"El Piache, Terrazas de Alto Picure, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","sin inspeccionar"],
+    [4,0,1,true,["Alimentos"],"Aluminiologo La Guaira, 1161, Avenida Carlos Soublette, 10 de Marzo, Urbanización José María Vargas, Pariata, Parroquia Maiquetía, Municipio Vargas, Estado Vargas, 1161, Venezuela","Verde"],
+    [3,1,1,true,["En búsqueda de lugar donde vivir","Alimentos","Necesitan nebulizador"],"Ezequiel Zamora, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Perdida de vivienda"],
+    [1,3,1,null,["Alimentos","Ayuda reparando vivienda actual"],"Palo Negro, Municipio Libertador, Distrito Metropolitano de Caracas, Distrito Capital, Venezuela","Amarillo"],
+    [3,0,1,true,["Alimentos","Medicamento para asma"],"","Casa de laminas"],
+    [3,1,1,null,["Alimentos","Cuiados para niña discapacitada"],"E, Avenida Aeropuerto Auxiliar, Sotavento I, Santa Eduvigis, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Verde"],
+    [3,0,1,null,["Cuidados de Enfermedades post terremoto"],"Valle La Cruz, Ezequiel Zamora, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,2,1,null,["Alimentos"],"Brisas del Aeropuerto, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [4,1,1,null,["Alimentos","Cuidados para niña de 2 años"],"Barrio aeropuerto maiquetia la guaira","Amarillo"],
+    [3,0,1,null,["Cuidados de Enfermedades post terremoto","Ayuda reparando vivienda actual"],"Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [2,1,1,true,["Alimentos","Hipertensa"],"Avenida Carlos Soublette, 10 de Marzo, Urbanización José María Vargas, Pariata, Parroquia Carlos Soublette, Municipio Vargas, Estado Vargas, Venezuela","Grietas y fracturas"],
+    [2,2,1,true,["En búsqueda de lugar donde vivir"],"","Sin inspección"],
+    [2,2,1,null,["Alimentos"],"Brisas del Aeropuerto, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [3,4,1,null,["Alimentos"],"Santa eduvijis Catia la mar","Sin inspeccionar"],
+    [1,0,1,null,["Cuidados de Enfermedades post terremoto"],"Hotel Círculo Militar de Caracas, Paseo Los Próceres, Caracas, Barrio Las Malvinas, San Antonio, El Valle, Parroquia El Valle, Municipio Libertador, Distrito Metropolitano de Caracas, Distrito Capital, 1040, Venezuela","no inspeccionada"],
+    [3,3,1,null,["Alimentos"],"Caracas, Topo Arriba, Parroquia El Junquito, Municipio Libertador, Distrito Metropolitano de Caracas, Distrito Capital, Venezuela","no inspeccionada"],
+    [4,3,1,null,["Alimentos","Necesidades de salud mental o Embarazo"],"","Sin inspección"],
+    [2,0,1,null,["Alimentos"],"Playa Los Cocos, Urbanización Caribe, La Guaira, Parroquia Caraballeda, Municipio Vargas, Estado Vargas, 1165, Venezuela","Rojo"],
+    [2,1,1,null,["Alimentos"],"Iberia vía Carallaca","Amarillo"],
+    [3,1,1,true,["Alimentos"],"Cardonado la guaira","Verde"],
+    [2,0,1,true,["Alimentos"],"Autopista Caracas - La Guaira, Caracas, Parroquia Sucre, Municipio Libertador, Distrito Metropolitano de Caracas, Distrito Capital, 1010, Venezuela","Amarillo"],
+    [1,4,1,true,["Ayuda reparando vivienda actual"],"","Sin inspección"],
+    [2,1,1,true,["Alimentos","Uso personales"],"Parroquia Urimare, Municipio Vargas, Estado Vargas, Venezuela","Ninguna certificación pero está bien"],
+    [4,3,1,null,["Alimentos"],"Barrio aeropuerto la guaira","Amarillo"],
+    [1,2,1,null,["Cuidados de Enfermedades post terremoto","Ayuda reparando vivienda actual"],"Caracas, Parroquia El Junquito, Municipio Libertador, Distrito Metropolitano de Caracas, Distrito Capital, Venezuela","casa no inspeccionada"],
+    [2,2,1,true,["En búsqueda de lugar donde vivir"],"Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [2,2,1,true,["Alimentos"],"Barrio Aeropuerto, Mantecal, Parroquia Mantecal, Municipio Muñoz, Estado Apure, Venezuela","Amarillo"],
+    [2,2,1,null,["Ayuda reparando vivienda actual"],"Carretera Paracotos - Tácata, Piedras Azules, Parroquia Tácata, Municipio Guaicaipuro, Estado Miranda, 1211, Venezuela","no inspeccionada"],
+    [2,3,1,null,["Cuidados de Enfermedades post terremoto","Alimentos"],"La guaira barrio aeropuerto","Verde"],
+    [2,2,1,true,["Alimentos","Necesidades de salud mental o Embarazo","2 discapacitados"],"","Sin inspección"],
+    [4,0,1,true,["Alimentos"],"Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Verde"],
+    [2,2,1,true,["En búsqueda de lugar donde vivir","Alimentos","Necesitan pañales de adultos y baston"],"","Rojo"],
+    [8,4,1,true,["En búsqueda de lugar donde vivir"],"","Casa destruida"],
+    [1,1,1,null,["En búsqueda de lugar donde vivir","Alimentos"],"Maiquetía, Parroquia Maiquetía, Municipio Vargas, Estado Vargas, 1161, Venezuela","Colapsada"],
+    [2,2,1,null,["Ayuda reparando vivienda actual","Alimentos"],"","Casa de laminas"],
+    [4,1,1,null,["Necesidades de salud mental o Embarazo"],"Valle La Cruz, Ezequiel Zamora, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","No esta inspeccionada"],
+    [2,2,1,null,["Alimentos"],"Los Corales, Caraballeda, Parroquia Caraballeda, Municipio Vargas, Estado Vargas, 1165, Venezuela","Amarillo"],
+    [2,2,1,null,["Ayuda reparando vivienda actual"],"Túnel Boquerón I, Salto Boquerón, Catia La Mar, Parroquia Urimare, Municipio Vargas, Distrito Metropolitano de Caracas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,3,1,true,["En búsqueda de lugar donde vivir","Alimentos"],"Carlos Soublette","Rojo"],
+    [1,3,1,null,["Cuidados de Enfermedades post terremoto","Alimentos"],"Malboro","Todavía sin evaluar"],
+    [3,0,1,true,["En búsqueda de lugar donde vivir"],"","Rojo"],
+    [2,4,1,true,["Alimentos"],"Montesano, El Trébol, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [2,3,1,null,["En búsqueda de lugar donde vivir"],"Río Arriba, Parroquia Tácata, Municipio Guaicaipuro, Estado Miranda, 1211, Venezuela","Rojo"],
+    [3,1,1,true,["Alimentos"],"Refugio transitorio","Rojo"],
+    [5,2,1,true,["En búsqueda de lugar donde vivir","Alimentos","Cuidado personal de amputación o de familiar amputado"],"Montesano, El Trébol, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Perdió la vivienda"],
+    [1,2,1,true,["Alimentos"],"OPPE 25, Avenida Principal de Caribe, Tanaguarena, Caraballeda, Parroquia Caraballeda, Municipio Vargas, Estado Vargas, 1165, Venezuela","Rojo"],
+    [2,1,1,null,["En búsqueda de lugar donde vivir"],"Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [2,4,1,true,["Alimentos"],"Las Tunitas, Terrazas de Alto Picure, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,1,1,null,["Alimentos"],"Valle La Cruz, Ezequiel Zamora, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Verde"],
+    [2,1,1,null,["Alimentos","Ayuda reparando vivienda actual"],"Aeropuerto Internacional de Maiquetía Simón Bolívar, Avenida La Armada, Sotavento II, Santa Eduvigis, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [2,3,1,true,["Ayuda reparando vivienda actual"],"Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,0,1,null,["Alimentos","Cuidados de Enfermedades post terremoto","Hipertensión cuidados"],"Carallaca la guaira","Amarillo"],
+    [2,1,1,null,["Alimentos"],"Valle La Cruz, Ezequiel Zamora, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [6,3,1,null,["Ayuda reparando vivienda actual"],"Parroquia Urimare, Municipio Vargas, Estado Vargas, Venezuela","Ninguna"],
+    [2,2,1,null,["Ayuda reparando vivienda actual","Cuidados de Enfermedades post terremoto"],"Valle La Cruz, Ezequiel Zamora, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [3,2,1,null,["En búsqueda de lugar donde vivir"],"","Rojo"],
+    [6,4,2,null,["Alimentos"],"Santa eduvijis la guaira","Amarillo"],
+    [2,2,1,null,["Cuidados de Enfermedades post terremoto"],"Caracas, Parroquia Sucre, Municipio Libertador, Distrito Metropolitano de Caracas, Distrito Capital, Venezuela","Rojo"],
+    [3,1,1,null,["Alimentos"],"Paro curimare santa eduvijis sector 1","Verde"],
+    [6,4,1,null,["Ayuda reparando vivienda actual","Cuidados de Enfermedades post terremoto"],"Hospital Dermatológico Martín Vegas, Avenida Fundación Mendoza, Urbanización Martín Vegas, Week-End, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [2,1,1,null,["En búsqueda de lugar donde vivir"],"","No apta"],
+    [2,1,1,true,["Alimentos"],"Res Ana Victoria. La guaira","Verde"],
+    [4,4,1,null,["En búsqueda de lugar donde vivir"],"El Piache, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Casa destruida"],
+    [5,1,1,true,["Ayuda reparando vivienda actual"],"","Sin inspección"],
+    [2,4,1,null,["Alimentos"],"Autopista Caracas - La Guaira, La Aviación, El Trébol, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [2,1,1,null,["Alimentos"],"Mare, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Médicos. Tomografía cervical"],
+    [2,1,1,null,["Alimentos"],"Santa eduvijis la guaira","Amarillo"],
+    [5,3,1,null,["Alimentos"],"Carretera San Casimiro - Güiripa, El Horno, Parroquia Güiripa, Municipio San Casimiro, Estado Aragua, Venezuela","Verde"],
+    [2,2,1,null,["Alimentos"],"Avenida La Armada, La Veguita, Week-End, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [6,6,1,null,["En búsqueda de lugar donde vivir"],"","Amarillo"],
+    [3,0,1,null,["Ayuda reparando vivienda actual","Cuidados de Enfermedades post terremoto"],"Calle 6, Ciudad Chávez, Playa Grande, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [1,2,1,true,["Alimentos"],"Atanacio","Rojo"],
+    [1,1,1,null,["En búsqueda de lugar donde vivir"],"Avenida Fundación Mendoza, Urbanización Martín Vegas, Week-End, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [3,0,1,null,["Alimentos"],"Autopista Caracas - La Guaira, La Aviación, El Trébol, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Amarillo"],
+    [6,3,1,null,["Necesita una silla de ruedas"],"","Verde"],
+    [2,1,1,true,["Alimentos"],"La guaira c","Rojo"],
+    [2,3,2,null,["Alimentos"],"Valle La Cruz, Ezequiel Zamora, Parroquia Catia La Mar, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"],
+    [2,0,1,null,["Alimentos"],"Playa Grande, Catia La Mar, Parroquia Urimare, Municipio Vargas, Estado Vargas, 1162, Venezuela","Rojo"]
+  ];
+  // Coordenadas (lat, lng) de cada entrega en el mismo orden que STATIC_DEMO_ENTREGAS_RAW —
+  // alimentan el mapa de "Zonas atendidas" en la demo estática.
+  const STATIC_DEMO_LATLNG = [null,[10.611691,-6],null,[10.588122,-66.670395],[10.60126,-67.02467],null,[10.596607,-66.959755],[10.608837,-6],null,null,[10.599235,-67.0245],[10.610242,-67.02673],[10.607516,-66.97264],[7.5605035,-69.1429],[10.594429,-66.973045],[10.607684,-67.0287],null,[10.607376,-66.97245],null,null,[10.598138,-67.024155],[10.588122,-66.670395],null,[10.602862,-67.024414],[10.654413,-63.284912],[10.604506,-67.02948],null,null,[10.608465,-67.02038],[10.592714,-67.00432],null,null,[10.607711,-67.020035],null,null,[10.607206,-66.97288],[10.606302,-67.02399],[10.5706415,-66.99266],null,[10.602088,-6],[10.602989,-67.02296],[10.593008,-67.014595],[10.607449,-66.9795],[10.607454,-66.9723],[10.595103,-67.02347],[10.607503,-67.0245],null,[10.607125,-66.97293],[10.607087,-66.97723],null,[10.596663,-67.0154],null,[10.607455,-66.9723],[10.424254,-67.022095],null,null,[10.594275,-67.00289],null,[10.604237,-67.0269],null,null,[10.607947,-67.01274],[10.592714,-67.00432],null,[10.563337,-67.06879],null,null,[10.529586,-67.04132],null,[10.571438,-67.013855],[10.592714,-67.00432],[10.592714,-67.00432],[10.466839,-67.02347],[0.6074823,-66.973595],[10.567388,-67.04132],null,[10.606475,-66.89229],null,[10.561988,-67.02484],null,null,[10.6139555,-66.84436],null,[10.595826,-66.98377],[10.575488,-67.04407],[10.596607,-66.959755],null,[10.607204,-66.97289],null,[10.529354,-67.12044],[10.575488,-67.03308],[10.595976,-66.95709],null,[10.602897,-67.02965],null,null,[10.57553,-67.030334],[10.603138,-66.99668],null,[10.554605,-67.030334],null,[10.2242985,-67.030334],[10.597175,-6],null,[10.606651,-66.979774],null,[10.607154,-66.97893],[10.607206,-66.97288],null,null,[10.607087,-66.97723],[10.607468,-66.97312],[10.5640545,-67.03308],null,null,null,null,null,[10.302674,-67.01111],[10.607453,-66.972305],[9.994464,-67.038574],[10.592714,-67.00432],[10.570805,-66.99051],[10.596607,-66.959755],null,[10.556587,-67.03308],[10.599412,-66.96293],[10.582718,-67.0174],[10.408047,-67.046814],null,[10.598361,-66.99034],[10.572787,-67.03308],[10.592714,-67.00432],null,[10.748234,-67.005615],[10.599607,-66.96503],null,[10.592714,-67.00432],null,[10.465868,-66.89575],[10.521484,-67.0166],null,[10.617287,-66.8384],null,null,[10.519344,-66.945114],null,[10.589096,-66.998924],null,[10.526252,-67.005615],[10.607206,-66.97288],[7.5605035,-69.1429],[10.216189,-67.00287],null,null,[10.599267,-67.01451],null,[10.815686,-67.013855],[10.596607,-66.959755],null,[10.580255,-67.02072],[10.613524,-66.85653],[10.564688,-67.005615],null,null,null,[10.594707,-66.97811],[10.143199,-67.01111],null,[10.594707,-66.97811],[10.611735,-66.829865],[10.674736,-67.01111],[10.588694,-67.0637],[10.58093,-67.01935],[10.603138,-66.99668],[10.606913,-66.976234],null,[10.584305,-67.01248],[10.589096,-66.998924],[10.587005,-67.017975],null,null,[10.541653,-67.0166],null,[10.587637,-67.0166],null,null,[10.572787,-67.04407],null,[10.575488,-66.997375],[10.606651,-66.979774],null,[10.020075,-67.01111],[10.602212,-67.015915],null,[10.603203,-67.01111],null,[10.584937,-67.013855],[10.583588,-66.99463],null,null,[10.58363,-67.009735],[10.608837,-67.01599]];
+  const STATIC_DEMO_ENTREGAS = STATIC_DEMO_ENTREGAS_RAW.map(function (row, i) {
+    const coords = STATIC_DEMO_LATLNG[i];
+    return {
+      composicionAdultos: row[0], composicionNinos: row[1], cantidadPaquetes: row[2],
+      confirmadoRecibido: row[3], necesidad: row[4], ubicacionActual: row[5], statusVivienda: row[6],
+      ubicacionLat: coords ? coords[0] : null, ubicacionLng: coords ? coords[1] : null
+    };
+  });
+  // === FIN BLOQUE TEMPORAL DE DEMOSTRACIÓN ===
 
   const EVENT_STATUS = {
     planned: 'Planificado',
@@ -33,14 +287,33 @@
     'Coalicion con amor a Venezuela': 'Coalicion con amor a Venezuela',
     'Fundacion Ingenia': 'Fundacion Ingenia',
     'Voluntariado AVAA': 'Voluntariado AVAA',
+    'ADRA': 'ADRA',
+    'Nodos Venezuela': 'Nodos Venezuela',
     'Voluntario Particular': 'Voluntario Particular'
   };
   const AFFILIATION_CLASSES = {
     'Coalicion con amor a Venezuela': 'affiliation-coalicion',
     'Fundacion Ingenia': 'affiliation-ingenia',
     'Voluntariado AVAA': 'affiliation-avaa',
+    'ADRA': 'affiliation-adra',
+    'Nodos Venezuela': 'affiliation-nodos',
     'Voluntario Particular': 'affiliation-particular'
   };
+  // Logos reales por afiliación — alimentan la franja de colaboradores del
+  // Resumen y los avatares de Responsables. Mientras una afiliación no tenga
+  // entrada aquí, no aparece en la franja (no se mezclan logos con iniciales).
+  const AFFILIATION_LOGOS = {
+    'Coalicion con amor a Venezuela': './assets/logos/coalicion.jpeg',
+    'ADRA': './assets/logos/adra.png',
+    'Fundacion Ingenia': './assets/logos/ingenia.jpeg',
+    'Nodos Venezuela': './assets/logos/nodos-venezuela.jpeg'
+  };
+  // conektados Lite no es una afiliación de un responsable — es la plataforma
+  // que alimenta los Resultados — así que su logo va siempre en la franja,
+  // sin depender de que algún contacto la tenga asignada.
+  const FIXED_COLLABORATOR_LOGOS = [
+    { key: 'conektados', logo: './assets/logos/conektados.jpeg', alt: 'conektados Lite' }
+  ];
   const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
@@ -51,7 +324,6 @@
     contacts: [],
     revealedContacts: {},
     events: [],
-    inventory: [],
     query: '',
     keyRequest: null,
     keyRequestCounter: 0,
@@ -62,7 +334,7 @@
     discardArmed: false,
     realtime: null,
     loadId: 0,
-    results: { loading: false, error: null, loaded: false, entregas: [], envios: [], semaforoFilter: null },
+    results: { loading: false, error: null, loaded: false, entregas: [], envios: [], semaforoFilter: null, needsData: [], openNeedCategory: null },
     map: null,
     mapMarkers: null
   };
@@ -111,12 +383,11 @@
     dom.loadingState = document.getElementById('loading-state');
     dom.connectivityBanner = document.getElementById('connectivity-banner');
     dom.retryLoad = document.getElementById('retry-load');
-    dom.kpiGrid = document.getElementById('kpi-grid');
     dom.summaryResults = document.getElementById('summary-results');
     dom.summaryResultsGrid = document.getElementById('summary-results-grid');
     dom.summaryTeamList = document.getElementById('summary-team-list');
     dom.nextEventCard = document.getElementById('next-event-card');
-    dom.inventoryList = document.getElementById('inventory-list');
+    dom.headerEventDatetime = document.getElementById('header-event-datetime');
     dom.calendarMonthLabel = document.getElementById('calendar-month-label');
     dom.calendarGrid = document.getElementById('calendar-grid');
     dom.contactSearch = document.getElementById('contact-search');
@@ -291,8 +562,7 @@
       .order('name');
     const results = await Promise.all([
       contactsRequest,
-      state.client.from(TABLES.events).select('*').is('archived_at', null).order('event_date'),
-      state.client.from(TABLES.inventory).select('*').is('archived_at', null).order('name')
+      state.client.from(TABLES.events).select('*').is('archived_at', null).order('event_date')
     ]);
 
     if (loadId !== state.loadId) return;
@@ -306,7 +576,6 @@
     state.contacts = results[0].data || [];
     state.revealedContacts = {};
     state.events = results[1].data || [];
-    state.inventory = results[2].data || [];
     dom.loadingState.hidden = true;
     renderAll();
     if (!background) setView(state.view);
@@ -315,7 +584,7 @@
   function subscribeRealtime() {
     teardownRealtime();
     let channel = state.client.channel('coalicion-evento-publico');
-    [TABLES.events, TABLES.inventory].forEach(function (table) {
+    [TABLES.events].forEach(function (table) {
       channel = channel.on('postgres_changes', { event: '*', schema: 'public', table: table }, function () {
         loadAllData(true);
       });
@@ -362,10 +631,9 @@
     if (action === 'hide-contact') hideContact(id);
     if (action === 'new-event') openEditor('event');
     if (action === 'edit-event') openEditor('event', findById(state.events, id));
-    if (action === 'new-inventory') openEditor('inventory');
-    if (action === 'edit-inventory') openEditor('inventory', findById(state.inventory, id));
     if (action === 'refresh-results') fetchResultados(true);
     if (action === 'filter-semaforo') toggleSemaforoFilter(id);
+    if (action === 'toggle-need') toggleNeedCategory(id);
   }
 
   function hideContact(id) {
@@ -383,48 +651,15 @@
     renderSummaryTeam();
   }
 
-  function renderSummary() {
-    const inventoryAvailable = state.inventory.reduce(function (sum, item) {
-      return sum + Math.max(0, Number(item.total_quantity || 0) - Number(item.distributed_quantity || 0));
-    }, 0);
-    renderMarkup(dom.kpiGrid,
-      kpi('kpi-primary', state.events.length, '🗓️ Eventos registrados') +
-      kpi('kpi-blue', state.contacts.length, '🤝 Responsables') +
-      kpi('kpi-sky', inventoryAvailable, '📦 Unidades disponibles')
-    );
-    renderSummaryTeam();
-
+  function renderHeaderDatetime() {
+    if (!dom.headerEventDatetime) return;
     const next = nextEvent();
-    if (!next) {
-      renderMarkup(dom.nextEventCard, emptyState('🗓️ Sin evento registrado', 'Agrega la fecha, una dirección o un enlace de Maps para activar el pulso operativo.', '<button class="btn btn-primary" type="button" data-action="new-event">➕ Agregar evento</button>'));
-    } else {
-      const date = dateParts(next.event_date);
-      renderMarkup(dom.nextEventCard,
-        '<div class="event-hero-content">' +
-          '<div class="event-date-block"><span class="event-day">' + safe(date.day) + '</span><div><span class="event-month">' + safe(date.month + ' ' + date.year) + '</span><div class="status-pill status-' + safe(next.status) + '">' + safe(EVENT_STATUS[next.status] || 'Planificado') + '</div></div></div>' +
-          '<h3>' + safe(next.title) + '</h3>' +
-          '<div class="event-meta"><p>◷ ' + safe(formatTime(next.start_time)) + '</p>' + renderEventLocation(next) + (next.notes ? '<p>↳ ' + safe(next.notes) + '</p>' : '') + '</div>' +
-        '</div>' +
-        '<div class="event-actions"><button class="btn btn-secondary" type="button" data-action="edit-event" data-id="' + safe(next.id) + '">Editar evento</button></div>'
-      );
-    }
+    dom.headerEventDatetime.textContent = next ? '📅 ' + formatDate(next.event_date) + ' · ◷ ' + formatTime(next.start_time) : '';
+  }
 
-    if (!state.inventory.length) {
-      renderMarkup(dom.inventoryList, emptyState('📦 Inventario pendiente', 'Registra los artículos disponibles y las unidades distribuidas.', ''));
-    } else {
-      renderMarkup(dom.inventoryList, state.inventory.map(function (item) {
-        const total = Math.max(0, Number(item.total_quantity || 0));
-        const distributed = Math.max(0, Number(item.distributed_quantity || 0));
-        const available = Math.max(0, total - distributed);
-        const pct = total ? Math.min(100, Math.round(distributed / total * 100)) : 0;
-        return '<article class="inventory-item">' +
-          '<div class="inventory-top"><span class="inventory-name">' + safe(item.name) + '</span><span class="inventory-count">' + available + '</span></div>' +
-          '<div class="progress-track" role="progressbar" aria-label="Distribución de ' + safe(item.name) + '" aria-valuemin="0" aria-valuemax="' + total + '" aria-valuenow="' + distributed + '"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
-          '<div class="inventory-meta"><span>' + distributed + ' distribuidas</span><span>' + total + ' ' + safe(item.unit || 'unidades') + '</span></div>' +
-          '<button class="btn btn-ghost" type="button" data-action="edit-inventory" data-id="' + safe(item.id) + '">Actualizar</button>' +
-        '</article>';
-      }).join(''));
-    }
+  function renderSummary() {
+    renderSummaryTeam();
+    renderHeaderDatetime();
   }
 
   function renderSummaryResults() {
@@ -452,14 +687,14 @@
       progressTile = '<div class="summary-result-tile summary-result-progress">' +
         '<span class="srt-icon">🎯</span>' +
         '<span class="srt-value">' + envioTotals.entregado + ' <small>de ' + envioTotals.total + '</small></span>' +
-        '<span class="srt-label">Progreso del envío de hoy</span>' +
+        '<span class="srt-label">Progreso del envío</span>' +
         '<div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="' + envioTotals.total + '" aria-valuenow="' + envioTotals.entregado + '"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
       '</div>';
     } else {
       progressTile = '<div class="summary-result-tile summary-result-progress">' +
         '<span class="srt-icon">🎯</span>' +
         '<span class="srt-value">—</span>' +
-        '<span class="srt-label">Sin envíos registrados hoy</span>' +
+        '<span class="srt-label">Sin envíos registrados</span>' +
       '</div>';
     }
 
@@ -472,17 +707,29 @@
     }).join('') + progressTile);
   }
 
+  // Orden fijo de la franja de colaboradores en el Resumen (ADRA al extremo derecho).
+  const COLLABORATOR_STRIP_ORDER = [
+    'Coalicion con amor a Venezuela',
+    'Fundacion Ingenia',
+    'Nodos Venezuela',
+    'conektados',
+    'ADRA'
+  ];
+
   function renderSummaryTeam() {
     if (!dom.summaryTeamList) return;
-    if (!state.contacts.length) {
-      renderMarkup(dom.summaryTeamList, emptyState('🤝 Sin equipo registrado', 'Agrega a los responsables del evento en la pestaña Responsables.', ''));
-      return;
-    }
-    const preview = state.contacts.slice(0, 8);
-    renderMarkup(dom.summaryTeamList, preview.map(function (contact) {
-      return '<div class="summary-team-chip ' + safe(affiliationClass(contact.belongs_to)) + '">' +
-        '<span class="summary-team-avatar" aria-hidden="true">' + safe(initials(contact.name)) + '</span>' +
-        '<span class="summary-team-info"><strong>' + safe(contact.name) + '</strong><small>' + safe(contact.role || 'Responsable') + '</small></span>' +
+    const orgCards = Object.keys(AFFILIATION_LOGOS).map(function (org) {
+      return { key: org, cls: affiliationClass(org), logo: AFFILIATION_LOGOS[org], alt: org };
+    });
+    const fixedCards = FIXED_COLLABORATOR_LOGOS.map(function (c) {
+      return { key: c.key, cls: 'affiliation-' + c.key, logo: c.logo, alt: c.alt };
+    });
+    const byKey = {};
+    orgCards.concat(fixedCards).forEach(function (c) { byKey[c.key] = c; });
+    const cards = COLLABORATOR_STRIP_ORDER.map(function (key) { return byKey[key]; }).filter(Boolean);
+    renderMarkup(dom.summaryTeamList, cards.map(function (c) {
+      return '<div class="collaborator-card ' + safe(c.cls) + '">' +
+        '<img src="' + safe(c.logo) + '" alt="' + safe(c.alt) + '">' +
       '</div>';
     }).join(''));
   }
@@ -575,6 +822,11 @@
   }
 
   async function callLiteApi(resource, params) {
+    if (USE_STATIC_DEMO_DATA) {
+      if (resource === 'entregas') return { data: { total: STATIC_DEMO_ENTREGAS.length, entregas: STATIC_DEMO_ENTREGAS }, error: null };
+      if (resource === 'envios') return { data: { total: STATIC_DEMO_ENVIOS.length, envios: STATIC_DEMO_ENVIOS }, error: null };
+      return { data: { total: 0 }, error: null };
+    }
     try {
       const response = await fetch(LITE_FUNCTION_URL, {
         method: 'POST',
@@ -665,18 +917,25 @@
     });
     const zones = Object.keys(zoneMap).map(function (k) { return zoneMap[k]; }).sort(function (a, b) { return b.count - a.count; });
 
-    const needMap = {};
+    const needCategoryMap = {};
     entregas.forEach(function (e) {
       // necesidad es una lista (una persona puede pedir varias cosas a la
       // vez); cada una suma en su propio bucket. Se acepta también un string
       // suelto por compatibilidad con datos antiguos, igual que statusVivienda.
-      const needs = Array.isArray(e.necesidad) ? e.necesidad : (e.necesidad ? [e.necesidad] : []);
-      if (!needs.length) needs.push('Sin especificar');
-      needs.forEach(function (need) {
-        needMap[need] = (needMap[need] || 0) + 1;
+      const rawNeeds = Array.isArray(e.necesidad) ? e.necesidad : (e.necesidad ? [e.necesidad] : []);
+      if (!rawNeeds.length) rawNeeds.push('Sin especificar');
+      rawNeeds.forEach(function (need) {
+        const category = classifyNeed(need);
+        if (!needCategoryMap[category.key]) needCategoryMap[category.key] = { key: category.key, icon: category.icon, label: category.label, count: 0, items: {} };
+        needCategoryMap[category.key].count += 1;
+        needCategoryMap[category.key].items[need] = (needCategoryMap[category.key].items[need] || 0) + 1;
       });
     });
-    const needs = Object.keys(needMap).map(function (k) { return { name: k, count: needMap[k] }; }).sort(function (a, b) { return b.count - a.count; });
+    const needs = Object.keys(needCategoryMap).map(function (k) {
+      const bucket = needCategoryMap[k];
+      const items = Object.keys(bucket.items).map(function (name) { return { name: name, count: bucket.items[name] }; }).sort(function (a, b) { return b.count - a.count; });
+      return { key: bucket.key, icon: bucket.icon, label: bucket.label, count: bucket.count, items: items };
+    }).sort(function (a, b) { return b.count - a.count; });
 
     const nucleos = NUCLEO_BRACKETS.map(function (bracket) {
       const matching = entregas.filter(function (e) {
@@ -719,8 +978,10 @@
       kpi('kpi-indigo', m.confirmadas, '✅ Confirmadas por QR')
     );
 
-    renderSemaforoBlock(m.semaforo, all.length);
+    const semaforoAll = filter ? computeResultsMetrics(all).semaforo : m.semaforo;
+    renderSemaforoBlock(semaforoAll, all.length);
     renderZonesBlock(m.zones);
+    state.results.needsData = m.needs;
     renderNeedsBlock(m.needs);
     renderNucleosBlock(m.nucleos);
   }
@@ -734,7 +995,8 @@
       const pct = total ? Math.round(count / total * 100) : 0;
       const active = !filter || filter === key;
       return '<button type="button" class="semaforo-chip' + (active ? ' active' : '') + '" data-action="filter-semaforo" data-id="' + key + '" style="--chip-color:' + meta.color + ';--chip-soft:' + meta.soft + '">' +
-        '<span class="semaforo-dot"></span><span class="semaforo-num">' + count + '</span><span class="semaforo-label">' + meta.label + '</span><span class="semaforo-pct">' + pct + '%</span>' +
+        '<span class="semaforo-chip-top"><span class="semaforo-dot"></span><span class="semaforo-num">' + count + '</span><span class="semaforo-pct">' + pct + '%</span></span>' +
+        '<span class="semaforo-label">' + meta.label + '</span>' +
       '</button>';
     }).join(''));
 
@@ -770,7 +1032,10 @@
 
   function renderResultsMap(zones) {
     if (!window.L || !dom.resultsMap) return;
-    const withCoords = zones.filter(function (z) { return typeof z.lat === 'number' && typeof z.lng === 'number'; });
+    const withCoords = zones.filter(function (z) {
+      return typeof z.lat === 'number' && typeof z.lng === 'number' &&
+        z.lat > 0 && z.lat < 13 && z.lng > -75 && z.lng < -59;
+    });
     if (!state.map) {
       state.map = window.L.map(dom.resultsMap, { attributionControl: true, zoomControl: true, scrollWheelZoom: false });
       window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -779,13 +1044,18 @@
       }).addTo(state.map);
       state.mapMarkers = window.L.layerGroup().addTo(state.map);
     }
+    state.map.invalidateSize();
     state.mapMarkers.clearLayers();
     if (!withCoords.length) {
       state.map.setView([10.5, -66.9], 9);
       return;
     }
-    const SEMAFORO_HEX = { Rojo: '#a02525', Amarillo: '#b8790a', Verde: '#0f7a3d' };
+    const SEMAFORO_HEX = { Rojo: '#a02525', Amarillo: '#d69e00', Verde: '#0f7a3d' };
     const bounds = [];
+    // El grueso de las entregas cae en esta caja (Vargas / Catia La Mar); unos pocos puntos
+    // sueltos y con datos errados quedan muy lejos y arruinarían el zoom si los usamos para encuadrar.
+    const CORE_BOX = { latMin: 10.4, latMax: 10.75, lngMin: -67.15, lngMax: -66.6 };
+    const coreBounds = [];
     withCoords.forEach(function (z) {
       const dominant = ['Rojo', 'Amarillo', 'Verde'].reduce(function (best, key) { return z.semaforo[key] > z.semaforo[best] ? key : best; }, 'Verde');
       const color = SEMAFORO_HEX[dominant] || '#1d4ed8';
@@ -793,8 +1063,11 @@
       marker.bindTooltip(safe(z.name) + ' · ' + z.count);
       marker.addTo(state.mapMarkers);
       bounds.push([z.lat, z.lng]);
+      if (z.lat >= CORE_BOX.latMin && z.lat <= CORE_BOX.latMax && z.lng >= CORE_BOX.lngMin && z.lng <= CORE_BOX.lngMax) {
+        coreBounds.push([z.lat, z.lng]);
+      }
     });
-    state.map.fitBounds(bounds, { padding: [24, 24], maxZoom: 14 });
+    state.map.fitBounds(coreBounds.length ? coreBounds : bounds, { padding: [30, 30], maxZoom: 15 });
     setTimeout(function () { if (state.map) state.map.invalidateSize(); }, 60);
   }
 
@@ -803,15 +1076,31 @@
       renderMarkup(dom.resultsNeeds, emptyState('🥫 Sin necesidades registradas', '', ''));
       return;
     }
-    const total = needs.reduce(function (sum, n) { return sum + n.count; }, 0);
     const max = needs[0].count;
-    renderMarkup(dom.resultsNeeds, needs.map(function (n) {
-      const pct = max ? Math.round(n.count / max * 100) : 0;
-      const share = total ? Math.round(n.count / total * 100) : 0;
-      return '<div class="need-row"><span class="need-label">' + safe(n.name) + '</span>' +
-        '<span class="need-track"><span class="need-fill" style="width:' + pct + '%"></span></span>' +
-        '<span class="need-val">' + n.count + ' · ' + share + '%</span></div>';
-    }).join(''));
+    const openKey = state.results.openNeedCategory;
+    const openNeed = needs.find(function (n) { return n.key === openKey; });
+    const detail = !openNeed ? '' : '<div class="need-detail">' +
+      '<div class="need-detail-head"><span>' + openNeed.icon + ' ' + safe(openNeed.label) + '</span><span>' + openNeed.count + '</span></div>' +
+      openNeed.items.map(function (it) {
+        return '<div class="need-detail-row"><span>' + safe(it.name) + '</span><span>' + it.count + '</span></div>';
+      }).join('') +
+    '</div>';
+    renderMarkup(dom.resultsNeeds,
+      '<div class="need-grid-cards">' + needs.map(function (n) {
+        const pct = max ? Math.round(n.count / max * 100) : 0;
+        const isOpen = openKey === n.key;
+        return '<button type="button" class="need-chip' + (isOpen ? ' open' : '') + '" data-action="toggle-need" data-id="' + safe(n.key) + '">' +
+          '<span class="need-chip-top"><span class="need-chip-label">' + n.icon + ' ' + safe(n.label) + '</span><span class="need-chip-value">' + n.count + '</span></span>' +
+          '<span class="need-track"><span class="need-fill" style="width:' + pct + '%"></span></span>' +
+        '</button>';
+      }).join('') + '</div>' +
+      detail
+    );
+  }
+
+  function toggleNeedCategory(key) {
+    state.results.openNeedCategory = state.results.openNeedCategory === key ? null : key;
+    renderNeedsBlock(state.results.needsData || []);
   }
 
   function renderNucleosBlock(nucleos) {
@@ -829,8 +1118,7 @@
     hideDialogError();
     const configs = {
       contact: { eyebrow: 'Equipo del evento', title: record ? 'Editar responsable' : 'Agregar responsable', fields: contactFields(record) },
-      event: { eyebrow: 'Agenda compartida', title: record ? 'Editar evento' : 'Agregar evento', fields: eventFields(record) },
-      inventory: { eyebrow: 'Control de existencias', title: record ? 'Actualizar inventario' : 'Agregar artículo', fields: inventoryFields(record) }
+      event: { eyebrow: 'Agenda compartida', title: record ? 'Editar evento' : 'Agregar evento', fields: eventFields(record) }
     };
     const config = configs[type];
     dom.dialogEyebrow.textContent = config.eyebrow;
@@ -861,14 +1149,6 @@
       field('🗺️ Enlace de Google Maps (opcional si agregas dirección)', 'maps_url', item.maps_url, 'url', false, 'url', 'field-full', 'Pega el enlace del punto exacto', 'Debes completar la dirección o este enlace. Acepta maps.google.com y maps.app.goo.gl.') +
       selectField('Estado', 'status', item.status || 'planned', EVENT_STATUS) +
       textareaField('Indicaciones y notas', 'notes', item.notes, 'field-full');
-  }
-
-  function inventoryFields(record) {
-    const item = record || {};
-    return field('Artículo', 'name', item.name, 'text', true, '', 'field-full') +
-      field('Cantidad total', 'total_quantity', item.total_quantity || 0, 'number', true, 'numeric') +
-      field('Cantidad distribuida', 'distributed_quantity', item.distributed_quantity || 0, 'number', true, 'numeric') +
-      field('Unidad de medida', 'unit', item.unit || 'unidades', 'text', true, '', 'field-full');
   }
 
   async function saveEditor(event) {
@@ -927,22 +1207,12 @@
       if (!data.location.trim() && !data.maps_url.trim()) return issue('location', 'Agrega una dirección o un enlace de Google Maps.');
       if (data.maps_url && !isGoogleMapsUrl(data.maps_url)) return issue('maps_url', 'Pega un enlace válido de Google Maps.');
     }
-    if (type === 'inventory') {
-      if (!data.name.trim()) return issue('name', 'Escribe el nombre del artículo.');
-      if (Number(data.total_quantity) < 0) return issue('total_quantity', 'La cantidad total no puede ser negativa.');
-      if (Number(data.distributed_quantity) < 0) return issue('distributed_quantity', 'La cantidad distribuida no puede ser negativa.');
-      if (Number(data.distributed_quantity) > Number(data.total_quantity)) return issue('distributed_quantity', 'La cantidad distribuida no puede superar el total.');
-    }
     return null;
   }
 
   function normalizePayload(type, data) {
     const trimmed = {};
     Object.keys(data).forEach(function (key) { trimmed[key] = typeof data[key] === 'string' ? data[key].trim() : data[key]; });
-    if (type === 'inventory') {
-      trimmed.total_quantity = Number(trimmed.total_quantity);
-      trimmed.distributed_quantity = Number(trimmed.distributed_quantity);
-    }
     if (type === 'event') trimmed.start_time = trimmed.start_time || null;
     return trimmed;
   }
