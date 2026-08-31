@@ -892,6 +892,34 @@
     return stripped ? stripped.charAt(0).toUpperCase() + stripped.slice(1) : text;
   }
 
+  // conektados Lite no manda coordenadas (ubicacionActual es texto libre, no
+  // un punto de mapa) — esta es una geocodificación manual de las zonas con
+  // más entregas, hecha una sola vez, para que el mapa de "Ubicación actual"
+  // tenga puntos reales mientras no haya coordenadas en la API. Se puede
+  // ampliar agregando más entradas con el mismo nombre normalizado como key.
+  const STATIC_ZONE_COORDS = {
+    'Mare, catia la mar, parroquia urimare, municipio vargas, estado vargas, 1162, venezuela': [10.6066515, -66.9797755],
+    'Bicentenaria, mare, catia la mar, parroquia urimare, municipio vargas, estado vargas, 1162, venezuela': [10.6031093, -66.9652971],
+    'Brisas del aeropuerto, catia la mar, parroquia urimare, municipio vargas, estado vargas, 1162, venezuela': [10.5927141, -67.0043153],
+    'Valle la cruz, ezequiel zamora, parroquia catia la mar, municipio vargas, estado vargas, 1162, venezuela': [10.5786833, -67.0157808],
+    'Catia la mar, parroquia urimare, municipio vargas, estado vargas, 1162, venezuela': [10.5992669, -67.0145106],
+    'Aeropuerto la guaira': [10.5974618, -67.0049753],
+    'El aeropuerto la guaira': [10.6001010, -66.9818693],
+    'Aeropuerto maiquetia la guaira': [10.6031377, -66.9966802],
+    'Maiquetia, parroquia maiquetia, municipio vargas, estado vargas, 1161, venezuela': [10.6031377, -66.9966802],
+    'Unidad educativa jose atanasio girardot, calle 4, playa grande, catia la mar, parroquia urimare, municipio vargas, estado vargas, 1162, venezuela': [10.6088372, -67.0159933],
+    'Caracas, parroquia sucre, municipio libertador, distrito metropolitano de caracas, distrito capital, venezuela': [10.4937486, -66.8841058],
+    'El piache, terrazas de alto picure, parroquia catia la mar, municipio vargas, estado vargas, 1162, venezuela': [10.5764140, -67.0510237],
+    'El piache, parroquia catia la mar, municipio vargas, estado vargas, 1162, venezuela': [10.5764140, -67.0510237],
+    'Carlos soublette': [10.5989798, -66.9741680],
+    'La soublette, catia la mar': [10.5977383, -67.0393882],
+    'El plan la guaira': [10.5321704, -66.9709678],
+    'La guaira c': [10.6000384, -66.9296405],
+    'Atanasio girardot la guaira': [10.6090029, -67.0166967],
+    'Carayaca, parroquia carayaca, municipio vargas, estado vargas, 1167, venezuela': [10.5293542, -67.1204381],
+    'Carallaca la guaira': [10.5293542, -67.1204381]
+  };
+
   function computeResultsMetrics(entregas) {
     const totalCajas = entregas.reduce(function (sum, e) { return sum + Number(e.cantidadPaquetes || 0); }, 0);
     const totalAdultos = entregas.reduce(function (sum, e) { return sum + Number(e.composicionAdultos || 0); }, 0);
@@ -913,6 +941,7 @@
       const status = Array.isArray(e.statusVivienda) ? e.statusVivienda[0] : e.statusVivienda;
       if (zoneMap[zone].semaforo[status] != null) zoneMap[zone].semaforo[status] += 1;
       if (zoneMap[zone].lat == null && typeof e.ubicacionLat === 'number') { zoneMap[zone].lat = e.ubicacionLat; zoneMap[zone].lng = e.ubicacionLng; }
+      if (zoneMap[zone].lat == null && STATIC_ZONE_COORDS[zone]) { zoneMap[zone].lat = STATIC_ZONE_COORDS[zone][0]; zoneMap[zone].lng = STATIC_ZONE_COORDS[zone][1]; }
     });
     // "Sin especificar" sí cuenta en el listado (es información real: cuántas
     // personas no dieron dirección), pero nunca tiene coordenadas, así que el
