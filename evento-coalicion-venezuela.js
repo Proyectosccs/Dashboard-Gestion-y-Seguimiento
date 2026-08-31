@@ -853,10 +853,9 @@
       dom.resultsBody.hidden = true;
       dom.resultsEmpty.hidden = true;
     }
-    const today = new Date().toISOString().slice(0, 10);
     const [result, enviosResult] = await Promise.all([
       callLiteApi('entregas', {}),
-      callLiteApi('envios', { desde: today, hasta: today })
+      callLiteApi('envios', {})
     ]);
     state.results.loading = false;
     if (result.error) {
