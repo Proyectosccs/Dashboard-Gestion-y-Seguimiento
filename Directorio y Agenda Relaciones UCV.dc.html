@@ -1038,7 +1038,7 @@
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
             <input type="file" accept=".pdf,.doc,.docx,.txt,image/*" onChange="{{ onUnitAttachment }}" style="font-size: 12px" />
             <sc-if value="{{ unitHasAttachment }}" hint-placeholder-val="{{ false }}">
-              <span style="display: inline-flex; align-items: center; gap: 6px; background: #fff; border-radius: 999px; padding: 5px 6px 5px 12px; font-size: 12px; font-weight: 700">📎 {{ unitAttachmentName }}<button type="button" aria-label="Quitar archivo" onClick="{{ removeUnitAttachment }}" style="border: none; background: transparent; cursor: pointer; font-size: 11px; padding: 0 4px">✕</button></span>
+              <span style="display: inline-flex; align-items: center; gap: 6px; background: #fff; border-radius: 999px; padding: 5px 6px 5px 12px; font-size: 12px; font-weight: 700">📎 <a href="{{ unitAttachmentData }}" download="{{ unitAttachmentName }}" target="_blank" rel="noopener noreferrer" style="color: var(--color-accent-700); text-decoration: underline">{{ unitAttachmentName }}</a><button type="button" aria-label="Quitar archivo" onClick="{{ removeUnitAttachment }}" style="border: none; background: transparent; cursor: pointer; font-size: 11px; padding: 0 4px">✕</button></span>
             </sc-if>
           </div>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">O pega aquí el texto del triaje
@@ -3177,6 +3177,7 @@ class Component extends DCLogic {
       onUnitInvolved: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { involved: e.target.value }) }),
       personRoleOptions: personRoleOptions, personFunctionOptions: personFunctionOptions,
       unitHasAttachment: !!s.unitForm.attachmentName, unitAttachmentName: s.unitForm.attachmentName,
+      unitAttachmentData: s.unitForm.attachmentData,
       closeUnitModal: this.closeUnitModal,
       saveUnitInfo: this.saveUnitInfo,
       removeUnitAttachment: this.removeUnitAttachment,
