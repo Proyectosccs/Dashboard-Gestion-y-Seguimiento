@@ -5,6 +5,7 @@
   // escribe en ninguna de las tres, solo lee y muestra junto.
   const SUPABASE_URL = 'https://hcylkagvwfncdaaizutn.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_E-cV9DiNK9rctFCxzondvA_7OppBD7Y';
+  const COALICION_EDITOR_URL = SUPABASE_URL + '/functions/v1/coalicion-editor';
 
   const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -31,7 +32,10 @@
         state.calendarMonth = new Date().toISOString().slice(0, 7);
         state.selectedDay = new Date().toISOString().slice(0, 10);
         renderCalendar();
-      }
+      },
+      'new-event-btn': openEventDialog,
+      'event-dialog-close': closeEventDialog,
+      'event-dialog-cancel': closeEventDialog
     };
     const action = actionsById[target.id];
     if (action) action();
@@ -43,6 +47,8 @@
 
   function init() {
     cacheDom();
+    dom.eventForm.addEventListener('submit', onEventSubmit);
+    dom.eventDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeEventDialog(); });
     if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) return showConnectionFailure();
     state.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     loadAll();
@@ -56,6 +62,9 @@
     dom.calendarGrid = document.getElementById('calendar-grid');
     dom.agendaTitle = document.getElementById('agenda-title');
     dom.agendaList = document.getElementById('agenda-list');
+    dom.eventDialog = document.getElementById('event-dialog');
+    dom.eventForm = document.getElementById('event-form');
+    dom.eventError = document.getElementById('event-error');
   }
 
   function showConnectionFailure() {
@@ -162,6 +171,93 @@
       '</div>';
     }).join(''));
   }
+
+  // ---------- Agregar evento (a la fuente elegida) ----------
+
+  function openEventDialog() {
+    hideError(dom.eventError);
+    dom.eventForm.reset();
+    dom.eventForm.elements.event_date.value = state.selectedDay || new Date().toISOString().slice(0, 10);
+    dom.eventDialog.showModal();
+    dom.eventForm.elements.source.focus();
+  }
+
+  function closeEventDialog() { dom.eventDialog.close(); }
+
+  async function onEventSubmit(e) {
+    e.preventDefault();
+    hideError(dom.eventError);
+    const source = dom.eventForm.elements.source.value;
+    const title = dom.eventForm.elements.title.value.trim();
+    const eventDate = dom.eventForm.elements.event_date.value;
+    const startTime = dom.eventForm.elements.start_time.value;
+    const location = dom.eventForm.elements.location.value.trim();
+    const notes = dom.eventForm.elements.notes.value.trim();
+    if (!title || !eventDate) { showError(dom.eventError, 'Título y fecha son obligatorios.'); return; }
+    if (source === 'coalicion' && !location) { showError(dom.eventError, 'Coalición Venezuela necesita una ubicación (o edítalo luego para agregar el link de Maps).'); return; }
+
+    const submitBtn = dom.eventForm.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    let ok = false;
+    if (source === 'coalicion') ok = await saveCoalicionEvent({ title: title, event_date: eventDate, start_time: startTime, location: location, notes: notes });
+    else if (source === 'florangel') ok = await saveFlorangelEvent({ title: title, event_date: eventDate, start_time: startTime, location: location, notes: notes });
+    else if (source === 'ucv') ok = await saveUcvEvent({ title: title, event_date: eventDate, start_time: startTime, location: location, notes: notes });
+    submitBtn.disabled = false;
+
+    if (!ok) { showError(dom.eventError, 'No se pudo guardar — revisa tu conexión e intenta de nuevo.'); return; }
+    closeEventDialog();
+    await loadAll();
+    state.selectedDay = eventDate;
+    renderCalendar();
+  }
+
+  async function saveCoalicionEvent(fields) {
+    try {
+      const res = await fetch(COALICION_EDITOR_URL, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save', entity: 'event', id: null,
+          payload: { title: fields.title, event_date: fields.event_date, start_time: fields.start_time || '', location: fields.location, maps_url: '', notes: fields.notes, status: 'planned' }
+        })
+      });
+      return res.ok;
+    } catch (_err) { return false; }
+  }
+
+  async function saveFlorangelEvent(fields) {
+    const current = await readBoardKey('florangel_board_state', 'florangel-events-v1', []);
+    const next = current.concat({
+      id: uid(), title: fields.title, event_date: fields.event_date, start_time: fields.start_time,
+      location: fields.location, notes: fields.notes, created_at: new Date().toISOString()
+    });
+    return writeBoardKey('florangel_board_state', 'florangel-events-v1', next);
+  }
+
+  async function saveUcvEvent(fields) {
+    const current = await readBoardKey('ucv_board_state', 'ucv-journeys-v3', []);
+    const next = current.concat({
+      id: uid(), title: fields.title, dates: [fields.event_date], time: fields.start_time || '',
+      location: fields.location, notes: fields.notes, status: 'planned', eventType: 'other',
+      owner: '', doctors: '', students: '', assignedVolunteers: [], checks: {}
+    });
+    return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
+  }
+
+  async function readBoardKey(table, key, fallback) {
+    const res = await state.client.from(table).select('value').eq('key', key).maybeSingle();
+    if (res.error || !res.data || !Array.isArray(res.data.value)) return fallback;
+    return res.data.value;
+  }
+
+  async function writeBoardKey(table, key, value) {
+    const res = await state.client.from(table).upsert({ key: key, value: value, updated_at: new Date().toISOString() });
+    return !res.error;
+  }
+
+  function uid() { return 'id-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
+  function showError(node, message) { node.textContent = message; node.hidden = false; }
+  function hideError(node) { node.hidden = true; node.textContent = ''; }
 
   function safe(value) {
     return String(value == null ? '' : value)

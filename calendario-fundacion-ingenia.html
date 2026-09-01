@@ -35,10 +35,13 @@
     </section>
 
     <section id="calendar-view" class="view" hidden>
-      <div class="source-legend">
-        <span class="source-legend-item"><span class="source-dot src-coalicion"></span>Coalición Venezuela</span>
-        <span class="source-legend-item"><span class="source-dot src-florangel"></span>Dra Florangel</span>
-        <span class="source-legend-item"><span class="source-dot src-ucv"></span>UCV</span>
+      <div class="view-heading">
+        <div class="source-legend" style="margin: 0">
+          <span class="source-legend-item"><span class="source-dot src-coalicion"></span>Coalición Venezuela</span>
+          <span class="source-legend-item"><span class="source-dot src-florangel"></span>Dra Florangel</span>
+          <span class="source-legend-item"><span class="source-dot src-ucv"></span>UCV</span>
+        </div>
+        <button class="btn btn-primary" type="button" id="new-event-btn" onclick="window.ingeniaAction(event)">➕ Agregar evento</button>
       </div>
       <div class="calendar-toolbar panel">
         <button id="calendar-prev" class="icon-button" type="button" aria-label="Mes anterior" onclick="window.ingeniaAction(event)">‹</button>
@@ -59,5 +62,52 @@
       </section>
     </section>
   </div>
+
+  <dialog id="event-dialog" class="editor-dialog" aria-labelledby="event-dialog-title">
+    <form id="event-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">➕ Nuevo evento</p>
+          <h2 id="event-dialog-title">Agregar evento</h2>
+        </div>
+        <button id="event-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.ingeniaAction(event)">×</button>
+      </div>
+      <div id="event-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-fields">
+        <div class="field field-full">
+          <label for="field-event-source">¿A cuál calendario pertenece?</label>
+          <select id="field-event-source" class="input" name="source" required>
+            <option value="coalicion">🤝 Coalición Venezuela</option>
+            <option value="florangel">🩺 Dra Florangel</option>
+            <option value="ucv">🎓 UCV</option>
+          </select>
+        </div>
+        <div class="field field-full">
+          <label for="field-event-title">Título</label>
+          <input id="field-event-title" class="input" name="title" type="text" required>
+        </div>
+        <div class="field">
+          <label for="field-event-date">Fecha</label>
+          <input id="field-event-date" class="input" name="event_date" type="date" required>
+        </div>
+        <div class="field">
+          <label for="field-event-time">Hora</label>
+          <input id="field-event-time" class="input" name="start_time" type="time">
+        </div>
+        <div class="field field-full">
+          <label for="field-event-location">Ubicación</label>
+          <input id="field-event-location" class="input" name="location" type="text">
+        </div>
+        <div class="field field-full">
+          <label for="field-event-notes">Notas</label>
+          <textarea id="field-event-notes" class="input" name="notes"></textarea>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="event-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)">Cancelar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
 </body>
 </html>
