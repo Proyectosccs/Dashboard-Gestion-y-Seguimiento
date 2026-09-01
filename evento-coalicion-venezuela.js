@@ -345,7 +345,7 @@
     discardArmed: false,
     realtime: null,
     loadId: 0,
-    results: { loading: false, error: null, loaded: false, entregas: [], envios: [], semaforoFilter: null, needsData: [], openNeedCategory: null, selectedJornada: null },
+    results: { loading: false, error: null, loaded: false, entregas: [], envios: [], semaforoFilter: null, needsData: [], openNeedCategory: null, selectedJornada: null, jornadaAnchored: false },
     map: null,
     mapMarkers: null
   };
@@ -884,10 +884,26 @@
   function ensureSelectedJornada() {
     const dates = jornadaDates();
     if (!dates.length) { state.results.selectedJornada = null; return; }
+
+    // Preferimos anclar siempre a la fecha del evento activo del calendario
+    // (no a "la que tenga más entregas") — así el número mostrado no salta
+    // solo porque una jornada en curso va acumulando entregas en vivo.
+    // Reintentamos esto en cada carga hasta lograrlo (por ejemplo, si los
+    // eventos o las primeras entregas del día todavía no habían llegado la
+    // vez anterior); una vez anclado, queda fijo el resto de la sesión.
+    if (!state.results.jornadaAnchored) {
+      const next = nextEvent();
+      if (next && dates.some(function (d) { return d.date === next.event_date; })) {
+        state.results.selectedJornada = next.event_date;
+        state.results.jornadaAnchored = true;
+        return;
+      }
+    }
+
     const stillValid = dates.some(function (d) { return d.date === state.results.selectedJornada; });
     if (stillValid) return;
-    // Por defecto se muestra la jornada con más entregas registradas (la
-    // "principal"); en empate, gana la más reciente.
+    // Reserva mientras no se pueda anclar todavía: la jornada con más
+    // entregas registradas; en empate, gana la más reciente.
     const best = dates.slice().sort(function (a, b) { return b.count - a.count || (a.date < b.date ? 1 : -1); })[0];
     state.results.selectedJornada = best.date;
   }
@@ -895,6 +911,7 @@
   function selectJornada(date) {
     if (!date || date === state.results.selectedJornada) return;
     state.results.selectedJornada = date;
+    state.results.jornadaAnchored = true;
     renderResultados();
     renderSummaryResults();
   }
