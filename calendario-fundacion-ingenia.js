@@ -9,7 +9,7 @@
 
   const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-  const SOURCE_LABELS = { coalicion: 'Coalición Venezuela', florangel: 'Dra Florangel', ucv: 'UCV' };
+  const SOURCE_LABELS = { coalicion: 'Coalición Venezuela', florangel: 'Dra Florangel', ucv: 'UCV', networking: 'Networking Fund. Ingenia', otros: 'Otros' };
 
   const state = {
     client: null,
@@ -76,13 +76,14 @@
     dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
 
-    const [coalicionRes, florangelRes, ucvRes] = await Promise.all([
+    const [coalicionRes, florangelRes, ucvRes, ingeniaRes] = await Promise.all([
       state.client.from('coalicion_events').select('id,title,event_date,start_time,location').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
-      state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle()
+      state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
+      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1'])
     ]);
 
-    const anyFailed = coalicionRes.error && florangelRes.error && ucvRes.error;
+    const anyFailed = coalicionRes.error && florangelRes.error && ucvRes.error && ingeniaRes.error;
     if (anyFailed) {
       showConnectionFailure();
       return;
@@ -106,7 +107,17 @@
       });
     });
 
-    state.events = coalicionEvents.concat(florangelEvents, ucvEvents).filter(function (e) { return !!e.date; });
+    const ingeniaRows = ingeniaRes.data || [];
+    const networkingRaw = ingeniaRows.find(function (r) { return r.key === 'ingenia-networking-events-v1'; });
+    const otrosRaw = ingeniaRows.find(function (r) { return r.key === 'ingenia-otros-events-v1'; });
+    const networkingEvents = (Array.isArray(networkingRaw && networkingRaw.value) ? networkingRaw.value : []).map(function (e) {
+      return { id: 'networking-' + e.id, source: 'networking', title: e.title, date: e.event_date, time: e.start_time, location: e.location };
+    });
+    const otrosEvents = (Array.isArray(otrosRaw && otrosRaw.value) ? otrosRaw.value : []).map(function (e) {
+      return { id: 'otros-' + e.id, source: 'otros', title: e.title, date: e.event_date, time: e.start_time, location: e.location };
+    });
+
+    state.events = coalicionEvents.concat(florangelEvents, ucvEvents, networkingEvents, otrosEvents).filter(function (e) { return !!e.date; });
     dom.loadingState.hidden = true;
     dom.calendarView.hidden = false;
     renderCalendar();
@@ -199,9 +210,12 @@
     const submitBtn = dom.eventForm.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     let ok = false;
-    if (source === 'coalicion') ok = await saveCoalicionEvent({ title: title, event_date: eventDate, start_time: startTime, location: location, notes: notes });
-    else if (source === 'florangel') ok = await saveFlorangelEvent({ title: title, event_date: eventDate, start_time: startTime, location: location, notes: notes });
-    else if (source === 'ucv') ok = await saveUcvEvent({ title: title, event_date: eventDate, start_time: startTime, location: location, notes: notes });
+    const fields = { title: title, event_date: eventDate, start_time: startTime, location: location, notes: notes };
+    if (source === 'coalicion') ok = await saveCoalicionEvent(fields);
+    else if (source === 'florangel') ok = await saveFlorangelEvent(fields);
+    else if (source === 'ucv') ok = await saveUcvEvent(fields);
+    else if (source === 'networking') ok = await saveIngeniaEvent('ingenia-networking-events-v1', fields);
+    else if (source === 'otros') ok = await saveIngeniaEvent('ingenia-otros-events-v1', fields);
     submitBtn.disabled = false;
 
     if (!ok) { showError(dom.eventError, 'No se pudo guardar — revisa tu conexión e intenta de nuevo.'); return; }
@@ -242,6 +256,15 @@
       owner: '', doctors: '', students: '', assignedVolunteers: [], checks: {}
     });
     return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
+  }
+
+  async function saveIngeniaEvent(key, fields) {
+    const current = await readBoardKey('ingenia_board_state', key, []);
+    const next = current.concat({
+      id: uid(), title: fields.title, event_date: fields.event_date, start_time: fields.start_time,
+      location: fields.location, notes: fields.notes, created_at: new Date().toISOString()
+    });
+    return writeBoardKey('ingenia_board_state', key, next);
   }
 
   async function readBoardKey(table, key, fallback) {

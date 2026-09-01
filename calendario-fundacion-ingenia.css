@@ -55,6 +55,10 @@
   --source-florangel-soft: #fce7f3;
   --source-ucv: #0f766e;
   --source-ucv-soft: #e6fffb;
+  --source-networking: #7c3aed;
+  --source-networking-soft: #ede9fe;
+  --source-otros: #57534e;
+  --source-otros-soft: #f5f5f4;
   --shadow-sm: 0 1px 3px color-mix(in srgb, #451a03 13%, transparent);
   --shadow-md: 0 4px 14px color-mix(in srgb, #451a03 16%, transparent);
   --shadow-lg: 0 18px 42px color-mix(in srgb, #451a03 22%, transparent);
@@ -376,12 +380,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .source-dot.src-coalicion { background: var(--source-coalicion); }
 .source-dot.src-florangel { background: var(--source-florangel); }
 .source-dot.src-ucv { background: var(--source-ucv); }
+.source-dot.src-networking { background: var(--source-networking); }
+.source-dot.src-otros { background: var(--source-otros); }
 .calendar-event.src-coalicion { background: var(--source-coalicion-soft); color: var(--source-coalicion); }
 .calendar-event.src-florangel { background: var(--source-florangel-soft); color: var(--source-florangel); }
 .calendar-event.src-ucv { background: var(--source-ucv-soft); color: var(--source-ucv); }
-.calendar-event.src-coalicion:hover { filter: brightness(.95); }
-.calendar-event.src-florangel:hover { filter: brightness(.95); }
-.calendar-event.src-ucv:hover { filter: brightness(.95); }
+.calendar-event.src-networking { background: var(--source-networking-soft); color: var(--source-networking); }
+.calendar-event.src-otros { background: var(--source-otros-soft); color: var(--source-otros); }
+.calendar-event.src-coalicion:hover, .calendar-event.src-florangel:hover, .calendar-event.src-ucv:hover,
+.calendar-event.src-networking:hover, .calendar-event.src-otros:hover { filter: brightness(.95); }
 
 .agenda-list { display: flex; flex-direction: column; gap: 8px; }
 .agenda-row { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--color-neutral-300); background: #fff; }
@@ -392,6 +399,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .agenda-row-source.src-coalicion { background: var(--source-coalicion-soft); color: var(--source-coalicion); }
 .agenda-row-source.src-florangel { background: var(--source-florangel-soft); color: var(--source-florangel); }
 .agenda-row-source.src-ucv { background: var(--source-ucv-soft); color: var(--source-ucv); }
+.agenda-row-source.src-networking { background: var(--source-networking-soft); color: var(--source-networking); }
+.agenda-row-source.src-otros { background: var(--source-otros-soft); color: var(--source-otros); }
 
 .editor-dialog {
   width: min(720px, calc(100vw - 28px));

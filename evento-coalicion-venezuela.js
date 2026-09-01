@@ -857,60 +857,67 @@
     }
   }
 
-  // Cada jornada es un día de entrega distinto — no se deben sumar los
-  // números de una jornada nueva (aún en curso) con los de una ya cerrada.
-  function jornadaDates() {
+  // Cada jornada es un envío real de conektados Lite (envioId) — NO agrupamos
+  // por fechaRecibimiento, porque algunas entregas de una misma jornada se
+  // anotaron a mano con una fecha distinta a la del envío (error de captura
+  // en campo). Agrupar por envío evita partir una sola jornada en varias.
+  function jornadaList() {
     const counts = {};
+    const meta = {};
     state.results.entregas.forEach(function (e) {
-      const d = e.fechaRecibimiento || 'Sin fecha';
-      counts[d] = (counts[d] || 0) + 1;
+      const key = e.envioId != null ? String(e.envioId) : 'sin-envio';
+      counts[key] = (counts[key] || 0) + 1;
+      if (!meta[key]) meta[key] = { codigo: e.envio && e.envio.codigo, fecha: e.envio && e.envio.fecha };
     });
-    return Object.keys(counts).map(function (d) { return { date: d, count: counts[d] }; })
-      .sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+    return Object.keys(counts).map(function (k) {
+      return { id: k, count: counts[k], fecha: meta[k].fecha, codigo: meta[k].codigo };
+    }).sort(function (a, b) { return (b.fecha || '') < (a.fecha || '') ? -1 : (b.fecha || '') > (a.fecha || '') ? 1 : 0; });
   }
 
   function jornadaEntregas() {
-    const date = state.results.selectedJornada;
-    if (!date) return state.results.entregas;
-    return state.results.entregas.filter(function (e) { return (e.fechaRecibimiento || 'Sin fecha') === date; });
+    const id = state.results.selectedJornada;
+    if (!id) return state.results.entregas;
+    return state.results.entregas.filter(function (e) { return (e.envioId != null ? String(e.envioId) : 'sin-envio') === id; });
   }
 
   function jornadaEnvios() {
-    const date = state.results.selectedJornada;
-    if (!date) return state.results.envios;
-    return state.results.envios.filter(function (e) { return e.fecha === date; });
+    const id = state.results.selectedJornada;
+    if (!id) return state.results.envios;
+    return state.results.envios.filter(function (e) { return String(e.id) === id; });
   }
 
   function ensureSelectedJornada() {
-    const dates = jornadaDates();
-    if (!dates.length) { state.results.selectedJornada = null; return; }
+    const list = jornadaList();
+    if (!list.length) { state.results.selectedJornada = null; return; }
 
-    // Preferimos anclar siempre a la fecha del evento activo del calendario
-    // (no a "la que tenga más entregas") — así el número mostrado no salta
-    // solo porque una jornada en curso va acumulando entregas en vivo.
-    // Reintentamos esto en cada carga hasta lograrlo (por ejemplo, si los
-    // eventos o las primeras entregas del día todavía no habían llegado la
-    // vez anterior); una vez anclado, queda fijo el resto de la sesión.
+    // Preferimos anclar siempre al envío cuya fecha coincide con el evento
+    // activo del calendario (no "el que tenga más entregas") — así el número
+    // mostrado no salta solo porque una jornada en curso va acumulando
+    // entregas en vivo. Reintentamos esto en cada carga hasta lograrlo; una
+    // vez anclado, queda fijo el resto de la sesión.
     if (!state.results.jornadaAnchored) {
       const next = nextEvent();
-      if (next && dates.some(function (d) { return d.date === next.event_date; })) {
-        state.results.selectedJornada = next.event_date;
-        state.results.jornadaAnchored = true;
-        return;
+      if (next) {
+        const match = list.find(function (j) { return j.fecha === next.event_date; });
+        if (match) {
+          state.results.selectedJornada = match.id;
+          state.results.jornadaAnchored = true;
+          return;
+        }
       }
     }
 
-    const stillValid = dates.some(function (d) { return d.date === state.results.selectedJornada; });
+    const stillValid = list.some(function (j) { return j.id === state.results.selectedJornada; });
     if (stillValid) return;
-    // Reserva mientras no se pueda anclar todavía: la jornada con más
-    // entregas registradas; en empate, gana la más reciente.
-    const best = dates.slice().sort(function (a, b) { return b.count - a.count || (a.date < b.date ? 1 : -1); })[0];
-    state.results.selectedJornada = best.date;
+    // Reserva mientras no se pueda anclar todavía: el envío con más
+    // entregas registradas.
+    const best = list.slice().sort(function (a, b) { return b.count - a.count; })[0];
+    state.results.selectedJornada = best.id;
   }
 
-  function selectJornada(date) {
-    if (!date || date === state.results.selectedJornada) return;
-    state.results.selectedJornada = date;
+  function selectJornada(id) {
+    if (!id || id === state.results.selectedJornada) return;
+    state.results.selectedJornada = id;
     state.results.jornadaAnchored = true;
     renderResultados();
     renderSummaryResults();
@@ -918,13 +925,13 @@
 
   function renderJornadaPicker() {
     if (!dom.resultsJornadaPicker) return;
-    const dates = jornadaDates();
-    if (dates.length <= 1) { dom.resultsJornadaPicker.hidden = true; return; }
+    const list = jornadaList();
+    if (list.length <= 1) { dom.resultsJornadaPicker.hidden = true; return; }
     dom.resultsJornadaPicker.hidden = false;
-    renderMarkup(dom.resultsJornadaSelect, dates.map(function (d) {
-      const selected = d.date === state.results.selectedJornada ? ' selected' : '';
-      const label = d.date === 'Sin fecha' ? 'Sin fecha' : formatDate(d.date);
-      return '<option value="' + safe(d.date) + '"' + selected + '>' + safe(label) + ' · ' + d.count + ' entregas</option>';
+    renderMarkup(dom.resultsJornadaSelect, list.map(function (j) {
+      const selected = j.id === state.results.selectedJornada ? ' selected' : '';
+      const label = (j.fecha ? formatDate(j.fecha) : 'Sin fecha') + (j.codigo ? ' · ' + j.codigo : '');
+      return '<option value="' + safe(j.id) + '"' + selected + '>' + safe(label) + ' · ' + j.count + ' entregas</option>';
     }).join(''));
   }
 
