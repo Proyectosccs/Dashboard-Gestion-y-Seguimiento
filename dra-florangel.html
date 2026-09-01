@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es-VE">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Tareas y calendario de jornadas — Dra Florangel.">
+  <title>Dra Florangel — Tareas y jornadas</title>
+  <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
+  <link rel="stylesheet" href="./dra-florangel.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
+  <script src="./dra-florangel.js" defer></script>
+</head>
+<body>
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+  <div id="app-shell" class="app-shell">
+    <header class="app-header">
+      <div class="header-copy">
+        <p class="eyebrow">🩺 Coordinación · Dra Florangel</p>
+        <h1>Dra Florangel</h1>
+        <p>Tareas pendientes y calendario de jornadas.</p>
+      </div>
+      <div class="session-card">
+        <span id="session-name" class="session-name">Acceso desde cualquier dispositivo</span>
+        <span class="role-badge">✏️ Edición directa</span>
+      </div>
+    </header>
+
+    <nav class="tab-nav" aria-label="Secciones">
+      <button class="tab-button" type="button" data-view="tasks" aria-current="page" onclick="window.florangelAction(event)">📋 Tareas</button>
+      <button class="tab-button" type="button" data-view="calendar" onclick="window.florangelAction(event)">🗓️ Calendario</button>
+    </nav>
+
+    <div id="connectivity-banner" class="notice notice-warning page-notice" role="status" hidden>
+      No pudimos actualizar los datos. Conservamos la última información visible. <button id="retry-load" type="button" onclick="window.florangelAction(event)">Reintentar</button>
+    </div>
+
+    <section id="loading-state" class="loading-state" aria-live="polite">
+      <span class="loader" aria-hidden="true"></span>
+      <p>Cargando tareas y calendario…</p>
+    </section>
+
+    <section id="tasks-view" class="view" aria-labelledby="tasks-title" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">📋 Tablero</p>
+          <h2 id="tasks-title">Tareas</h2>
+        </div>
+        <button class="btn btn-primary" type="button" data-action="new-task" onclick="window.florangelAction(event)">➕ Agregar tarea</button>
+      </div>
+      <div id="kanban-board" class="kanban-board"></div>
+    </section>
+
+    <section id="calendar-view" class="view" aria-labelledby="calendar-title" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">⏰ Agenda</p>
+          <h2 id="calendar-title">🗓️ Calendario de jornadas</h2>
+        </div>
+        <button class="btn btn-primary" type="button" data-action="new-event" onclick="window.florangelAction(event)">➕ Agregar evento</button>
+      </div>
+      <div class="calendar-toolbar panel">
+        <button id="calendar-prev" class="icon-button" type="button" aria-label="Mes anterior" onclick="window.florangelAction(event)">‹</button>
+        <h3 id="calendar-month-label"></h3>
+        <button id="calendar-next" class="icon-button" type="button" aria-label="Mes siguiente" onclick="window.florangelAction(event)">›</button>
+        <button id="calendar-today" class="btn btn-secondary" type="button" onclick="window.florangelAction(event)">Hoy</button>
+      </div>
+      <div id="calendar-grid" class="calendar-grid panel"></div>
+    </section>
+  </div>
+
+  <dialog id="task-dialog" class="editor-dialog" aria-labelledby="task-dialog-title">
+    <form id="task-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">📋 Tablero</p>
+          <h2 id="task-dialog-title">Agregar tarea</h2>
+        </div>
+        <button id="task-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.florangelAction(event)">×</button>
+      </div>
+      <div id="task-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-fields">
+        <div class="field field-full">
+          <label for="field-task-title">Título</label>
+          <input id="field-task-title" class="input" name="title" type="text" required>
+        </div>
+        <div class="field field-full">
+          <label for="field-task-notes">Notas</label>
+          <textarea id="field-task-notes" class="input" name="notes"></textarea>
+        </div>
+        <div class="field field-full">
+          <label for="field-task-stage">Columna</label>
+          <select id="field-task-stage" class="input" name="stage">
+            <option value="todo">Por hacer</option>
+            <option value="doing">En progreso</option>
+            <option value="done">Hecho</option>
+          </select>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="task-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.florangelAction(event)">Cancelar</button>
+        <button id="task-delete" class="btn btn-secondary" type="button" onclick="window.florangelAction(event)" hidden>🗑️ Eliminar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="event-dialog" class="editor-dialog" aria-labelledby="event-dialog-title">
+    <form id="event-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">⏰ Agenda</p>
+          <h2 id="event-dialog-title">Agregar evento</h2>
+        </div>
+        <button id="event-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.florangelAction(event)">×</button>
+      </div>
+      <div id="event-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-fields">
+        <div class="field field-full">
+          <label for="field-event-title">Nombre del evento</label>
+          <input id="field-event-title" class="input" name="title" type="text" required>
+        </div>
+        <div class="field">
+          <label for="field-event-date">Fecha</label>
+          <input id="field-event-date" class="input" name="event_date" type="date" required>
+        </div>
+        <div class="field">
+          <label for="field-event-time">Hora</label>
+          <input id="field-event-time" class="input" name="start_time" type="time">
+        </div>
+        <div class="field field-full">
+          <label for="field-event-location">Ubicación</label>
+          <input id="field-event-location" class="input" name="location" type="text">
+        </div>
+        <div class="field field-full">
+          <label for="field-event-notes">Notas</label>
+          <textarea id="field-event-notes" class="input" name="notes"></textarea>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="event-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.florangelAction(event)">Cancelar</button>
+        <button id="event-delete" class="btn btn-secondary" type="button" onclick="window.florangelAction(event)" hidden>🗑️ Eliminar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
