@@ -345,7 +345,7 @@
     discardArmed: false,
     realtime: null,
     loadId: 0,
-    results: { loading: false, error: null, loaded: false, entregas: [], envios: [], semaforoFilter: null, needsData: [], openNeedCategory: null },
+    results: { loading: false, error: null, loaded: false, entregas: [], envios: [], semaforoFilter: null, needsData: [], openNeedCategory: null, selectedJornada: null },
     map: null,
     mapMarkers: null
   };
@@ -359,7 +359,7 @@
     const target = event.currentTarget;
     if (!target) return;
     if (target.dataset.view) return setView(target.dataset.view);
-    if (target.dataset.action) return handleAction(target.dataset.action, target.dataset.id);
+    if (target.dataset.action) return handleAction(target.dataset.action, target.tagName === 'SELECT' ? target.value : target.dataset.id);
     const actionsById = {
       'retry-load': loadAllData,
       'calendar-prev': function () { changeMonth(-1); },
@@ -410,6 +410,8 @@
     dom.resultsBody = document.getElementById('results-body');
     dom.resultsRefresh = document.getElementById('results-refresh');
     dom.resultsKpiGrid = document.getElementById('results-kpi-grid');
+    dom.resultsJornadaPicker = document.getElementById('results-jornada-picker');
+    dom.resultsJornadaSelect = document.getElementById('results-jornada-select');
     dom.resultsSemaforo = document.getElementById('results-semaforo');
     dom.resultsSemaforoBar = document.getElementById('results-semaforo-bar');
     dom.resultsFilterPill = document.getElementById('results-filter-pill');
@@ -645,6 +647,7 @@
     if (action === 'refresh-results') fetchResultados(true);
     if (action === 'filter-semaforo') toggleSemaforoFilter(id);
     if (action === 'toggle-need') toggleNeedCategory(id);
+    if (action === 'select-jornada') selectJornada(id);
   }
 
   function hideContact(id) {
@@ -680,8 +683,8 @@
       return;
     }
     dom.summaryResults.hidden = false;
-    const m = computeResultsMetrics(state.results.entregas);
-    const envioTotals = state.results.envios.reduce(function (acc, e) {
+    const m = computeResultsMetrics(jornadaEntregas());
+    const envioTotals = jornadaEnvios().reduce(function (acc, e) {
       acc.total += Number(e.totalCajas || 0);
       acc.entregado += Number(e.totalEntregado || 0);
       return acc;
@@ -854,6 +857,60 @@
     }
   }
 
+  // Cada jornada es un día de entrega distinto — no se deben sumar los
+  // números de una jornada nueva (aún en curso) con los de una ya cerrada.
+  function jornadaDates() {
+    const counts = {};
+    state.results.entregas.forEach(function (e) {
+      const d = e.fechaRecibimiento || 'Sin fecha';
+      counts[d] = (counts[d] || 0) + 1;
+    });
+    return Object.keys(counts).map(function (d) { return { date: d, count: counts[d] }; })
+      .sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+  }
+
+  function jornadaEntregas() {
+    const date = state.results.selectedJornada;
+    if (!date) return state.results.entregas;
+    return state.results.entregas.filter(function (e) { return (e.fechaRecibimiento || 'Sin fecha') === date; });
+  }
+
+  function jornadaEnvios() {
+    const date = state.results.selectedJornada;
+    if (!date) return state.results.envios;
+    return state.results.envios.filter(function (e) { return e.fecha === date; });
+  }
+
+  function ensureSelectedJornada() {
+    const dates = jornadaDates();
+    if (!dates.length) { state.results.selectedJornada = null; return; }
+    const stillValid = dates.some(function (d) { return d.date === state.results.selectedJornada; });
+    if (stillValid) return;
+    // Por defecto se muestra la jornada con más entregas registradas (la
+    // "principal"); en empate, gana la más reciente.
+    const best = dates.slice().sort(function (a, b) { return b.count - a.count || (a.date < b.date ? 1 : -1); })[0];
+    state.results.selectedJornada = best.date;
+  }
+
+  function selectJornada(date) {
+    if (!date || date === state.results.selectedJornada) return;
+    state.results.selectedJornada = date;
+    renderResultados();
+    renderSummaryResults();
+  }
+
+  function renderJornadaPicker() {
+    if (!dom.resultsJornadaPicker) return;
+    const dates = jornadaDates();
+    if (dates.length <= 1) { dom.resultsJornadaPicker.hidden = true; return; }
+    dom.resultsJornadaPicker.hidden = false;
+    renderMarkup(dom.resultsJornadaSelect, dates.map(function (d) {
+      const selected = d.date === state.results.selectedJornada ? ' selected' : '';
+      const label = d.date === 'Sin fecha' ? 'Sin fecha' : formatDate(d.date);
+      return '<option value="' + safe(d.date) + '"' + selected + '>' + safe(label) + ' · ' + d.count + ' entregas</option>';
+    }).join(''));
+  }
+
   async function fetchResultados(userTriggered) {
     state.results.loading = true;
     state.results.error = null;
@@ -883,6 +940,7 @@
     state.results.loaded = true;
     state.results.entregas = (result.data && result.data.entregas) || [];
     state.results.envios = (enviosResult.data && enviosResult.data.envios) || [];
+    ensureSelectedJornada();
     dom.resultsStatus.hidden = true;
     renderResultados();
     renderSummaryResults();
@@ -996,8 +1054,9 @@
   }
 
   function renderResultados() {
+    renderJornadaPicker();
     const filter = state.results.semaforoFilter;
-    const all = state.results.entregas;
+    const all = jornadaEntregas();
     const filtered = filter
       ? all.filter(function (e) { const s = Array.isArray(e.statusVivienda) ? e.statusVivienda[0] : e.statusVivienda; return s === filter; })
       : all;

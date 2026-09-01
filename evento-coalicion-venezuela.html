@@ -134,6 +134,10 @@
       <div id="results-empty" hidden></div>
 
       <div id="results-body" hidden>
+        <div id="results-jornada-picker" class="jornada-picker" hidden>
+          <label for="results-jornada-select">🗓️ Jornada</label>
+          <select id="results-jornada-select" data-action="select-jornada" onchange="window.coalicionAction(event)"></select>
+        </div>
         <div class="kpi-grid" id="results-kpi-grid"></div>
 
         <div class="results-card">
