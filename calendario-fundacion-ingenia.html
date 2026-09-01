@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es-VE">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Calendario Fundación Ingenia — une los eventos de Coalición Venezuela, Dra Florangel y UCV en una sola vista.">
+  <title>Calendario Fundación Ingenia</title>
+  <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
+  <script src="./calendario-fundacion-ingenia.js" defer></script>
+</head>
+<body>
+  <div id="app-shell" class="app-shell">
+    <header class="app-header">
+      <div class="header-copy">
+        <p class="eyebrow">💡 Fundación Ingenia</p>
+        <h1>Calendario Fundación Ingenia</h1>
+        <p>Une en una sola vista los eventos de Coalición Venezuela, Dra Florangel y el directorio UCV. Es de solo lectura — para editar un evento, hazlo desde su tablero de origen.</p>
+      </div>
+      <div class="quick-links">
+        <a href="./Directorio y Agenda Relaciones UCV.dc.html" target="_blank" rel="noopener noreferrer">🎓 Abrir tablero UCV ↗</a>
+        <a href="./evento-coalicion-venezuela.html" target="_blank" rel="noopener noreferrer">🤝 Abrir Coalición Venezuela ↗</a>
+        <a href="./dra-florangel.html" target="_blank" rel="noopener noreferrer">🩺 Abrir Dra Florangel ↗</a>
+      </div>
+    </header>
+
+    <div id="connectivity-banner" class="notice notice-warning page-notice" role="status" hidden>
+      No pudimos traer alguno de los calendarios. Conservamos lo que sí cargó. <button id="retry-load" type="button" onclick="window.ingeniaAction(event)">Reintentar</button>
+    </div>
+
+    <section id="loading-state" class="loading-state" aria-live="polite">
+      <span class="loader" aria-hidden="true"></span>
+      <p>Cargando los tres calendarios…</p>
+    </section>
+
+    <section id="calendar-view" class="view" hidden>
+      <div class="source-legend">
+        <span class="source-legend-item"><span class="source-dot src-coalicion"></span>Coalición Venezuela</span>
+        <span class="source-legend-item"><span class="source-dot src-florangel"></span>Dra Florangel</span>
+        <span class="source-legend-item"><span class="source-dot src-ucv"></span>UCV</span>
+      </div>
+      <div class="calendar-toolbar panel">
+        <button id="calendar-prev" class="icon-button" type="button" aria-label="Mes anterior" onclick="window.ingeniaAction(event)">‹</button>
+        <h3 id="calendar-month-label"></h3>
+        <button id="calendar-next" class="icon-button" type="button" aria-label="Mes siguiente" onclick="window.ingeniaAction(event)">›</button>
+        <button id="calendar-today" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)">Hoy</button>
+      </div>
+      <div id="calendar-grid" class="calendar-grid panel"></div>
+
+      <section class="panel" style="margin-top: 14px">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">📋 Agenda del día</p>
+            <h3 id="agenda-title">Selecciona un día</h3>
+          </div>
+        </div>
+        <div id="agenda-list" class="agenda-list"></div>
+      </section>
+    </section>
+  </div>
+</body>
+</html>
