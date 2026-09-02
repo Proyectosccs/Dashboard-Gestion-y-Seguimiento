@@ -1114,7 +1114,8 @@
     renderSemaforoBlock(semaforoAll, all.length);
     renderZonesBlock(m.zones);
     state.results.needsData = m.needs;
-    renderNeedsBlock(m.needs);
+    state.results.needsTotal = m.totalEntregas;
+    renderNeedsBlock(m.needs, m.totalEntregas);
     renderNucleosBlock(m.nucleos);
   }
 
@@ -1203,12 +1204,16 @@
     setTimeout(function () { if (state.map) state.map.invalidateSize(); }, 60);
   }
 
-  function renderNeedsBlock(needs) {
+  function renderNeedsBlock(needs, total) {
     if (!needs.length) {
       renderMarkup(dom.resultsNeeds, emptyState('🥫 Sin necesidades registradas', '', ''));
       return;
     }
-    const max = needs[0].count;
+    // Porcentaje = de cuántas entregas de esta jornada se reportó cada
+    // necesidad (una persona puede pedir varias, así que la suma de los
+    // porcentajes puede superar 100%; cada barra es independiente).
+    const base = total || needs.reduce(function (sum, n) { return sum + n.count; }, 0);
+    const maxPct = needs.reduce(function (max, n) { return Math.max(max, base ? n.count / base * 100 : 0); }, 0) || 1;
     const openKey = state.results.openNeedCategory;
     const openNeed = needs.find(function (n) { return n.key === openKey; });
     const detail = !openNeed ? '' : '<div class="need-detail">' +
@@ -1218,12 +1223,15 @@
       }).join('') +
     '</div>';
     renderMarkup(dom.resultsNeeds,
-      '<div class="need-grid-cards">' + needs.map(function (n) {
-        const pct = max ? Math.round(n.count / max * 100) : 0;
+      '<div class="need-bar-list">' + needs.map(function (n) {
+        const pct = base ? Math.round(n.count / base * 100) : 0;
+        const barWidth = Math.round((base ? n.count / base * 100 : 0) / maxPct * 100);
         const isOpen = openKey === n.key;
-        return '<button type="button" class="need-chip' + (isOpen ? ' open' : '') + '" data-action="toggle-need" data-id="' + safe(n.key) + '">' +
-          '<span class="need-chip-top"><span class="need-chip-label">' + n.icon + ' ' + safe(n.label) + '</span><span class="need-chip-value">' + n.count + '</span></span>' +
-          '<span class="need-track"><span class="need-fill" style="width:' + pct + '%"></span></span>' +
+        return '<button type="button" class="need-bar-row' + (isOpen ? ' open' : '') + '" data-action="toggle-need" data-id="' + safe(n.key) + '">' +
+          '<span class="need-bar-label">' + n.icon + ' ' + safe(n.label) + '</span>' +
+          '<span class="need-bar-track"><span class="need-bar-fill" style="width:' + barWidth + '%"></span></span>' +
+          '<span class="need-bar-pct">' + pct + '%</span>' +
+          '<span class="need-bar-count">' + n.count + '</span>' +
         '</button>';
       }).join('') + '</div>' +
       detail
@@ -1232,7 +1240,7 @@
 
   function toggleNeedCategory(key) {
     state.results.openNeedCategory = state.results.openNeedCategory === key ? null : key;
-    renderNeedsBlock(state.results.needsData || []);
+    renderNeedsBlock(state.results.needsData || [], state.results.needsTotal || 0);
   }
 
   function renderNucleosBlock(nucleos) {
