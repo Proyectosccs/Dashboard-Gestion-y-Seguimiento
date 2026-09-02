@@ -33,13 +33,13 @@
     { key: 'vivienda', icon: '🏠', label: 'Vivienda y refugio', test: /vivienda|donde vivir|carpa|inspeccion|rancho|colchoneta/i },
     { key: 'salud', icon: '🩺', label: 'Salud y medicamentos', test: /hipertensi|ipertension|losartan|diclofenac|asma|nebulizador|basartan|mecformina|amputaci|enfermedad|medicamento/i },
     { key: 'discapacidad', icon: '♿', label: 'Discapacidad y movilidad', test: /discapacita|silla de ruedas|autista|bast[oó]n|cardiac/i },
-    { key: 'adultos-mayores', icon: '👴', label: 'Adultos mayores', test: /adultos? mayor/i },
     { key: 'materno-infantil', icon: '🤰', label: 'Salud mental, embarazo y bebés', test: /salud mental|embarazo|beb[eé]|pa[ñn]al/i },
     { key: 'alimentacion', icon: '🍲', label: 'Alimentación y agua', test: /aliment|comida|agua/i },
-    { key: 'higiene', icon: '🧴', label: 'Higiene y cuidado personal', test: /higiene|personal/i },
-    { key: 'infantil', icon: '👶', label: 'Cuidado infantil', test: /ni[ñn][ao] de|cuidados para ni[ñn]/i },
-    { key: 'sin-necesidad', icon: '✅', label: 'Sin necesidad reportada', test: /^ninguna$|^sin especificar$/i },
-    { key: 'otras', icon: '📋', label: 'Otras necesidades', test: /^/ }
+    // Cuidado personal, adultos mayores, cuidado infantil, "sin necesidad" y
+    // cualquier texto libre que no calce con las categorías de arriba quedan
+    // agrupados aquí — cada uno por separado era demasiado chico para leerse
+    // bien en la gráfica de barras.
+    { key: 'otras', icon: '📋', label: 'Otros cuidados y necesidades', test: /^/ }
   ];
 
   function classifyNeed(text) {
@@ -1215,26 +1215,24 @@
     const base = total || needs.reduce(function (sum, n) { return sum + n.count; }, 0);
     const maxPct = needs.reduce(function (max, n) { return Math.max(max, base ? n.count / base * 100 : 0); }, 0) || 1;
     const openKey = state.results.openNeedCategory;
-    const openNeed = needs.find(function (n) { return n.key === openKey; });
-    const detail = !openNeed ? '' : '<div class="need-detail">' +
-      '<div class="need-detail-head"><span>' + openNeed.icon + ' ' + safe(openNeed.label) + '</span><span>' + openNeed.count + '</span></div>' +
-      openNeed.items.map(function (it) {
-        return '<div class="need-detail-row"><span>' + safe(it.name) + '</span><span>' + it.count + '</span></div>';
-      }).join('') +
-    '</div>';
     renderMarkup(dom.resultsNeeds,
       '<div class="need-bar-list">' + needs.map(function (n) {
         const pct = base ? Math.round(n.count / base * 100) : 0;
         const barWidth = Math.round((base ? n.count / base * 100 : 0) / maxPct * 100);
         const isOpen = openKey === n.key;
-        return '<button type="button" class="need-bar-row' + (isOpen ? ' open' : '') + '" data-action="toggle-need" data-id="' + safe(n.key) + '">' +
+        const row = '<button type="button" class="need-bar-row' + (isOpen ? ' open' : '') + '" data-action="toggle-need" data-id="' + safe(n.key) + '">' +
           '<span class="need-bar-label">' + n.icon + ' ' + safe(n.label) + '</span>' +
           '<span class="need-bar-track"><span class="need-bar-fill" style="width:' + barWidth + '%"></span></span>' +
           '<span class="need-bar-pct">' + pct + '%</span>' +
           '<span class="need-bar-count">' + n.count + '</span>' +
         '</button>';
-      }).join('') + '</div>' +
-      detail
+        if (!isOpen) return row;
+        return row + '<div class="need-detail">' +
+          n.items.map(function (it) {
+            return '<div class="need-detail-row"><span>' + safe(it.name) + '</span><span>' + it.count + '</span></div>';
+          }).join('') +
+        '</div>';
+      }).join('') + '</div>'
     );
   }
 
