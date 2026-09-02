@@ -1318,15 +1318,6 @@
       html: '<strong>' + amarilloPct + '%</strong> de las viviendas están en Amarillo — riesgo moderado que todavía se puede reparar (' + m.semaforo.Amarillo + ').'
     });
 
-    if (m.zones.length) {
-      const z0 = m.zones[0];
-      const pctZ = Math.round(z0.count / total * 100);
-      insights.push({
-        icon: '📍', tone: 'neutral',
-        html: '<strong>' + safe(z0.name) + '</strong> es la zona con más entregas: ' + z0.count + ' (' + pctZ + '% del total).'
-      });
-    }
-
     return insights;
   }
 
@@ -1361,14 +1352,6 @@
       const pctNinos = Math.round(m.totalNinos / personasTotal * 100);
       if (pctNinos >= 30) {
         recs.push({ icon: '🧒', html: 'Priorizar artículos y atención para niños en la próxima jornada — representan <strong>' + pctNinos + '%</strong> de las personas beneficiadas (' + m.totalNinos + ').' });
-      }
-    }
-
-    if (m.zones.length) {
-      const z0 = m.zones[0];
-      const pctZ = Math.round(z0.count / total * 100);
-      if (pctZ >= 20) {
-        recs.push({ icon: '📍', html: 'Evaluar un punto de entrega fijo o recurrente en <strong>' + safe(z0.name) + '</strong>, que concentra el ' + pctZ + '% de las entregas.' });
       }
     }
 
