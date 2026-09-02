@@ -419,6 +419,8 @@
     dom.resultsMap = document.getElementById('results-map');
     dom.resultsNeeds = document.getElementById('results-needs');
     dom.resultsNucleos = document.getElementById('results-nucleos');
+    dom.resultsInsights = document.getElementById('results-insights');
+    dom.resultsRecommendations = document.getElementById('results-recommendations');
     dom.keyDialog = document.getElementById('key-dialog');
     dom.keyForm = document.getElementById('key-form');
     dom.keyDialogTitle = document.getElementById('key-dialog-title');
@@ -1110,13 +1112,19 @@
       kpi('kpi-indigo', m.confirmadas, '✅ Confirmadas por QR')
     );
 
-    const semaforoAll = filter ? computeResultsMetrics(all).semaforo : m.semaforo;
-    renderSemaforoBlock(semaforoAll, all.length);
+    const overall = filter ? computeResultsMetrics(all) : m;
+    renderSemaforoBlock(overall.semaforo, all.length);
     renderZonesBlock(m.zones);
     state.results.needsData = m.needs;
     state.results.needsTotal = m.totalEntregas;
     renderNeedsBlock(m.needs, m.totalEntregas);
     renderNucleosBlock(m.nucleos);
+    // Insights y recomendaciones narran la jornada completa, no el recorte del
+    // filtro rápido del semáforo — si no, "42% en Rojo" desaparecería en cuanto
+    // alguien filtre a "solo Verde" y el mensaje dejaría de tener sentido.
+    const insights = computeInsights(overall);
+    renderInsightsBlock(insights);
+    renderRecommendationsBlock(computeRecommendations(overall));
   }
 
   function renderSemaforoBlock(semaforo) {
@@ -1128,7 +1136,7 @@
       const pct = total ? Math.round(count / total * 100) : 0;
       const active = !filter || filter === key;
       return '<button type="button" class="semaforo-chip' + (active ? ' active' : '') + '" data-action="filter-semaforo" data-id="' + key + '" style="--chip-color:' + meta.color + ';--chip-soft:' + meta.soft + '">' +
-        '<span class="semaforo-chip-top"><span class="semaforo-dot"></span><span class="semaforo-num">' + count + '</span><span class="semaforo-pct">' + pct + '%</span></span>' +
+        '<span class="semaforo-chip-top"><span class="semaforo-dot"></span><span class="semaforo-num">' + pct + '%</span><span class="semaforo-pct">' + count + '</span></span>' +
         '<span class="semaforo-label">' + meta.label + '</span>' +
       '</button>';
     }).join(''));
@@ -1245,6 +1253,118 @@
     renderMarkup(dom.resultsNucleos, nucleos.map(function (n) {
       return '<div class="nucleo-card"><strong>' + n.count + '</strong><span>' + safe(n.label) + '</span>' +
         '<div class="nucleo-meta">' + n.cajas + ' cajas · ' + n.avgCajas.toFixed(1) + ' prom.</div></div>';
+    }).join(''));
+  }
+
+  // ---------- Insights y recomendaciones ----------
+  // Ambos se calculan en vivo a partir de las mismas métricas ya mostradas
+  // arriba (semáforo, necesidades, zonas, confirmaciones, núcleos) — nada de
+  // texto inventado, cada frase es verificable contra los números de la
+  // jornada. Las recomendaciones solo aparecen cuando el dato cruza un umbral
+  // que amerita acción; si nada lo amerita, se muestra un mensaje neutral.
+
+  function computeInsights(m) {
+    const insights = [];
+    const total = m.totalEntregas;
+    if (!total) return insights;
+
+    const riesgo = m.semaforo.Rojo + m.semaforo.Colapso;
+    const riesgoPct = Math.round(riesgo / total * 100);
+    insights.push({
+      icon: '🚦', tone: riesgoPct >= 40 ? 'danger' : riesgoPct >= 20 ? 'warning' : 'good',
+      html: '<strong>' + riesgoPct + '%</strong> de las viviendas registradas están en Rojo o Colapso (' + riesgo + ' de ' + total + ').'
+    });
+
+    if (m.needs.length) {
+      const n0 = m.needs[0];
+      const pct0 = Math.round(n0.count / total * 100);
+      insights.push({
+        icon: n0.icon, tone: 'neutral',
+        html: '<strong>' + safe(n0.label) + '</strong> es la necesidad más reportada: ' + pct0 + '% de las entregas (' + n0.count + ').'
+      });
+    }
+
+    if (m.zones.length) {
+      const z0 = m.zones[0];
+      const pctZ = Math.round(z0.count / total * 100);
+      insights.push({
+        icon: '📍', tone: 'neutral',
+        html: '<strong>' + safe(z0.name) + '</strong> es la zona con más entregas: ' + z0.count + ' (' + pctZ + '% del total).'
+      });
+    }
+
+    const pctConfirm = Math.round(m.confirmadas / total * 100);
+    insights.push({
+      icon: '✅', tone: pctConfirm >= 70 ? 'good' : pctConfirm >= 40 ? 'warning' : 'danger',
+      html: '<strong>' + pctConfirm + '%</strong> de las entregas están confirmadas por QR (' + m.confirmadas + ' de ' + total + ').'
+    });
+
+    const topNucleo = m.nucleos.slice().sort(function (a, b) { return b.count - a.count; })[0];
+    if (topNucleo && topNucleo.count) {
+      const pctN = Math.round(topNucleo.count / total * 100);
+      insights.push({
+        icon: '👨‍👩‍👧‍👦', tone: 'neutral',
+        html: 'El núcleo familiar más común es de <strong>' + safe(topNucleo.label) + '</strong>: ' + topNucleo.count + ' familias (' + pctN + '%).'
+      });
+    }
+
+    return insights;
+  }
+
+  function computeRecommendations(m) {
+    const recs = [];
+    const total = m.totalEntregas;
+    if (!total) return recs;
+
+    const riesgo = m.semaforo.Rojo + m.semaforo.Colapso;
+    const riesgoPct = Math.round(riesgo / total * 100);
+    if (riesgoPct >= 30) {
+      recs.push({ icon: '🏚️', html: 'Priorizar inspección y refuerzo estructural en las <strong>' + riesgo + ' viviendas</strong> en Rojo o Colapso antes de la próxima jornada.' });
+    } else if (riesgoPct >= 15) {
+      recs.push({ icon: '🏚️', html: 'Mantener seguimiento cercano a las <strong>' + riesgo + ' viviendas</strong> en Rojo o Colapso.' });
+    }
+
+    if (m.needs.length) {
+      const n0 = m.needs[0];
+      const pct0 = Math.round(n0.count / total * 100);
+      if (pct0 >= 30) {
+        recs.push({ icon: n0.icon, html: 'Reforzar el abastecimiento de <strong>' + safe(n0.label) + '</strong> en la próxima jornada — es la necesidad más solicitada (' + pct0 + '%).' });
+      }
+    }
+
+    if (m.zones.length) {
+      const z0 = m.zones[0];
+      const pctZ = Math.round(z0.count / total * 100);
+      if (pctZ >= 20) {
+        recs.push({ icon: '📍', html: 'Evaluar un punto de entrega fijo o recurrente en <strong>' + safe(z0.name) + '</strong>, que concentra el ' + pctZ + '% de las entregas.' });
+      }
+    }
+
+    const pctConfirm = Math.round(m.confirmadas / total * 100);
+    if (pctConfirm < 50) {
+      recs.push({ icon: '✅', html: 'Reforzar el proceso de confirmación por QR en campo — solo el <strong>' + pctConfirm + '%</strong> de las entregas está confirmado.' });
+    }
+
+    if (!recs.length) {
+      recs.push({ icon: '👍', html: 'No hay alertas críticas en esta jornada según los datos registrados — mantener el ritmo actual.' });
+    }
+
+    return recs;
+  }
+
+  function renderInsightsBlock(insights) {
+    if (!insights.length) {
+      renderMarkup(dom.resultsInsights, emptyState('💡 Sin datos suficientes', 'Todavía no hay entregas registradas para esta jornada.', ''));
+      return;
+    }
+    renderMarkup(dom.resultsInsights, insights.map(function (it) {
+      return '<div class="insight-item tone-' + it.tone + '"><span class="insight-icon">' + it.icon + '</span><span>' + it.html + '</span></div>';
+    }).join(''));
+  }
+
+  function renderRecommendationsBlock(recs) {
+    renderMarkup(dom.resultsRecommendations, recs.map(function (r) {
+      return '<div class="recommendation-item"><span class="recommendation-icon">' + r.icon + '</span><span>' + r.html + '</span></div>';
     }).join(''));
   }
 

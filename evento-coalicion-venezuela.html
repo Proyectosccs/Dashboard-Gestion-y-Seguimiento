@@ -138,6 +138,8 @@
           <label for="results-jornada-select">🗓️ Jornada</label>
           <select id="results-jornada-select" data-action="select-jornada" onchange="window.coalicionAction(event)"></select>
         </div>
+
+        <p class="results-section-label">🔢 Datos de la jornada</p>
         <div class="kpi-grid" id="results-kpi-grid"></div>
 
         <div class="results-card">
@@ -172,6 +174,16 @@
             <div id="results-zone-list" class="zone-list"></div>
             <div id="results-map" class="results-map"></div>
           </div>
+        </div>
+
+        <p class="results-section-label">💡 Insights</p>
+        <div class="results-card">
+          <div id="results-insights" class="insight-list"></div>
+        </div>
+
+        <p class="results-section-label">🎯 Recomendaciones</p>
+        <div class="results-card">
+          <div id="results-recommendations" class="recommendation-list"></div>
         </div>
       </div>
     </section>
