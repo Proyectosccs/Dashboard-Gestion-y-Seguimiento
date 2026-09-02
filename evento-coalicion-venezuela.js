@@ -1268,13 +1268,26 @@
     const total = m.totalEntregas;
     if (!total) return insights;
 
-    const riesgo = m.semaforo.Rojo + m.semaforo.Colapso;
-    const riesgoPct = Math.round(riesgo / total * 100);
-    insights.push({
-      icon: '🚦', tone: riesgoPct >= 40 ? 'danger' : riesgoPct >= 20 ? 'warning' : 'good',
-      html: '<strong>' + riesgoPct + '%</strong> de las viviendas registradas están en Rojo o Colapso (' + riesgo + ' de ' + total + ').'
-    });
+    // Núcleo familiar: cuántos niños hay y qué tan grande suele ser la familia.
+    const personasTotal = m.personas;
+    if (personasTotal) {
+      const pctNinos = Math.round(m.totalNinos / personasTotal * 100);
+      insights.push({
+        icon: '🧒', tone: pctNinos >= 40 ? 'warning' : 'neutral',
+        html: '<strong>' + m.totalNinos + ' niños</strong> (' + pctNinos + '%) forman parte de las ' + personasTotal + ' personas beneficiadas, junto a ' + m.totalAdultos + ' adultos.'
+      });
+    }
 
+    const topNucleo = m.nucleos.slice().sort(function (a, b) { return b.count - a.count; })[0];
+    if (topNucleo && topNucleo.count) {
+      const pctN = Math.round(topNucleo.count / total * 100);
+      insights.push({
+        icon: '👨‍👩‍👧‍👦', tone: 'neutral',
+        html: 'El núcleo familiar más común es de <strong>' + safe(topNucleo.label) + '</strong>: ' + topNucleo.count + ' familias (' + pctN + '%).'
+      });
+    }
+
+    // Necesidades: la principal y la segunda, para no quedarse con una sola lectura.
     if (m.needs.length) {
       const n0 = m.needs[0];
       const pct0 = Math.round(n0.count / total * 100);
@@ -1283,6 +1296,27 @@
         html: '<strong>' + safe(n0.label) + '</strong> es la necesidad más reportada: ' + pct0 + '% de las entregas (' + n0.count + ').'
       });
     }
+    if (m.needs.length > 1) {
+      const n1 = m.needs[1];
+      const pct1 = Math.round(n1.count / total * 100);
+      insights.push({
+        icon: n1.icon, tone: 'neutral',
+        html: 'La segunda necesidad más reportada es <strong>' + safe(n1.label) + '</strong>: ' + pct1 + '% de las entregas (' + n1.count + ').'
+      });
+    }
+
+    // Semáforo: riesgo alto (Rojo/Colapso) y riesgo moderado pero reparable (Amarillo).
+    const riesgo = m.semaforo.Rojo + m.semaforo.Colapso;
+    const riesgoPct = Math.round(riesgo / total * 100);
+    insights.push({
+      icon: '🚦', tone: riesgoPct >= 40 ? 'danger' : riesgoPct >= 20 ? 'warning' : 'good',
+      html: '<strong>' + riesgoPct + '%</strong> de las viviendas registradas están en Rojo o Colapso (' + riesgo + ' de ' + total + ').'
+    });
+    const amarilloPct = Math.round(m.semaforo.Amarillo / total * 100);
+    insights.push({
+      icon: '🟡', tone: amarilloPct >= 30 ? 'warning' : 'neutral',
+      html: '<strong>' + amarilloPct + '%</strong> de las viviendas están en Amarillo — riesgo moderado que todavía se puede reparar (' + m.semaforo.Amarillo + ').'
+    });
 
     if (m.zones.length) {
       const z0 = m.zones[0];
@@ -1290,21 +1324,6 @@
       insights.push({
         icon: '📍', tone: 'neutral',
         html: '<strong>' + safe(z0.name) + '</strong> es la zona con más entregas: ' + z0.count + ' (' + pctZ + '% del total).'
-      });
-    }
-
-    const pctConfirm = Math.round(m.confirmadas / total * 100);
-    insights.push({
-      icon: '✅', tone: pctConfirm >= 70 ? 'good' : pctConfirm >= 40 ? 'warning' : 'danger',
-      html: '<strong>' + pctConfirm + '%</strong> de las entregas están confirmadas por QR (' + m.confirmadas + ' de ' + total + ').'
-    });
-
-    const topNucleo = m.nucleos.slice().sort(function (a, b) { return b.count - a.count; })[0];
-    if (topNucleo && topNucleo.count) {
-      const pctN = Math.round(topNucleo.count / total * 100);
-      insights.push({
-        icon: '👨‍👩‍👧‍👦', tone: 'neutral',
-        html: 'El núcleo familiar más común es de <strong>' + safe(topNucleo.label) + '</strong>: ' + topNucleo.count + ' familias (' + pctN + '%).'
       });
     }
 
@@ -1324,11 +1343,24 @@
       recs.push({ icon: '🏚️', html: 'Mantener seguimiento cercano a las <strong>' + riesgo + ' viviendas</strong> en Rojo o Colapso.' });
     }
 
+    const amarilloPct = Math.round(m.semaforo.Amarillo / total * 100);
+    if (amarilloPct >= 25) {
+      recs.push({ icon: '🟡', html: 'Programar reparaciones preventivas en las <strong>' + m.semaforo.Amarillo + ' viviendas</strong> en Amarillo antes de que su condición empeore.' });
+    }
+
     if (m.needs.length) {
       const n0 = m.needs[0];
       const pct0 = Math.round(n0.count / total * 100);
       if (pct0 >= 30) {
         recs.push({ icon: n0.icon, html: 'Reforzar el abastecimiento de <strong>' + safe(n0.label) + '</strong> en la próxima jornada — es la necesidad más solicitada (' + pct0 + '%).' });
+      }
+    }
+
+    const personasTotal = m.personas;
+    if (personasTotal) {
+      const pctNinos = Math.round(m.totalNinos / personasTotal * 100);
+      if (pctNinos >= 30) {
+        recs.push({ icon: '🧒', html: 'Priorizar artículos y atención para niños en la próxima jornada — representan <strong>' + pctNinos + '%</strong> de las personas beneficiadas (' + m.totalNinos + ').' });
       }
     }
 
@@ -1338,11 +1370,6 @@
       if (pctZ >= 20) {
         recs.push({ icon: '📍', html: 'Evaluar un punto de entrega fijo o recurrente en <strong>' + safe(z0.name) + '</strong>, que concentra el ' + pctZ + '% de las entregas.' });
       }
-    }
-
-    const pctConfirm = Math.round(m.confirmadas / total * 100);
-    if (pctConfirm < 50) {
-      recs.push({ icon: '✅', html: 'Reforzar el proceso de confirmación por QR en campo — solo el <strong>' + pctConfirm + '%</strong> de las entregas está confirmado.' });
     }
 
     if (!recs.length) {
