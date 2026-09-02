@@ -903,7 +903,7 @@
     // entregas a mostrar un envío casi vacío, sin avisar. Umbral temporal
     // mientras se decide el comportamiento definitivo (ver selector de
     // "Total / todas las jornadas" pendiente).
-    const JORNADA_MIN_ENTREGAS_PARA_ANCLAR = 10;
+    const JORNADA_MIN_ENTREGAS_PARA_ANCLAR = 150;
     if (!state.results.jornadaAnchored) {
       const next = nextEvent();
       if (next) {
