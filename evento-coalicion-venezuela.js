@@ -895,11 +895,18 @@
     // mostrado no salta solo porque una jornada en curso va acumulando
     // entregas en vivo. Reintentamos esto en cada carga hasta lograrlo; una
     // vez anclado, queda fijo el resto de la sesión.
+    // No anclamos todavía a una jornada nueva que apenas tiene unas pocas
+    // entregas capturadas (ej. un envío recién creado hoy) — eso hacía que
+    // el dashboard saltara de mostrar una jornada consolidada de cientos de
+    // entregas a mostrar un envío casi vacío, sin avisar. Umbral temporal
+    // mientras se decide el comportamiento definitivo (ver selector de
+    // "Total / todas las jornadas" pendiente).
+    const JORNADA_MIN_ENTREGAS_PARA_ANCLAR = 10;
     if (!state.results.jornadaAnchored) {
       const next = nextEvent();
       if (next) {
         const match = list.find(function (j) { return j.fecha === next.event_date; });
-        if (match) {
+        if (match && match.count >= JORNADA_MIN_ENTREGAS_PARA_ANCLAR) {
           state.results.selectedJornada = match.id;
           state.results.jornadaAnchored = true;
           return;
