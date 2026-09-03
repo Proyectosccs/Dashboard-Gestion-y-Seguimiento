@@ -1192,16 +1192,18 @@
       return typeof z.lat === 'number' && typeof z.lng === 'number' &&
         z.lat > 0 && z.lat < 13 && z.lng > -75 && z.lng < -59;
     });
-    if (!state.map) {
-      state.map = window.L.map(dom.resultsMap, { attributionControl: true, zoomControl: true, scrollWheelZoom: false });
-      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 18,
-        attribution: '© OpenStreetMap'
-      }).addTo(state.map);
-      state.mapMarkers = window.L.layerGroup().addTo(state.map);
-    }
-    state.map.invalidateSize();
-    state.mapMarkers.clearLayers();
+    // Se recrea el mapa en cada render (en vez de reusar la instancia) porque
+    // Leaflet cachea internamente el zoom calculado la primera vez que
+    // fitBounds() corre con el contenedor todavía en 0×0 (pestaña recién
+    // activada) — invalidateSize() + un segundo fitBounds() no lo corregían:
+    // el mapa se quedaba mostrando el país entero en vez de solo Vargas.
+    if (state.map) { state.map.remove(); state.map = null; state.mapMarkers = null; }
+    state.map = window.L.map(dom.resultsMap, { attributionControl: true, zoomControl: true, scrollWheelZoom: false });
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '© OpenStreetMap'
+    }).addTo(state.map);
+    state.mapMarkers = window.L.layerGroup().addTo(state.map);
     if (!withCoords.length) {
       state.map.setView([10.5, -66.9], 9);
       return;
@@ -1224,16 +1226,13 @@
       }
     });
     const fitTarget = coreBounds.length ? coreBounds : bounds;
+    state.map.invalidateSize();
     state.map.fitBounds(fitTarget, { padding: [30, 30], maxZoom: 15 });
-    // Si el mapa se inicializa mientras su pestaña todavía no es visible, el
-    // contenedor mide 0×0 y fitBounds calcula un zoom equivocado (todo el
-    // país en vez de solo Vargas); invalidateSize() por sí solo no corrige
-    // ese zoom ya calculado, así que hay que reencuadrar de nuevo después.
     setTimeout(function () {
       if (!state.map) return;
       state.map.invalidateSize();
       state.map.fitBounds(fitTarget, { padding: [30, 30], maxZoom: 15 });
-    }, 60);
+    }, 80);
   }
 
   function renderNeedsBlock(needs, total) {
