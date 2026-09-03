@@ -1223,8 +1223,17 @@
         coreBounds.push([z.lat, z.lng]);
       }
     });
-    state.map.fitBounds(coreBounds.length ? coreBounds : bounds, { padding: [30, 30], maxZoom: 15 });
-    setTimeout(function () { if (state.map) state.map.invalidateSize(); }, 60);
+    const fitTarget = coreBounds.length ? coreBounds : bounds;
+    state.map.fitBounds(fitTarget, { padding: [30, 30], maxZoom: 15 });
+    // Si el mapa se inicializa mientras su pestaña todavía no es visible, el
+    // contenedor mide 0×0 y fitBounds calcula un zoom equivocado (todo el
+    // país en vez de solo Vargas); invalidateSize() por sí solo no corrige
+    // ese zoom ya calculado, así que hay que reencuadrar de nuevo después.
+    setTimeout(function () {
+      if (!state.map) return;
+      state.map.invalidateSize();
+      state.map.fitBounds(fitTarget, { padding: [30, 30], maxZoom: 15 });
+    }, 60);
   }
 
   function renderNeedsBlock(needs, total) {
