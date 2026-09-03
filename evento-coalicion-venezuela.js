@@ -1019,7 +1019,22 @@
     'La guaira c': [10.6000384, -66.9296405],
     'Atanasio girardot la guaira': [10.6090029, -67.0166967],
     'Carayaca, parroquia carayaca, municipio vargas, estado vargas, 1167, venezuela': [10.5293542, -67.1204381],
-    'Carallaca la guaira': [10.5293542, -67.1204381]
+    'Carallaca la guaira': [10.5293542, -67.1204381],
+    // Segunda tanda (2026-09-03), geocodificada vía Nominatim/OpenStreetMap
+    // para las zonas con 2+ entregas que todavía no tenían coordenadas.
+    'Aeropuerto': [10.6031377, -66.9966802],
+    'Maiquetia': [10.5966074, -66.9597542],
+    'Carretera colonia tovar - el junquito, caracas, parroquia macarao, municipio libertador, distrito metropolitano de caracas, distrito capital, venezuela': [10.4542706, -67.0998335],
+    'Aluminiologo la guaira, 1161, avenida carlos soublette, 10 de marzo, urbanizacion jose maria vargas, pariata, parroquia maiquetia, municipio vargas, estado vargas, 1161, venezuela': [10.5997041, -66.9650188],
+    'Parroquia naiguata, municipio vargas, estado vargas, 1166, venezuela': [10.5881223, -66.6703927],
+    'Playa grande, catia la mar, parroquia urimare, municipio vargas, estado vargas, 1162, venezuela': [10.6088372, -67.0159933],
+    'Aeropuerto, mantecal, parroquia mantecal, municipio munoz, estado apure, venezuela': [7.5667997, -69.1468122],
+    '6, ciudad chavez, playa grande, catia la mar, parroquia urimare, municipio vargas, estado vargas, 1162, venezuela': [10.6067725, -67.0240547],
+    'Parroquia urimare, municipio vargas, estado vargas, venezuela': [10.5890958, -66.9989237],
+    'Montesano, el trebol, catia la mar, parroquia urimare, municipio vargas, estado vargas, 1162, venezuela': [10.5934753, -66.9777343],
+    'Autopista caracas - la guaira, la aviacion, el trebol, catia la mar, parroquia urimare, municipio vargas, estado vargas, 1162, venezuela': [10.5958258, -66.9837760],
+    'Santa eduviges catia la mar': [10.5931043, -66.9995302],
+    'Santa eduvijis la guaira': [10.5931043, -66.9995302]
   };
 
   function computeResultsMetrics(entregas) {
