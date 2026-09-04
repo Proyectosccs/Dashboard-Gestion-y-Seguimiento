@@ -49,6 +49,26 @@
     return NEED_CATEGORIES[NEED_CATEGORIES.length - 1];
   }
 
+  // Igual que NEED_CATEGORIES pero un nivel más abajo: dentro del detalle de
+  // una categoría, distintos errores de tipeo del mismo pedido puntual
+  // ("Hipertensión", "Hipertensa", "Ipertension"...) se unifican en una sola
+  // línea en vez de aparecer sueltas contando 1 cada una.
+  const NEED_ITEM_ALIASES = [
+    { test: /hipertensi|ipertension|presi[oó]n alta/i, label: 'Hipertensión' },
+    { test: /losartan|basartan/i, label: 'Losartán' },
+    { test: /mecformina|metformina/i, label: 'Metformina' },
+    { test: /diclofenac/i, label: 'Diclofenac' },
+    { test: /nebulizador/i, label: 'Nebulizador' },
+    { test: /amputaci/i, label: 'Amputación' }
+  ];
+
+  function canonicalizeNeedItem(text) {
+    for (let i = 0; i < NEED_ITEM_ALIASES.length; i++) {
+      if (NEED_ITEM_ALIASES[i].test.test(text)) return NEED_ITEM_ALIASES[i].label;
+    }
+    return text;
+  }
+
   const NUCLEO_BRACKETS = [
     { key: '1-2', label: '1–2 personas', test: function (t) { return t <= 2; } },
     { key: '3-4', label: '3–4 personas', test: function (t) { return t >= 3 && t <= 4; } },
@@ -1123,7 +1143,8 @@
         const category = classifyNeed(need);
         if (!needCategoryMap[category.key]) needCategoryMap[category.key] = { key: category.key, icon: category.icon, label: category.label, count: 0, items: {} };
         needCategoryMap[category.key].count += 1;
-        needCategoryMap[category.key].items[need] = (needCategoryMap[category.key].items[need] || 0) + 1;
+        const itemKey = canonicalizeNeedItem(need);
+        needCategoryMap[category.key].items[itemKey] = (needCategoryMap[category.key].items[itemKey] || 0) + 1;
       });
     });
     const needs = Object.keys(needCategoryMap).map(function (k) {
