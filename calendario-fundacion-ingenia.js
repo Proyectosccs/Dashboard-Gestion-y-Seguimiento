@@ -55,6 +55,7 @@
     editingTask: null,
     eventLockedOrg: null,
     dragTaskId: null,
+    taskOrgFilter: '',
     orgBoard: {
       orgId: null,
       subview: 'calendar',
@@ -89,6 +90,11 @@
       'task-dialog-close': closeTaskDialog,
       'task-dialog-cancel': closeTaskDialog,
       'task-delete': deleteEditingTask,
+      'tasks-filter-clear': function () {
+        state.taskOrgFilter = '';
+        dom.tasksOrgFilter.value = '';
+        refreshTaskBoards();
+      },
       'new-org-btn': openOrgDialog,
       'org-dialog-close': closeOrgDialog,
       'org-dialog-cancel': closeOrgDialog,
@@ -168,6 +174,10 @@
     dom.eventSourceSelect.addEventListener('change', onSourceChange);
     dom.taskForm.addEventListener('submit', onTaskSubmit);
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
+    dom.tasksOrgFilter.addEventListener('change', function () {
+      state.taskOrgFilter = dom.tasksOrgFilter.value;
+      refreshTaskBoards();
+    });
     dom.orgForm.addEventListener('submit', onOrgSubmit);
     dom.orgDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeOrgDialog(); });
     if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) return showConnectionFailure();
@@ -198,6 +208,8 @@
     dom.taskError = document.getElementById('task-error');
     dom.taskDelete = document.getElementById('task-delete');
     dom.taskOrgSelect = document.getElementById('field-task-org');
+    dom.tasksOrgFilter = document.getElementById('tasks-org-filter');
+    dom.tasksKpiGrid = document.getElementById('tasks-kpi-grid');
     dom.organizationsGrid = document.getElementById('organizations-grid');
     dom.orgDialog = document.getElementById('org-dialog');
     dom.orgForm = document.getElementById('org-form');
@@ -394,6 +406,7 @@
     dom.loadingState.hidden = true;
     renderLegend();
     populateSourceSelect();
+    populateTasksOrgFilter();
     refreshTaskBoards();
     renderOrganizations();
     if (state.orgBoard.orgId) renderOrgCalendar();
@@ -668,11 +681,41 @@
     });
   }
 
-  // Vuelve a pintar el tablero general y, si hay uno abierto, el de la
-  // organización correspondiente — para que ambos queden sincronizados.
+  // Vuelve a pintar el tablero general (respetando el filtro por
+  // organización) y, si hay uno abierto, el tablero de esa organización —
+  // para que ambos queden sincronizados.
   function refreshTaskBoards() {
-    renderTasksBoard();
+    renderTasksBoard(state.taskOrgFilter || null, dom.tasksBoard);
+    renderTasksKpis();
     if (state.orgBoard.orgId) renderTasksBoard(state.orgBoard.orgId, dom.orgTasksBoard);
+  }
+
+  function renderTasksKpis() {
+    const orgFilter = state.taskOrgFilter || null;
+    const scoped = state.tasks.filter(function (t) { return !orgFilter || t.org === orgFilter; });
+    function count(statusKey) { return scoped.filter(function (t) { return (t.status || 'pendiente') === statusKey; }).length; }
+    const cards = [
+      { icon: '🧩', value: scoped.length, label: 'Tareas operativas', cls: 'kpi-primary' },
+      { icon: '○', value: count('pendiente'), label: 'Pendiente', cls: 'kpi-neutral' },
+      { icon: '↻', value: count('en_proceso'), label: 'En proceso', cls: 'kpi-sky' },
+      { icon: '✓', value: count('listo'), label: 'Listo', cls: 'kpi-good' },
+      { icon: '⛔', value: count('bloqueada'), label: 'Bloqueada', cls: 'kpi-danger' }
+    ];
+    renderMarkup(dom.tasksKpiGrid, cards.map(function (c) {
+      return '<article class="kpi-card ' + c.cls + '"><span class="kpi-icon" aria-hidden="true">' + c.icon + '</span><strong>' + c.value + '</strong><span class="kpi-label">' + safe(c.label) + '</span></article>';
+    }).join(''));
+  }
+
+  function populateTasksOrgFilter() {
+    const current = dom.tasksOrgFilter.value;
+    const options = REAL_ORGS.map(function (key) {
+      return '<option value="' + key + '">' + FIXED_SOURCE_EMOJI[key] + ' ' + safe(SOURCE_LABELS[key]) + '</option>';
+    }).concat(state.customCalendars.map(function (c) {
+      return '<option value="' + safe(c.id) + '">🏷️ ' + safe(c.name) + '</option>';
+    }));
+    renderMarkup(dom.tasksOrgFilter, ['<option value="">Todas las organizaciones</option>'].concat(options).join(''));
+    dom.tasksOrgFilter.value = current || '';
+    state.taskOrgFilter = dom.tasksOrgFilter.value;
   }
 
   function renderTaskCard(task) {
@@ -800,6 +843,7 @@
     if (!created) { showError(dom.orgError, 'No se pudo guardar — revisa tu conexión.'); return; }
     renderOrganizations();
     populateSourceSelect();
+    populateTasksOrgFilter();
     closeOrgDialog();
     toast('Organización agregada.', 'success');
   }
