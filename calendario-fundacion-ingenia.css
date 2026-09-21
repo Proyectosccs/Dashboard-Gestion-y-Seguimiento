@@ -411,6 +411,34 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .agenda-row-source.src-networking { background: var(--source-networking-soft); color: var(--source-networking); }
 .agenda-row-source.src-otros { background: var(--source-otros-soft); color: var(--source-otros); }
 
+/* ---------- Tareas de Equipo (kanban) ---------- */
+.kanban-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; align-items: start; }
+.kanban-column { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 24px; background: rgba(255,255,255,.6); border: 1px solid var(--color-neutral-300); min-height: 120px; }
+.kanban-column.drag-over { border-color: var(--color-accent); background: var(--color-accent-100); }
+.kanban-column-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 4px 2px; }
+.kanban-column-head h3 { margin: 0; font-size: 14px; font-family: var(--font-heading); }
+.kanban-count { min-width: 24px; padding: 2px 8px; border-radius: 999px; background: var(--color-neutral-200); color: var(--color-neutral-700); font-size: 12px; font-weight: 700; text-align: center; }
+.kanban-card { --status-color: var(--color-accent); display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 18px; background: #fff; border: 1px solid var(--color-neutral-300); border-left: 5px solid var(--status-color); box-shadow: var(--shadow-sm); cursor: grab; }
+.kanban-card:active { cursor: grabbing; }
+.kanban-card.dragging { opacity: .4; }
+.kanban-card-title { margin: 0; font-size: 14.5px; font-weight: 700; overflow-wrap: anywhere; }
+.kanban-card-notes { margin: 0; font-size: 12.5px; color: var(--color-neutral-600); overflow-wrap: anywhere; }
+.kanban-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.kanban-move-btn { border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: var(--color-accent-700); cursor: pointer; }
+.kanban-move-btn:hover { background: var(--color-accent-100); }
+.kanban-empty { padding: 14px; text-align: center; color: var(--color-neutral-500); font-size: 12.5px; }
+.org-tag { width: fit-content; padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; background: color-mix(in srgb, var(--source-color, var(--color-neutral-500)) 16%, white); color: color-mix(in srgb, var(--source-color, var(--color-neutral-500)) 82%, #1c1c1c); }
+
+/* ---------- Organizaciones ---------- */
+.org-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.org-card { display: flex; flex-direction: column; gap: 10px; padding: 20px; border-radius: 24px; background: rgba(255,255,255,.88); border: 1px solid var(--color-neutral-300); border-left: 6px solid var(--source-color, var(--color-neutral-500)); box-shadow: var(--shadow-sm); }
+.org-card h3 { margin: 0; font-size: 17px; }
+.org-card-note { margin: 0; color: var(--color-neutral-600); font-size: 12px; }
+.org-card .btn { align-self: flex-start; }
+
+/* ---------- Líderes de Comunidades (integrado) ---------- */
+.embedded-frame { width: 100%; height: 78vh; min-height: 520px; border: 0; padding: 0; }
+
 .editor-dialog {
   width: min(720px, calc(100vw - 28px));
   max-height: calc(100dvh - 28px);

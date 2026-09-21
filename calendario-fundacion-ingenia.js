@@ -21,14 +21,36 @@
   const CUSTOM_PALETTE = ['#7c3aed', '#be185d', '#0f766e', '#c67139', '#1d4ed8', '#15803d', '#a16207', '#4338ca', '#b91c1c', '#0e7490'];
   const NEW_CALENDAR_VALUE = '__new__';
 
+  // Organizaciones "reales" (con tablero propio o no) que se pueden elegir
+  // al crear una tarea o al listarlas en la pestaña Organizaciones. "otros"
+  // queda fuera a propósito — es el cajón genérico legado, ya no se ofrece
+  // para datos nuevos, solo se sigue mostrando si ya hay eventos viejos ahí.
+  const REAL_ORGS = ['coalicion', 'florangel', 'ucv', 'networking'];
+  const ORG_LINKS = {
+    ucv: './Directorio y Agenda Relaciones UCV.dc.html',
+    coalicion: './evento-coalicion-venezuela.html',
+    florangel: './dra-florangel.html'
+  };
+
+  const TEAM_TASKS_KEY = 'ingenia-team-tasks-v1';
+  const TASK_STATUSES = [
+    { key: 'pendiente', label: 'Pendiente', color: '#82796a' },
+    { key: 'en_proceso', label: 'En proceso', color: '#0f766e' },
+    { key: 'listo', label: 'Listo', color: '#0f7a3d' },
+    { key: 'bloqueada', label: 'Bloqueada', color: '#a02525' }
+  ];
+
   const state = {
     client: null,
     view: 'calendar',
     events: [],
     customCalendars: [],
+    tasks: [],
     calendarMonth: new Date().toISOString().slice(0, 7),
     selectedDay: new Date().toISOString().slice(0, 10),
-    editingEvent: null
+    editingEvent: null,
+    editingTask: null,
+    dragTaskId: null
   };
 
   const dom = {};
@@ -49,7 +71,15 @@
       },
       'new-event-btn': openEventDialog,
       'event-dialog-close': closeEventDialog,
-      'event-dialog-cancel': closeEventDialog
+      'event-dialog-cancel': closeEventDialog,
+      'event-delete': deleteEditingEvent,
+      'new-task-btn': openTaskDialog,
+      'task-dialog-close': closeTaskDialog,
+      'task-dialog-cancel': closeTaskDialog,
+      'task-delete': deleteEditingTask,
+      'new-org-btn': openOrgDialog,
+      'org-dialog-close': closeOrgDialog,
+      'org-dialog-cancel': closeOrgDialog
     };
     const action = actionsById[target.id];
     if (action) action();
@@ -63,6 +93,12 @@
     }
     if (target.dataset.eventId) {
       openEventDialog(findById(state.events, target.dataset.eventId));
+    }
+    if (target.dataset.taskId) {
+      openTaskDialog(findById(state.tasks, target.dataset.taskId));
+    }
+    if (target.dataset.action === 'move-task-status') {
+      moveTaskStatus(target.dataset.id, target.dataset.status);
     }
   };
 
@@ -101,6 +137,10 @@
     dom.eventForm.addEventListener('submit', onEventSubmit);
     dom.eventDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeEventDialog(); });
     dom.eventSourceSelect.addEventListener('change', onSourceChange);
+    dom.taskForm.addEventListener('submit', onTaskSubmit);
+    dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
+    dom.orgForm.addEventListener('submit', onOrgSubmit);
+    dom.orgDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeOrgDialog(); });
     if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) return showConnectionFailure();
     state.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     loadAll();
@@ -121,6 +161,27 @@
     dom.eventError = document.getElementById('event-error');
     dom.eventSourceSelect = document.getElementById('field-event-source');
     dom.newCalendarField = document.getElementById('new-calendar-field');
+    dom.eventDelete = document.getElementById('event-delete');
+    dom.tasksBoard = document.getElementById('tasks-board');
+    dom.taskDialog = document.getElementById('task-dialog');
+    dom.taskDialogTitle = document.getElementById('task-dialog-title');
+    dom.taskForm = document.getElementById('task-form');
+    dom.taskError = document.getElementById('task-error');
+    dom.taskDelete = document.getElementById('task-delete');
+    dom.taskOrgSelect = document.getElementById('field-task-org');
+    dom.organizationsGrid = document.getElementById('organizations-grid');
+    dom.orgDialog = document.getElementById('org-dialog');
+    dom.orgForm = document.getElementById('org-form');
+    dom.orgError = document.getElementById('org-error');
+    dom.toastRegion = document.getElementById('toast-region');
+  }
+
+  function toast(message, tone) {
+    const node = document.createElement('div');
+    node.className = 'toast toast-' + (tone || 'success');
+    node.textContent = message;
+    dom.toastRegion.replaceChildren(node);
+    window.setTimeout(function () { if (node.parentNode) node.remove(); }, 3500);
   }
 
   function setView(viewName) {
@@ -153,7 +214,7 @@
       state.client.from('coalicion_events').select('id,title,event_date,start_time,location,maps_url,notes,status').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
-      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', CUSTOM_CALENDARS_KEY])
+      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY])
     ]);
 
     const anyFailed = coalicionRes.error && florangelRes.error && ucvRes.error && ingeniaRes.error;
@@ -166,6 +227,8 @@
     const ingeniaRowsEarly = ingeniaRes.data || [];
     const registryRaw = ingeniaRowsEarly.find(function (r) { return r.key === CUSTOM_CALENDARS_KEY; });
     state.customCalendars = Array.isArray(registryRaw && registryRaw.value) ? registryRaw.value : [];
+    const tasksRaw = ingeniaRowsEarly.find(function (r) { return r.key === TEAM_TASKS_KEY; });
+    state.tasks = Array.isArray(tasksRaw && tasksRaw.value) ? tasksRaw.value : [];
 
     let customEvents = [];
     if (state.customCalendars.length) {
@@ -211,6 +274,8 @@
     dom.loadingState.hidden = true;
     renderLegend();
     populateSourceSelect();
+    renderTasksBoard();
+    renderOrganizations();
     setView(state.view);
     renderCalendar();
   }
@@ -279,7 +344,10 @@
   }
 
   function renderLegend() {
-    const fixedKeys = ['coalicion', 'florangel', 'ucv', 'networking', 'otros'];
+    // "otros" solo se sigue mostrando en la leyenda si ya hay eventos viejos
+    // etiquetados así — ya no se ofrece para datos nuevos (ver REAL_ORGS).
+    const hasOtros = state.events.some(function (e) { return e.source === 'otros'; });
+    const fixedKeys = REAL_ORGS.concat(hasOtros ? ['otros'] : []);
     const items = fixedKeys.map(function (key) {
       return '<span class="source-legend-item">' + sourceDotHtml(key) + safe(SOURCE_LABELS[key]) + '</span>';
     }).concat(state.customCalendars.map(function (c) {
@@ -290,7 +358,11 @@
 
   function populateSourceSelect() {
     const current = dom.eventSourceSelect.value;
-    const fixedOptions = ['coalicion', 'florangel', 'ucv', 'networking', 'otros'].map(function (key) {
+    // "otros" ya no se ofrece para eventos nuevos, pero si se está editando
+    // uno viejo con esa fuente hay que conservar la opción para no perderla.
+    const editingSource = state.editingEvent && state.editingEvent.source;
+    const fixedKeys = REAL_ORGS.concat(editingSource === 'otros' ? ['otros'] : []);
+    const fixedOptions = fixedKeys.map(function (key) {
       return '<option value="' + key + '">' + FIXED_SOURCE_EMOJI[key] + ' ' + safe(SOURCE_LABELS[key]) + '</option>';
     });
     const customOptions = state.customCalendars.map(function (c) {
@@ -301,16 +373,27 @@
     if (current) dom.eventSourceSelect.value = current;
   }
 
+  function populateOrgSelect(currentOrg) {
+    const options = REAL_ORGS.map(function (key) {
+      return '<option value="' + key + '">' + FIXED_SOURCE_EMOJI[key] + ' ' + safe(SOURCE_LABELS[key]) + '</option>';
+    }).concat(state.customCalendars.map(function (c) {
+      return '<option value="' + safe(c.id) + '">🏷️ ' + safe(c.name) + '</option>';
+    }));
+    renderMarkup(dom.taskOrgSelect, options.join(''));
+    if (currentOrg) dom.taskOrgSelect.value = currentOrg;
+  }
+
   // ---------- Agregar evento (a la fuente elegida) ----------
 
   function openEventDialog(existing) {
     hideError(dom.eventError);
     dom.eventForm.reset();
+    state.editingEvent = existing || null;
     populateSourceSelect();
     dom.newCalendarField.hidden = true;
-    state.editingEvent = existing || null;
     dom.eventDialogTitle.textContent = existing ? 'Editar evento' : 'Agregar evento';
     dom.eventForm.elements.source.disabled = !!existing;
+    dom.eventDelete.hidden = !existing || existing.source === 'coalicion';
     if (existing) {
       dom.eventForm.elements.source.value = existing.source;
       dom.eventForm.elements.title.value = existing.title || '';
@@ -370,6 +453,42 @@
     renderCalendar();
   }
 
+  async function deleteEditingEvent() {
+    const existing = state.editingEvent;
+    if (!existing || existing.source === 'coalicion') return;
+    const submitBtn = dom.eventForm.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    let ok = false;
+    if (existing.source === 'florangel') ok = await deleteFromArrayKey('florangel_board_state', 'florangel-events-v1', existing.rawId);
+    else if (existing.source === 'ucv') ok = await deleteUcvEvent(existing);
+    else if (existing.source === 'networking') ok = await deleteFromArrayKey('ingenia_board_state', 'ingenia-networking-events-v1', existing.rawId);
+    else if (existing.source === 'otros') ok = await deleteFromArrayKey('ingenia_board_state', 'ingenia-otros-events-v1', existing.rawId);
+    else ok = await deleteFromArrayKey('ingenia_board_state', 'ingenia-custom-' + existing.source + '-events-v1', existing.rawId);
+    submitBtn.disabled = false;
+    if (!ok) { showError(dom.eventError, 'No se pudo eliminar — revisa tu conexión.'); return; }
+    closeEventDialog();
+    await loadAll();
+    renderCalendar();
+  }
+
+  async function deleteFromArrayKey(table, key, rawId) {
+    const current = await readBoardKey(table, key, []);
+    const next = current.filter(function (item) { return item.id !== rawId; });
+    return writeBoardKey(table, key, next);
+  }
+
+  async function deleteUcvEvent(existing) {
+    const current = await readBoardKey('ucv_board_state', 'ucv-journeys-v3', []);
+    const next = current
+      .map(function (j) {
+        if (j.id !== existing.rawId) return j;
+        const dates = (Array.isArray(j.dates) ? j.dates : []).filter(function (d) { return d !== existing.date; });
+        return Object.assign({}, j, { dates: dates });
+      })
+      .filter(function (j) { return j.id !== existing.rawId || j.dates.length > 0; });
+    return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
+  }
+
   // Registra un calendario/organización nuevo (nombre + color) antes de
   // guardar el primer evento que le pertenece.
   async function createCustomCalendar(name) {
@@ -386,6 +505,157 @@
   function slugify(text) {
     const clean = String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
     return clean || 'org';
+  }
+
+  // ---------- Tareas de Equipo (kanban por estado, etiquetadas por organización) ----------
+
+  function renderTasksBoard() {
+    renderMarkup(dom.tasksBoard, TASK_STATUSES.map(function (status) {
+      const items = state.tasks.filter(function (t) { return (t.status || 'pendiente') === status.key; });
+      return '<div class="kanban-column" data-status="' + status.key + '">' +
+        '<div class="kanban-column-head"><h3>' + safe(status.label) + '</h3><span class="kanban-count">' + items.length + '</span></div>' +
+        (items.length ? items.map(renderTaskCard).join('') : '<div class="kanban-empty">Sin tareas</div>') +
+      '</div>';
+    }).join(''));
+
+    dom.tasksBoard.querySelectorAll('.kanban-card').forEach(function (card) {
+      card.addEventListener('dragstart', function () { state.dragTaskId = card.dataset.id; card.classList.add('dragging'); });
+      card.addEventListener('dragend', function () { card.classList.remove('dragging'); });
+    });
+    dom.tasksBoard.querySelectorAll('.kanban-column').forEach(function (column) {
+      column.addEventListener('dragover', function (e) { e.preventDefault(); column.classList.add('drag-over'); });
+      column.addEventListener('dragleave', function () { column.classList.remove('drag-over'); });
+      column.addEventListener('drop', function (e) {
+        e.preventDefault();
+        column.classList.remove('drag-over');
+        if (state.dragTaskId) moveTaskStatus(state.dragTaskId, column.dataset.status);
+        state.dragTaskId = null;
+      });
+    });
+  }
+
+  function renderTaskCard(task) {
+    const statusIndex = TASK_STATUSES.findIndex(function (s) { return s.key === (task.status || 'pendiente'); });
+    const status = TASK_STATUSES[statusIndex] || TASK_STATUSES[0];
+    const info = sourceInfo(task.org);
+    const moveButtons = [];
+    if (statusIndex > 0) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task-status" data-id="' + safe(task.id) + '" data-status="' + TASK_STATUSES[statusIndex - 1].key + '" onclick="window.ingeniaAction(event)">← ' + safe(TASK_STATUSES[statusIndex - 1].label) + '</button>');
+    if (statusIndex < TASK_STATUSES.length - 1) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task-status" data-id="' + safe(task.id) + '" data-status="' + TASK_STATUSES[statusIndex + 1].key + '" onclick="window.ingeniaAction(event)">' + safe(TASK_STATUSES[statusIndex + 1].label) + ' →</button>');
+    return '<article class="kanban-card" draggable="true" data-id="' + safe(task.id) + '" style="--status-color:' + safe(status.color) + '">' +
+      '<button type="button" style="all:unset;cursor:pointer" data-task-id="' + safe(task.id) + '" onclick="window.ingeniaAction(event)">' +
+        '<span class="org-tag" style="--source-color:' + safe(info.color) + '">' + safe(info.label) + '</span>' +
+        '<p class="kanban-card-title">' + safe(task.title) + '</p>' +
+        (task.notes ? '<p class="kanban-card-notes">' + safe(task.notes) + '</p>' : '') +
+      '</button>' +
+      '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' +
+    '</article>';
+  }
+
+  async function moveTaskStatus(id, status) {
+    const task = findById(state.tasks, id);
+    if (!task || task.status === status) return;
+    const previous = task.status;
+    task.status = status;
+    renderTasksBoard();
+    const ok = await writeBoardKey('ingenia_board_state', TEAM_TASKS_KEY, state.tasks);
+    if (!ok) { task.status = previous; renderTasksBoard(); toast('No se pudo actualizar el estado — revisa tu conexión.', 'error'); }
+  }
+
+  function openTaskDialog(existing) {
+    hideError(dom.taskError);
+    dom.taskForm.reset();
+    state.editingTask = existing || null;
+    populateOrgSelect(existing ? existing.org : null);
+    dom.taskDialogTitle.textContent = existing ? 'Editar tarea' : 'Agregar tarea';
+    dom.taskDelete.hidden = !existing;
+    if (existing) {
+      dom.taskForm.elements.title.value = existing.title || '';
+      dom.taskForm.elements.notes.value = existing.notes || '';
+      dom.taskForm.elements.status.value = existing.status || 'pendiente';
+    }
+    dom.taskDialog.showModal();
+    dom.taskForm.elements.title.focus();
+  }
+
+  function closeTaskDialog() { dom.taskDialog.close(); state.editingTask = null; }
+
+  async function onTaskSubmit(e) {
+    e.preventDefault();
+    hideError(dom.taskError);
+    const org = dom.taskForm.elements.org.value;
+    const title = dom.taskForm.elements.title.value.trim();
+    if (!org || !title) { showError(dom.taskError, 'Organización y título son obligatorios.'); return; }
+    const payload = {
+      id: state.editingTask ? state.editingTask.id : uid(),
+      org: org,
+      title: title,
+      notes: dom.taskForm.elements.notes.value.trim(),
+      status: dom.taskForm.elements.status.value,
+      created_at: state.editingTask ? state.editingTask.created_at : new Date().toISOString()
+    };
+    const next = state.editingTask
+      ? state.tasks.map(function (t) { return t.id === state.editingTask.id ? payload : t; })
+      : state.tasks.concat(payload);
+    const ok = await writeBoardKey('ingenia_board_state', TEAM_TASKS_KEY, next);
+    if (!ok) { showError(dom.taskError, 'No se pudo guardar — revisa tu conexión.'); return; }
+    state.tasks = next;
+    renderTasksBoard();
+    closeTaskDialog();
+    toast('Tarea guardada.', 'success');
+  }
+
+  async function deleteEditingTask() {
+    if (!state.editingTask) return;
+    const next = state.tasks.filter(function (t) { return t.id !== state.editingTask.id; });
+    const ok = await writeBoardKey('ingenia_board_state', TEAM_TASKS_KEY, next);
+    if (!ok) { toast('No se pudo eliminar — revisa tu conexión.', 'error'); return; }
+    state.tasks = next;
+    renderTasksBoard();
+    closeTaskDialog();
+    toast('Tarea eliminada.', 'success');
+  }
+
+  // ---------- Organizaciones ----------
+
+  function renderOrganizations() {
+    const fixedCards = REAL_ORGS.map(function (key) {
+      return orgCardHtml(FIXED_SOURCE_EMOJI[key], SOURCE_LABELS[key], FIXED_SOURCE_COLOR[key], ORG_LINKS[key]);
+    });
+    const customCards = state.customCalendars.map(function (c) {
+      return orgCardHtml('🏷️', c.name, c.color, null);
+    });
+    renderMarkup(dom.organizationsGrid, fixedCards.concat(customCards).join(''));
+  }
+
+  function orgCardHtml(emoji, name, color, link) {
+    return '<article class="org-card" style="--source-color:' + safe(color) + '">' +
+      '<h3>' + emoji + ' ' + safe(name) + '</h3>' +
+      (link
+        ? '<a class="btn btn-secondary" href="' + safe(link) + '" target="_blank" rel="noopener noreferrer">Abrir tablero ↗</a>'
+        : '<p class="org-card-note">Sin tablero propio — sus datos viven dentro de este dashboard.</p>') +
+    '</article>';
+  }
+
+  function openOrgDialog() {
+    hideError(dom.orgError);
+    dom.orgForm.reset();
+    dom.orgDialog.showModal();
+    dom.orgForm.elements.name.focus();
+  }
+
+  function closeOrgDialog() { dom.orgDialog.close(); }
+
+  async function onOrgSubmit(e) {
+    e.preventDefault();
+    hideError(dom.orgError);
+    const name = dom.orgForm.elements.name.value.trim();
+    if (!name) { showError(dom.orgError, 'El nombre es obligatorio.'); return; }
+    const created = await createCustomCalendar(name);
+    if (!created) { showError(dom.orgError, 'No se pudo guardar — revisa tu conexión.'); return; }
+    renderOrganizations();
+    populateSourceSelect();
+    closeOrgDialog();
+    toast('Organización agregada.', 'success');
   }
 
   async function saveCoalicionEvent(fields, existing) {

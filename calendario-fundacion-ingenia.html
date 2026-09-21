@@ -6,11 +6,13 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=2">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=3">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=2" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=3" defer></script>
 </head>
 <body>
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+
   <div id="app-shell" class="app-shell">
     <header class="app-header">
       <div class="header-copy">
@@ -18,16 +20,13 @@
         <h1>Networking Fundación Ingenia</h1>
         <p>Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.</p>
       </div>
-      <div class="quick-links">
-        <a href="./Directorio y Agenda Relaciones UCV.dc.html" target="_blank" rel="noopener noreferrer">🎓 Abrir tablero UCV ↗</a>
-        <a href="./evento-coalicion-venezuela.html" target="_blank" rel="noopener noreferrer">🤝 Abrir Coalición Venezuela ↗</a>
-        <a href="./dra-florangel.html" target="_blank" rel="noopener noreferrer">🩺 Abrir Dra Florangel ↗</a>
-        <a href="./lideres-comunidades.html" target="_blank" rel="noopener noreferrer">🧑‍🤝‍🧑 Abrir Líderes de Comunidades ↗</a>
-      </div>
     </header>
 
     <nav class="tab-nav" aria-label="Secciones">
       <button class="tab-button" type="button" data-view="calendar" aria-current="page" onclick="window.ingeniaAction(event)">🗓️ Calendario</button>
+      <button class="tab-button" type="button" data-view="tasks" onclick="window.ingeniaAction(event)">📋 Tareas de Equipo</button>
+      <button class="tab-button" type="button" data-view="organizations" onclick="window.ingeniaAction(event)">🏢 Organizaciones</button>
+      <button class="tab-button" type="button" data-view="leaders" onclick="window.ingeniaAction(event)">🧑‍🤝‍🧑 Líderes de Comunidades</button>
     </nav>
 
     <div id="connectivity-banner" class="notice notice-warning page-notice" role="status" hidden>
@@ -61,6 +60,42 @@
         </div>
         <div id="agenda-list" class="agenda-list"></div>
       </section>
+    </section>
+
+    <section id="tasks-view" class="view" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">📋 Seguimiento</p>
+          <h2>Tareas de Equipo</h2>
+          <p class="view-description">Tareas del equipo etiquetadas por organización.</p>
+        </div>
+        <button class="btn btn-primary" type="button" id="new-task-btn" onclick="window.ingeniaAction(event)">➕ Agregar tarea</button>
+      </div>
+      <div id="tasks-board" class="kanban-board"></div>
+    </section>
+
+    <section id="organizations-view" class="view" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">🏢 Directorio</p>
+          <h2>Organizaciones</h2>
+          <p class="view-description">Accesos directos a cada tablero, y las organizaciones creadas desde el calendario o las tareas.</p>
+        </div>
+        <button class="btn btn-primary" type="button" id="new-org-btn" onclick="window.ingeniaAction(event)">➕ Agregar organización</button>
+      </div>
+      <div id="organizations-grid" class="org-grid"></div>
+    </section>
+
+    <section id="leaders-view" class="view" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">🧑‍🤝‍🧑 Comunidades</p>
+          <h2>Líderes de Comunidades</h2>
+          <p class="view-description">Directorio y tablero operativo de líderes comunitarios.</p>
+        </div>
+        <a class="btn btn-secondary" href="./lideres-comunidades.html" target="_blank" rel="noopener noreferrer">↗ Abrir en pestaña nueva</a>
+      </div>
+      <iframe id="leaders-frame" class="embedded-frame panel" src="./lideres-comunidades.html" title="Líderes de Comunidades" loading="lazy"></iframe>
     </section>
   </div>
 
@@ -106,6 +141,71 @@
       </div>
       <div class="dialog-actions">
         <button id="event-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)">Cancelar</button>
+        <button id="event-delete" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)" hidden>🗑️ Eliminar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="task-dialog" class="editor-dialog" aria-labelledby="task-dialog-title">
+    <form id="task-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">📋 Tareas de Equipo</p>
+          <h2 id="task-dialog-title">Agregar tarea</h2>
+        </div>
+        <button id="task-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.ingeniaAction(event)">×</button>
+      </div>
+      <div id="task-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-fields">
+        <div class="field field-full">
+          <label for="field-task-org">Organización</label>
+          <select id="field-task-org" class="input" name="org" required></select>
+        </div>
+        <div class="field field-full">
+          <label for="field-task-title">Título</label>
+          <input id="field-task-title" class="input" name="title" type="text" required>
+        </div>
+        <div class="field field-full">
+          <label for="field-task-notes">Notas</label>
+          <textarea id="field-task-notes" class="input" name="notes"></textarea>
+        </div>
+        <div class="field field-full">
+          <label for="field-task-status">Estado</label>
+          <select id="field-task-status" class="input" name="status">
+            <option value="pendiente">Pendiente</option>
+            <option value="en_proceso">En proceso</option>
+            <option value="listo">Listo</option>
+            <option value="bloqueada">Bloqueada</option>
+          </select>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="task-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)">Cancelar</button>
+        <button id="task-delete" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)" hidden>🗑️ Eliminar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="org-dialog" class="editor-dialog" aria-labelledby="org-dialog-title">
+    <form id="org-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">🏢 Organizaciones</p>
+          <h2 id="org-dialog-title">Agregar organización</h2>
+        </div>
+        <button id="org-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.ingeniaAction(event)">×</button>
+      </div>
+      <div id="org-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-fields">
+        <div class="field field-full">
+          <label for="field-org-name">Nombre de la organización</label>
+          <input id="field-org-name" class="input" name="name" type="text" required placeholder="Ej. Alcaldía de Vargas">
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="org-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)">Cancelar</button>
         <button class="btn btn-primary" type="submit">Guardar</button>
       </div>
     </form>
