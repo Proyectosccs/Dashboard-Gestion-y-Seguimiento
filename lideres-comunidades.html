@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Contactos de líderes comunitarios agrupados por comunidad y tablero operativo de seguimiento.">
-  <title>Líderes de comunidades — Contactos y seguimiento</title>
+  <title>Líderes de Comunidades — Contactos y seguimiento</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
   <link rel="stylesheet" href="./lideres-comunidades.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
@@ -17,7 +17,7 @@
     <header class="app-header">
       <div class="header-copy">
         <p class="eyebrow">🧑‍🤝‍🧑 Comunidades · Fundación Ingenia</p>
-        <h1>Líderes de comunidades</h1>
+        <h1>Líderes de Comunidades</h1>
         <p>Contactos por comunidad y seguimiento operativo.</p>
       </div>
       <div class="session-card">
@@ -48,6 +48,11 @@
           <p class="view-description">Cada líder se agrupa automáticamente bajo la comunidad que le asignes.</p>
         </div>
         <button class="btn btn-primary" type="button" data-action="new-contact" onclick="window.lideresAction(event)">➕ Agregar líder</button>
+      </div>
+      <div class="kpi-grid">
+        <article class="kpi-card kpi-primary"><strong id="kpi-identified">0</strong><span>🔍 Identificados</span></article>
+        <article class="kpi-card kpi-good"><strong id="kpi-contacted">0</strong><span>📞 Contactados</span></article>
+        <article class="kpi-card kpi-warning"><strong id="kpi-pending">0</strong><span>○ Pendientes por contactar</span></article>
       </div>
       <div class="list-toolbar panel">
         <div class="search-field">

@@ -5,8 +5,8 @@
 -- igual patrón de RLS que florangel_board_state / ucv_board_state.
 -- "community" es texto libre (lo escribe quien carga el contacto) — el
 -- dashboard agrupa por ese valor, no hay un catálogo fijo de comunidades.
--- "status" sigue el mismo set de estados que el tablero de seguimiento UCV
--- (pending/contacted/following/waiting_response/executed/blocked).
+-- "status" solo admite dos valores: pending (pendiente por contactar) y
+-- contacted (ya contactado) — sin CHECK constraint, el front controla el set.
 -- Borrado siempre suave (archived_at) — nunca se eliminan filas.
 
 create table if not exists public.lideres_contacts (

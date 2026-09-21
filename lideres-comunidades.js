@@ -8,14 +8,10 @@
   const SUPABASE_KEY = 'sb_publishable_E-cV9DiNK9rctFCxzondvA_7OppBD7Y';
   const TABLE = 'lideres_contacts';
 
-  // Mismo set de estados que el tablero de seguimiento del directorio UCV.
+  // Solo dos estados de seguimiento: pendiente por contactar y ya contactado.
   const STATUSES = [
     { key: 'pending', label: 'Pendiente', emoji: '○', color: '#82796a' },
-    { key: 'contacted', label: 'Contactado', emoji: '📞', color: '#4a7fd4' },
-    { key: 'following', label: 'En seguimiento', emoji: '↻', color: '#2fa89b' },
-    { key: 'waiting_response', label: 'Esperando respuesta', emoji: '◷', color: '#c67139' },
-    { key: 'executed', label: 'Ejecutado', emoji: '✓', color: '#4f8f68' },
-    { key: 'blocked', label: 'Bloqueado', emoji: '⛔', color: '#a02525' }
+    { key: 'contacted', label: 'Contactado', emoji: '📞', color: '#4a7fd4' }
   ];
   const STATUS_MAP = {};
   STATUSES.forEach(function (s) { STATUS_MAP[s.key] = s; });
@@ -74,6 +70,9 @@
     dom.connectivityBanner = document.getElementById('connectivity-banner');
     dom.toastRegion = document.getElementById('toast-region');
     dom.contactsGroups = document.getElementById('contacts-groups');
+    dom.kpiIdentified = document.getElementById('kpi-identified');
+    dom.kpiContacted = document.getElementById('kpi-contacted');
+    dom.kpiPending = document.getElementById('kpi-pending');
     dom.statusBoard = document.getElementById('status-board');
     dom.contactSearch = document.getElementById('contact-search');
     dom.contactSearchClear = document.getElementById('contact-search-clear');
@@ -180,7 +179,16 @@
       .map(function (label) { return { label: label, items: groups.get(label) }; });
   }
 
+  function renderKpis() {
+    const contacted = state.contacts.filter(function (c) { return c.status === 'contacted'; }).length;
+    const pending = state.contacts.length - contacted;
+    dom.kpiIdentified.textContent = state.contacts.length;
+    dom.kpiContacted.textContent = contacted;
+    dom.kpiPending.textContent = pending;
+  }
+
   function renderContacts() {
+    renderKpis();
     const query = normalize(state.query);
     const filtered = state.contacts.filter(function (contact) { return matchesQuery(contact, query); });
     dom.contactResultCount.textContent = filtered.length + ' de ' + state.contacts.length + ' líderes';
