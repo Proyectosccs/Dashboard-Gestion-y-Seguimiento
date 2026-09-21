@@ -10,10 +10,22 @@
   const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   const SOURCE_LABELS = { coalicion: 'Coalición Venezuela', florangel: 'Dra Florangel', ucv: 'UCV', networking: 'Networking Fund. Ingenia', otros: 'Otros' };
+  const FIXED_SOURCE_COLOR = { coalicion: '#1d4ed8', florangel: '#be185d', ucv: '#0f766e', networking: '#7c3aed', otros: '#57534e' };
+  const FIXED_SOURCE_EMOJI = { coalicion: '🤝', florangel: '🩺', ucv: '🎓', networking: '🌐', otros: '📌' };
+
+  // Calendarios creados al vuelo desde "Otra organización o calendario":
+  // el registro (nombre + color) vive en ingenia_board_state bajo esta
+  // clave; cada uno guarda sus eventos en su propia clave
+  // 'ingenia-custom-<id>-events-v1', mismo patrón que networking/otros.
+  const CUSTOM_CALENDARS_KEY = 'ingenia-custom-calendars-v1';
+  const CUSTOM_PALETTE = ['#7c3aed', '#be185d', '#0f766e', '#c67139', '#1d4ed8', '#15803d', '#a16207', '#4338ca', '#b91c1c', '#0e7490'];
+  const NEW_CALENDAR_VALUE = '__new__';
 
   const state = {
     client: null,
+    view: 'calendar',
     events: [],
+    customCalendars: [],
     calendarMonth: new Date().toISOString().slice(0, 7),
     selectedDay: new Date().toISOString().slice(0, 10),
     editingEvent: null
@@ -25,6 +37,7 @@
     event.stopPropagation();
     const target = event.currentTarget;
     if (!target) return;
+    if (target.dataset.view) return setView(target.dataset.view);
     const actionsById = {
       'retry-load': loadAll,
       'calendar-prev': function () { changeMonth(-1); },
@@ -57,10 +70,37 @@
     return list.find(function (item) { return item.id === id; }) || null;
   }
 
+  function findCustomCalendar(id) {
+    return state.customCalendars.find(function (c) { return c.id === id; }) || null;
+  }
+
+  // Info de color/etiqueta para cualquier fuente, fija o creada al vuelo.
+  function sourceInfo(key) {
+    if (SOURCE_LABELS[key]) return { label: SOURCE_LABELS[key], color: FIXED_SOURCE_COLOR[key], fixed: true };
+    const custom = findCustomCalendar(key);
+    if (custom) return { label: custom.name, color: custom.color, fixed: false };
+    return { label: 'Otros', color: FIXED_SOURCE_COLOR.otros, fixed: true };
+  }
+
+  function sourceDotHtml(key) {
+    const info = sourceInfo(key);
+    return info.fixed
+      ? '<span class="source-dot src-' + key + '"></span>'
+      : '<span class="source-dot src-dynamic" style="--source-color:' + safe(info.color) + '"></span>';
+  }
+
+  function sourceClassStyle(key) {
+    const info = sourceInfo(key);
+    return info.fixed
+      ? { cls: 'src-' + key, style: '' }
+      : { cls: 'src-dynamic', style: 'style="--source-color:' + safe(info.color) + '"' };
+  }
+
   function init() {
     cacheDom();
     dom.eventForm.addEventListener('submit', onEventSubmit);
     dom.eventDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeEventDialog(); });
+    dom.eventSourceSelect.addEventListener('change', onSourceChange);
     if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) return showConnectionFailure();
     state.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     loadAll();
@@ -70,6 +110,7 @@
     dom.loadingState = document.getElementById('loading-state');
     dom.connectivityBanner = document.getElementById('connectivity-banner');
     dom.calendarView = document.getElementById('calendar-view');
+    dom.sourceLegend = document.getElementById('source-legend');
     dom.calendarMonthLabel = document.getElementById('calendar-month-label');
     dom.calendarGrid = document.getElementById('calendar-grid');
     dom.agendaTitle = document.getElementById('agenda-title');
@@ -78,11 +119,30 @@
     dom.eventDialogTitle = document.getElementById('event-dialog-title');
     dom.eventForm = document.getElementById('event-form');
     dom.eventError = document.getElementById('event-error');
+    dom.eventSourceSelect = document.getElementById('field-event-source');
+    dom.newCalendarField = document.getElementById('new-calendar-field');
+  }
+
+  function setView(viewName) {
+    state.view = viewName;
+    document.querySelectorAll('.tab-button').forEach(function (button) {
+      if (button.dataset.view === viewName) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
+    });
+    document.querySelectorAll('.view').forEach(function (view) { view.hidden = true; });
+    const active = document.getElementById(viewName + '-view');
+    if (active) active.hidden = false;
   }
 
   function showConnectionFailure() {
     dom.loadingState.hidden = true;
     dom.connectivityBanner.hidden = false;
+  }
+
+  function onSourceChange() {
+    const isNew = dom.eventSourceSelect.value === NEW_CALENDAR_VALUE;
+    dom.newCalendarField.hidden = !isNew;
+    if (isNew) dom.eventForm.elements.new_calendar_name.focus();
   }
 
   async function loadAll() {
@@ -93,7 +153,7 @@
       state.client.from('coalicion_events').select('id,title,event_date,start_time,location,maps_url,notes,status').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
-      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1'])
+      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', CUSTOM_CALENDARS_KEY])
     ]);
 
     const anyFailed = coalicionRes.error && florangelRes.error && ucvRes.error && ingeniaRes.error;
@@ -102,6 +162,24 @@
       return;
     }
     if (coalicionRes.error || florangelRes.error || ucvRes.error) dom.connectivityBanner.hidden = false;
+
+    const ingeniaRowsEarly = ingeniaRes.data || [];
+    const registryRaw = ingeniaRowsEarly.find(function (r) { return r.key === CUSTOM_CALENDARS_KEY; });
+    state.customCalendars = Array.isArray(registryRaw && registryRaw.value) ? registryRaw.value : [];
+
+    let customEvents = [];
+    if (state.customCalendars.length) {
+      const customKeys = state.customCalendars.map(function (c) { return 'ingenia-custom-' + c.id + '-events-v1'; });
+      const customRes = await state.client.from('ingenia_board_state').select('key,value').in('key', customKeys);
+      const customRows = customRes.data || [];
+      state.customCalendars.forEach(function (c) {
+        const row = customRows.find(function (r) { return r.key === 'ingenia-custom-' + c.id + '-events-v1'; });
+        const items = Array.isArray(row && row.value) ? row.value : [];
+        items.forEach(function (e) {
+          customEvents.push({ id: c.id + '-' + e.id, rawId: e.id, source: c.id, title: e.title, date: e.event_date, time: e.start_time, location: e.location, notes: e.notes || '', raw: e });
+        });
+      });
+    }
 
     const coalicionEvents = (coalicionRes.data || []).map(function (e) {
       return { id: 'coalicion-' + e.id, rawId: e.id, source: 'coalicion', title: e.title, date: e.event_date, time: e.start_time, location: e.location, notes: e.notes || '', raw: e };
@@ -120,9 +198,8 @@
       });
     });
 
-    const ingeniaRows = ingeniaRes.data || [];
-    const networkingRaw = ingeniaRows.find(function (r) { return r.key === 'ingenia-networking-events-v1'; });
-    const otrosRaw = ingeniaRows.find(function (r) { return r.key === 'ingenia-otros-events-v1'; });
+    const networkingRaw = ingeniaRowsEarly.find(function (r) { return r.key === 'ingenia-networking-events-v1'; });
+    const otrosRaw = ingeniaRowsEarly.find(function (r) { return r.key === 'ingenia-otros-events-v1'; });
     const networkingEvents = (Array.isArray(networkingRaw && networkingRaw.value) ? networkingRaw.value : []).map(function (e) {
       return { id: 'networking-' + e.id, rawId: e.id, source: 'networking', title: e.title, date: e.event_date, time: e.start_time, location: e.location, notes: e.notes || '', raw: e };
     });
@@ -130,9 +207,11 @@
       return { id: 'otros-' + e.id, rawId: e.id, source: 'otros', title: e.title, date: e.event_date, time: e.start_time, location: e.location, notes: e.notes || '', raw: e };
     });
 
-    state.events = coalicionEvents.concat(florangelEvents, ucvEvents, networkingEvents, otrosEvents).filter(function (e) { return !!e.date; });
+    state.events = coalicionEvents.concat(florangelEvents, ucvEvents, networkingEvents, otrosEvents, customEvents).filter(function (e) { return !!e.date; });
     dom.loadingState.hidden = true;
-    dom.calendarView.hidden = false;
+    renderLegend();
+    populateSourceSelect();
+    setView(state.view);
     renderCalendar();
   }
 
@@ -166,7 +245,8 @@
       markup += '<button type="button" class="calendar-day' + (iso === today ? ' is-today' : '') + (isSelected ? ' is-selected' : '') + '" data-day="' + iso + '" onclick="window.ingeniaAction(event)" style="' + (isSelected ? 'outline:2px solid var(--color-accent);outline-offset:-2px;' : '') + 'text-align:left;font:inherit;cursor:pointer">' +
         '<span class="calendar-number">' + day + '</span>' +
         dayEvents.slice(0, 3).map(function (e) {
-          return '<span class="calendar-event src-' + e.source + '" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)">' + safe(e.title) + '</span>';
+          const cs = sourceClassStyle(e.source);
+          return '<span class="calendar-event ' + cs.cls + '" ' + cs.style + ' data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)">' + safe(e.title) + '</span>';
         }).join('') +
         (dayEvents.length > 3 ? '<span class="calendar-event">+' + (dayEvents.length - 3) + ' más</span>' : '') +
       '</button>';
@@ -185,15 +265,40 @@
     }
     renderMarkup(dom.agendaList, dayEvents.map(function (e) {
       const timeLabel = e.time ? formatTime(e.time) : (e.timeText || 'Hora por confirmar');
+      const info = sourceInfo(e.source);
+      const cs = sourceClassStyle(e.source);
       return '<button type="button" class="agenda-row" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
-        '<span class="source-dot src-' + e.source + '"></span>' +
+        sourceDotHtml(e.source) +
         '<div>' +
           '<p class="agenda-row-title">' + safe(e.title) + '</p>' +
           '<p class="agenda-row-meta">◷ ' + safe(timeLabel) + (e.location ? ' · ⌖ ' + safe(e.location) : '') + '</p>' +
-          '<span class="agenda-row-source src-' + e.source + '">' + safe(SOURCE_LABELS[e.source]) + '</span>' +
+          '<span class="agenda-row-source ' + cs.cls + '" ' + cs.style + '>' + safe(info.label) + '</span>' +
         '</div>' +
       '</button>';
     }).join(''));
+  }
+
+  function renderLegend() {
+    const fixedKeys = ['coalicion', 'florangel', 'ucv', 'networking', 'otros'];
+    const items = fixedKeys.map(function (key) {
+      return '<span class="source-legend-item">' + sourceDotHtml(key) + safe(SOURCE_LABELS[key]) + '</span>';
+    }).concat(state.customCalendars.map(function (c) {
+      return '<span class="source-legend-item">' + sourceDotHtml(c.id) + safe(c.name) + '</span>';
+    }));
+    renderMarkup(dom.sourceLegend, items.join(''));
+  }
+
+  function populateSourceSelect() {
+    const current = dom.eventSourceSelect.value;
+    const fixedOptions = ['coalicion', 'florangel', 'ucv', 'networking', 'otros'].map(function (key) {
+      return '<option value="' + key + '">' + FIXED_SOURCE_EMOJI[key] + ' ' + safe(SOURCE_LABELS[key]) + '</option>';
+    });
+    const customOptions = state.customCalendars.map(function (c) {
+      return '<option value="' + safe(c.id) + '">🏷️ ' + safe(c.name) + '</option>';
+    });
+    const newOption = '<option value="' + NEW_CALENDAR_VALUE + '">➕ Otra organización o calendario (crear nueva)</option>';
+    renderMarkup(dom.eventSourceSelect, fixedOptions.concat(customOptions, newOption).join(''));
+    if (current) dom.eventSourceSelect.value = current;
   }
 
   // ---------- Agregar evento (a la fuente elegida) ----------
@@ -201,6 +306,8 @@
   function openEventDialog(existing) {
     hideError(dom.eventError);
     dom.eventForm.reset();
+    populateSourceSelect();
+    dom.newCalendarField.hidden = true;
     state.editingEvent = existing || null;
     dom.eventDialogTitle.textContent = existing ? 'Editar evento' : 'Agregar evento';
     dom.eventForm.elements.source.disabled = !!existing;
@@ -223,7 +330,7 @@
   async function onEventSubmit(e) {
     e.preventDefault();
     hideError(dom.eventError);
-    const source = dom.eventForm.elements.source.value;
+    let source = dom.eventForm.elements.source.value;
     const title = dom.eventForm.elements.title.value.trim();
     const eventDate = dom.eventForm.elements.event_date.value;
     const startTime = dom.eventForm.elements.start_time.value;
@@ -232,16 +339,28 @@
     if (!title || !eventDate) { showError(dom.eventError, 'Título y fecha son obligatorios.'); return; }
     if (source === 'coalicion' && !location) { showError(dom.eventError, 'Coalición Venezuela necesita una ubicación (o edítalo luego para agregar el link de Maps).'); return; }
 
+    let newCalendarName = '';
+    if (source === NEW_CALENDAR_VALUE) {
+      newCalendarName = dom.eventForm.elements.new_calendar_name.value.trim();
+      if (!newCalendarName) { showError(dom.eventError, 'Escribe el nombre del nuevo calendario u organización.'); return; }
+    }
+
     const submitBtn = dom.eventForm.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     let ok = false;
     const fields = { title: title, event_date: eventDate, start_time: startTime, location: location, notes: notes };
     const existing = state.editingEvent;
-    if (source === 'coalicion') ok = await saveCoalicionEvent(fields, existing);
+
+    if (source === NEW_CALENDAR_VALUE) {
+      const created = await createCustomCalendar(newCalendarName);
+      if (created) { source = created.id; ok = await saveIngeniaEvent('ingenia-custom-' + created.id + '-events-v1', fields, null); }
+    }
+    else if (source === 'coalicion') ok = await saveCoalicionEvent(fields, existing);
     else if (source === 'florangel') ok = await saveFlorangelEvent(fields, existing);
     else if (source === 'ucv') ok = await saveUcvEvent(fields, existing);
     else if (source === 'networking') ok = await saveIngeniaEvent('ingenia-networking-events-v1', fields, existing);
     else if (source === 'otros') ok = await saveIngeniaEvent('ingenia-otros-events-v1', fields, existing);
+    else ok = await saveIngeniaEvent('ingenia-custom-' + source + '-events-v1', fields, existing);
     submitBtn.disabled = false;
 
     if (!ok) { showError(dom.eventError, 'No se pudo guardar — revisa tu conexión e intenta de nuevo.'); return; }
@@ -249,6 +368,24 @@
     await loadAll();
     state.selectedDay = eventDate;
     renderCalendar();
+  }
+
+  // Registra un calendario/organización nuevo (nombre + color) antes de
+  // guardar el primer evento que le pertenece.
+  async function createCustomCalendar(name) {
+    const id = slugify(name) + '-' + Date.now().toString(36).slice(-4);
+    const color = CUSTOM_PALETTE[state.customCalendars.length % CUSTOM_PALETTE.length];
+    const entry = { id: id, name: name, color: color, created_at: new Date().toISOString() };
+    const next = state.customCalendars.concat(entry);
+    const okWrite = await writeBoardKey('ingenia_board_state', CUSTOM_CALENDARS_KEY, next);
+    if (!okWrite) return null;
+    state.customCalendars = next;
+    return entry;
+  }
+
+  function slugify(text) {
+    const clean = String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
+    return clean || 'org';
   }
 
   async function saveCoalicionEvent(fields, existing) {

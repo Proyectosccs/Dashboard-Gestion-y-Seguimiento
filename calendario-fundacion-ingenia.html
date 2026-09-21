@@ -3,20 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Calendario Fundación Ingenia — une los eventos de Coalición Venezuela, Dra Florangel y UCV en una sola vista.">
-  <title>Calendario Fundación Ingenia</title>
+  <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
+  <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=2">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=2" defer></script>
 </head>
 <body>
   <div id="app-shell" class="app-shell">
     <header class="app-header">
       <div class="header-copy">
         <p class="eyebrow">💡 Fundación Ingenia</p>
-        <h1>Calendario Fundación Ingenia</h1>
-        <p>Une en una sola vista los eventos de Coalición Venezuela, Dra Florangel y el directorio UCV. Es de solo lectura — para editar un evento, hazlo desde su tablero de origen.</p>
+        <h1>Networking Fundación Ingenia</h1>
+        <p>Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.</p>
       </div>
       <div class="quick-links">
         <a href="./Directorio y Agenda Relaciones UCV.dc.html" target="_blank" rel="noopener noreferrer">🎓 Abrir tablero UCV ↗</a>
@@ -26,24 +26,22 @@
       </div>
     </header>
 
+    <nav class="tab-nav" aria-label="Secciones">
+      <button class="tab-button" type="button" data-view="calendar" aria-current="page" onclick="window.ingeniaAction(event)">🗓️ Calendario</button>
+    </nav>
+
     <div id="connectivity-banner" class="notice notice-warning page-notice" role="status" hidden>
       No pudimos traer alguno de los calendarios. Conservamos lo que sí cargó. <button id="retry-load" type="button" onclick="window.ingeniaAction(event)">Reintentar</button>
     </div>
 
     <section id="loading-state" class="loading-state" aria-live="polite">
       <span class="loader" aria-hidden="true"></span>
-      <p>Cargando los tres calendarios…</p>
+      <p>Cargando los calendarios…</p>
     </section>
 
     <section id="calendar-view" class="view" hidden>
       <div class="view-heading">
-        <div class="source-legend" style="margin: 0">
-          <span class="source-legend-item"><span class="source-dot src-coalicion"></span>Coalición Venezuela</span>
-          <span class="source-legend-item"><span class="source-dot src-florangel"></span>Dra Florangel</span>
-          <span class="source-legend-item"><span class="source-dot src-ucv"></span>UCV</span>
-          <span class="source-legend-item"><span class="source-dot src-networking"></span>Networking Fund. Ingenia</span>
-          <span class="source-legend-item"><span class="source-dot src-otros"></span>Otros</span>
-        </div>
+        <div id="source-legend" class="source-legend" style="margin: 0"></div>
         <button class="btn btn-primary" type="button" id="new-event-btn" onclick="window.ingeniaAction(event)">➕ Agregar evento</button>
       </div>
       <div class="calendar-toolbar panel">
@@ -79,13 +77,11 @@
       <div class="dialog-fields">
         <div class="field field-full">
           <label for="field-event-source">¿A cuál calendario pertenece?</label>
-          <select id="field-event-source" class="input" name="source" required>
-            <option value="coalicion">🤝 Coalición Venezuela</option>
-            <option value="florangel">🩺 Dra Florangel</option>
-            <option value="ucv">🎓 UCV</option>
-            <option value="networking">🌐 Networking Fund. Ingenia</option>
-            <option value="otros">📌 Otros</option>
-          </select>
+          <select id="field-event-source" class="input" name="source" required></select>
+        </div>
+        <div class="field field-full" id="new-calendar-field" hidden>
+          <label for="field-new-calendar-name">Nombre del nuevo calendario u organización</label>
+          <input id="field-new-calendar-name" class="input" name="new_calendar_name" type="text" placeholder="Ej. Alcaldía de Vargas">
         </div>
         <div class="field field-full">
           <label for="field-event-title">Título</label>

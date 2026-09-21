@@ -390,6 +390,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .calendar-event.src-coalicion:hover, .calendar-event.src-florangel:hover, .calendar-event.src-ucv:hover,
 .calendar-event.src-networking:hover, .calendar-event.src-otros:hover { filter: brightness(.95); }
 
+/* Fuentes creadas al vuelo ("Otra organización o calendario"): el color lo
+   fija el JS por variable inline, ya que no hay una clase CSS fija posible
+   para un nombre arbitrario que el equipo escribe en el momento. */
+.source-dot.src-dynamic { background: var(--source-color, var(--color-neutral-500)); }
+.calendar-event.src-dynamic { background: color-mix(in srgb, var(--source-color, var(--color-neutral-500)) 18%, white); color: color-mix(in srgb, var(--source-color, var(--color-neutral-500)) 82%, #1c1c1c); }
+.calendar-event.src-dynamic:hover { filter: brightness(.95); }
+.agenda-row-source.src-dynamic { background: color-mix(in srgb, var(--source-color, var(--color-neutral-500)) 18%, white); color: color-mix(in srgb, var(--source-color, var(--color-neutral-500)) 82%, #1c1c1c); }
+
 .agenda-list { display: flex; flex-direction: column; gap: 8px; }
 .agenda-row { width: 100%; box-sizing: border-box; display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--color-neutral-300); background: #fff; }
 .agenda-row:hover { border-color: var(--color-accent-400); background: var(--color-neutral-100); }
