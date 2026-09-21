@@ -26,6 +26,8 @@
     view: 'contacts',
     contacts: [],
     query: '',
+    communityFilter: '',
+    statusFilter: '',
     editor: null,
     dragId: null
   };
@@ -42,6 +44,7 @@
     const actionsById = {
       'retry-load': function () { loadContacts(false); },
       'contact-search-clear': clearSearch,
+      'filters-clear': clearFilters,
       'contact-dialog-close': closeContactDialog,
       'contact-dialog-cancel': closeContactDialog,
       'contact-archive': archiveEditingContact
@@ -84,6 +87,8 @@
     dom.contactArchive = document.getElementById('contact-archive');
     dom.communitySuggestions = document.getElementById('community-suggestions');
     dom.statusSelect = document.getElementById('field-contact-status');
+    dom.communityFilter = document.getElementById('community-filter');
+    dom.statusFilter = document.getElementById('status-filter');
   }
 
   function bindStaticEvents() {
@@ -93,12 +98,33 @@
       state.query = dom.contactSearch.value;
       renderContacts();
     });
+    dom.communityFilter.addEventListener('change', function () {
+      state.communityFilter = dom.communityFilter.value;
+      renderContacts();
+    });
+    dom.statusFilter.addEventListener('change', function () {
+      state.statusFilter = dom.statusFilter.value;
+      renderContacts();
+    });
   }
 
   function populateStatusSelect() {
     renderMarkup(dom.statusSelect, STATUSES.map(function (s) {
       return '<option value="' + safe(s.key) + '">' + safe(s.emoji + ' ' + s.label) + '</option>';
     }).join(''));
+    renderMarkup(dom.statusFilter, ['<option value="">Todos los estados</option>'].concat(STATUSES.map(function (s) {
+      return '<option value="' + safe(s.key) + '">' + safe(s.emoji + ' ' + s.label) + '</option>';
+    })).join(''));
+  }
+
+  function populateCommunityFilter() {
+    const communities = Array.from(new Set(state.contacts.map(function (c) { return communityLabel(c.community); }))).sort(function (a, b) { return a.localeCompare(b, 'es'); });
+    const current = dom.communityFilter.value;
+    renderMarkup(dom.communityFilter, ['<option value="">Todas las comunidades</option>'].concat(communities.map(function (c) {
+      return '<option value="' + safe(c) + '">' + safe(c) + '</option>';
+    })).join(''));
+    dom.communityFilter.value = communities.indexOf(current) !== -1 ? current : '';
+    state.communityFilter = dom.communityFilter.value;
   }
 
   function showConnectionFailure() {
@@ -130,6 +156,7 @@
     }
     state.contacts = res.data || [];
     dom.loadingState.hidden = true;
+    populateCommunityFilter();
     renderContacts();
     renderStatusBoard();
     setView(state.view);
@@ -144,9 +171,11 @@
 
   // ---------- Contactos agrupados por comunidad ----------
 
-  function matchesQuery(contact, query) {
-    if (!query) return true;
-    return normalize([contact.name, contact.role, contact.community].join(' ')).includes(query);
+  function matchesFilters(contact, query) {
+    if (query && !normalize([contact.name, contact.role, contact.community].join(' ')).includes(query)) return false;
+    if (state.communityFilter && communityLabel(contact.community) !== state.communityFilter) return false;
+    if (state.statusFilter && (contact.status || 'pending') !== state.statusFilter) return false;
+    return true;
   }
 
   function communityLabel(value) {
@@ -190,18 +219,18 @@
   function renderContacts() {
     renderKpis();
     const query = normalize(state.query);
-    const filtered = state.contacts.filter(function (contact) { return matchesQuery(contact, query); });
+    const filtered = state.contacts.filter(function (contact) { return matchesFilters(contact, query); });
     dom.contactResultCount.textContent = filtered.length + ' de ' + state.contacts.length + ' líderes';
     dom.contactSearchClear.hidden = !state.query;
 
     if (!filtered.length) {
       renderMarkup(dom.contactsGroups, emptyState(
         state.contacts.length ? '🔎 Sin coincidencias' : '🧑‍🤝‍🧑 Directorio vacío',
-        state.contacts.length ? 'Prueba otra búsqueda o limpia el filtro.' : 'Agrega los líderes comunitarios y su comunidad.',
-        state.contacts.length ? '<button class="btn btn-secondary" type="button" id="empty-clear-search">Limpiar búsqueda</button>' : ''
+        state.contacts.length ? 'Prueba otra búsqueda o limpia los filtros.' : 'Agrega los líderes comunitarios y su comunidad.',
+        state.contacts.length ? '<button class="btn btn-secondary" type="button" id="empty-clear-search">Limpiar filtros</button>' : ''
       ));
       const clear = document.getElementById('empty-clear-search');
-      if (clear) clear.addEventListener('click', clearSearch);
+      if (clear) clear.addEventListener('click', clearFilters);
       return;
     }
 
@@ -228,29 +257,36 @@
       ? '<a href="mailto:' + safe(contact.email) + '">' + safe(contact.email) + '</a>'
       : 'Por confirmar';
     return '<article class="contact-card" style="--affiliation-color:' + safe(color) + '">' +
-      '<div class="contact-card-header"><div class="contact-avatar" aria-hidden="true">' + safe(initials(contact.name)) + '</div><div><h3>' + safe(contact.name) + '</h3><div class="contact-role">' + safe(contact.role || 'Líder comunitario') + '</div></div></div>' +
-      '<div class="contact-chips">' +
-        '<span class="affiliation-chip">📍 ' + safe(communityLabel(contact.community)) + '</span>' +
-        '<span class="status-pill" style="--status-color:' + safe(status.color) + '">' + safe(status.emoji + ' ' + status.label) + '</span>' +
+      '<div class="contact-card-header">' +
+        '<div class="contact-avatar" aria-hidden="true">' + safe(initials(contact.name)) + '</div>' +
+        '<div class="contact-card-heading"><h3>' + safe(contact.name) + '</h3><div class="contact-community-line">📍 ' + safe(communityLabel(contact.community)) + '</div></div>' +
+        '<span class="role-chip">' + safe(contact.role || 'Líder comunitario') + '</span>' +
       '</div>' +
-      '<div class="contact-details">' +
-        detailRow('◉ Teléfono', phone) +
-        detailRow('✉ Correo', email) +
-        detailRow('↳ Notas', safe(contact.notes || 'Por confirmar')) +
+      '<div class="contact-simple-row">✉️ ' + email + '</div>' +
+      '<div class="contact-simple-row">📱 ' + phone + '</div>' +
+      '<div class="contact-status-box">' +
+        '<div>' + safe(status.emoji) + ' Estado: <strong>' + safe(status.label) + '</strong></div>' +
+        '<div>🗒️ Notas: ' + safe(contact.notes || 'Por confirmar') + '</div>' +
       '</div>' +
       '<div class="contact-card-actions">' +
-        '<button class="btn btn-secondary" type="button" data-action="edit-contact" data-id="' + safe(contact.id) + '" onclick="window.lideresAction(event)">Editar</button>' +
+        '<button class="btn btn-secondary" type="button" data-action="edit-contact" data-id="' + safe(contact.id) + '" onclick="window.lideresAction(event)">✏️ Editar</button>' +
       '</div>' +
     '</article>';
-  }
-
-  function detailRow(label, value) {
-    return '<div class="detail-row"><span class="detail-label">' + safe(label) + '</span><span class="detail-value">' + value + '</span></div>';
   }
 
   function clearSearch() {
     state.query = '';
     dom.contactSearch.value = '';
+    renderContacts();
+  }
+
+  function clearFilters() {
+    state.query = '';
+    state.communityFilter = '';
+    state.statusFilter = '';
+    dom.contactSearch.value = '';
+    dom.communityFilter.value = '';
+    dom.statusFilter.value = '';
     renderContacts();
   }
 
@@ -363,6 +399,7 @@
       state.contacts = state.contacts.concat(res.data);
       toast('Líder agregado.', 'success');
     }
+    populateCommunityFilter();
     renderContacts();
     renderStatusBoard();
     closeContactDialog();
@@ -374,6 +411,7 @@
     const res = await state.client.from(TABLE).update({ archived_at: new Date().toISOString() }).eq('id', id);
     if (res.error) { toast('No se pudo archivar — revisa tu conexión.', 'error'); return; }
     state.contacts = state.contacts.filter(function (c) { return c.id !== id; });
+    populateCommunityFilter();
     renderContacts();
     renderStatusBoard();
     closeContactDialog();

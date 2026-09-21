@@ -50,9 +50,9 @@
         <button class="btn btn-primary" type="button" data-action="new-contact" onclick="window.lideresAction(event)">➕ Agregar líder</button>
       </div>
       <div class="kpi-grid">
-        <article class="kpi-card kpi-primary"><strong id="kpi-identified">0</strong><span>🔍 Identificados</span></article>
-        <article class="kpi-card kpi-good"><strong id="kpi-contacted">0</strong><span>📞 Contactados</span></article>
-        <article class="kpi-card kpi-warning"><strong id="kpi-pending">0</strong><span>○ Pendientes por contactar</span></article>
+        <article class="kpi-card kpi-primary"><span class="kpi-icon" aria-hidden="true">🔍</span><strong id="kpi-identified">0</strong><span class="kpi-label">Identificados</span></article>
+        <article class="kpi-card kpi-good"><span class="kpi-icon" aria-hidden="true">📞</span><strong id="kpi-contacted">0</strong><span class="kpi-label">Contactados</span></article>
+        <article class="kpi-card kpi-warning"><span class="kpi-icon" aria-hidden="true">○</span><strong id="kpi-pending">0</strong><span class="kpi-label">Pendientes por contactar</span></article>
       </div>
       <div class="list-toolbar panel">
         <div class="search-field">
@@ -61,6 +61,11 @@
           <input id="contact-search" type="text" placeholder="Buscar por nombre, comunidad o rol…" autocomplete="off">
           <button id="contact-search-clear" class="search-clear" type="button" aria-label="Limpiar búsqueda" onclick="window.lideresAction(event)" hidden>×</button>
         </div>
+        <label class="sr-only" for="community-filter">Filtrar por comunidad</label>
+        <select id="community-filter" class="toolbar-select"><option value="">Todas las comunidades</option></select>
+        <label class="sr-only" for="status-filter">Filtrar por estado</label>
+        <select id="status-filter" class="toolbar-select"><option value="">Todos los estados</option></select>
+        <button id="filters-clear" class="link-button" type="button" onclick="window.lideresAction(event)">Limpiar</button>
         <p id="contact-result-count" class="result-count" aria-live="polite"></p>
       </div>
       <div id="contacts-groups"></div>
