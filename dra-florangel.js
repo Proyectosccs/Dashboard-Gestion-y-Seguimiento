@@ -10,10 +10,13 @@
   const TASKS_KEY = 'florangel-tasks-v1';
   const EVENTS_KEY = 'florangel-events-v1';
 
+  // Misma nomenclatura que Tareas de Equipo en Networking Fundación
+  // Ingenia — la columna sigue siendo "todo/doing/done" internamente,
+  // solo cambia la etiqueta visible.
   const STAGES = [
-    { key: 'todo', label: 'Por hacer' },
-    { key: 'doing', label: 'En progreso' },
-    { key: 'done', label: 'Hecho' }
+    { key: 'todo', label: 'Pendiente (Por hacer)', short: 'Pendiente', color: '#a15a7c' },
+    { key: 'doing', label: 'En proceso (En progreso)', short: 'En proceso', color: '#7c3aed' },
+    { key: 'done', label: 'Listo (Hecho)', short: 'Listo', color: '#0f7a3d' }
   ];
   const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -75,6 +78,7 @@
     dom.connectivityBanner = document.getElementById('connectivity-banner');
     dom.toastRegion = document.getElementById('toast-region');
     dom.kanbanBoard = document.getElementById('kanban-board');
+    dom.tasksKpiGrid = document.getElementById('tasks-kpi-grid');
     dom.calendarMonthLabel = document.getElementById('calendar-month-label');
     dom.calendarGrid = document.getElementById('calendar-grid');
     dom.taskDialog = document.getElementById('task-dialog');
@@ -170,7 +174,22 @@
 
   // ---------- Tareas (kanban) ----------
 
+  function renderKpis() {
+    const cards = [
+      { icon: '🧩', value: state.tasks.length, label: 'Tareas operativas', cls: 'kpi-primary' }
+    ].concat(STAGES.map(function (stage, idx) {
+      const count = state.tasks.filter(function (t) { return t.stage === stage.key; }).length;
+      const icons = ['○', '↻', '✓'];
+      const classes = ['kpi-neutral', 'kpi-sky', 'kpi-good'];
+      return { icon: icons[idx], value: count, label: stage.label, cls: classes[idx] };
+    }));
+    renderMarkup(dom.tasksKpiGrid, cards.map(function (c) {
+      return '<article class="kpi-card ' + c.cls + '"><span class="kpi-icon" aria-hidden="true">' + c.icon + '</span><strong>' + c.value + '</strong><span class="kpi-label">' + safe(c.label) + '</span></article>';
+    }).join(''));
+  }
+
   function renderKanban() {
+    renderKpis();
     renderMarkup(dom.kanbanBoard, STAGES.map(function (stage) {
       const items = state.tasks.filter(function (t) { return t.stage === stage.key; });
       return '<div class="kanban-column" data-stage="' + stage.key + '">' +
@@ -201,8 +220,8 @@
   function renderTaskCard(task) {
     const stageIndex = STAGES.findIndex(function (s) { return s.key === task.stage; });
     const moveButtons = [];
-    if (stageIndex > 0) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task" data-id="' + safe(task.id) + '" data-stage="' + STAGES[stageIndex - 1].key + '" onclick="window.florangelAction(event)">← ' + safe(STAGES[stageIndex - 1].label) + '</button>');
-    if (stageIndex < STAGES.length - 1) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task" data-id="' + safe(task.id) + '" data-stage="' + STAGES[stageIndex + 1].key + '" onclick="window.florangelAction(event)">' + safe(STAGES[stageIndex + 1].label) + ' →</button>');
+    if (stageIndex > 0) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task" data-id="' + safe(task.id) + '" data-stage="' + STAGES[stageIndex - 1].key + '" onclick="window.florangelAction(event)">← ' + safe(STAGES[stageIndex - 1].short) + '</button>');
+    if (stageIndex < STAGES.length - 1) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task" data-id="' + safe(task.id) + '" data-stage="' + STAGES[stageIndex + 1].key + '" onclick="window.florangelAction(event)">' + safe(STAGES[stageIndex + 1].short) + ' →</button>');
     return '<article class="kanban-card" draggable="true" data-id="' + safe(task.id) + '">' +
       '<button type="button" style="all:unset;cursor:pointer" data-action="edit-task" data-id="' + safe(task.id) + '" onclick="window.florangelAction(event)">' +
         '<p class="kanban-card-title">' + safe(task.title) + '</p>' +

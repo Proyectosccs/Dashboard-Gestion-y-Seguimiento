@@ -6,9 +6,9 @@
   <meta name="description" content="Tareas y calendario de jornadas — Dra Florangel.">
   <title>Dra Florangel — Tareas y jornadas</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./dra-florangel.css">
+  <link rel="stylesheet" href="./dra-florangel.css?v=2">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./dra-florangel.js" defer></script>
+  <script src="./dra-florangel.js?v=2" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -27,7 +27,7 @@
     </header>
 
     <nav class="tab-nav" aria-label="Secciones">
-      <button class="tab-button" type="button" data-view="tasks" aria-current="page" onclick="window.florangelAction(event)">📋 Tareas</button>
+      <button class="tab-button" type="button" data-view="tasks" aria-current="page" onclick="window.florangelAction(event)">📋 Tareas de Equipo</button>
       <button class="tab-button" type="button" data-view="calendar" onclick="window.florangelAction(event)">🗓️ Calendario</button>
     </nav>
 
@@ -43,11 +43,12 @@
     <section id="tasks-view" class="view" aria-labelledby="tasks-title" hidden>
       <div class="view-heading">
         <div>
-          <p class="eyebrow">📋 Tablero</p>
-          <h2 id="tasks-title">Tareas</h2>
+          <p class="eyebrow">📋 Seguimiento</p>
+          <h2 id="tasks-title">Tareas de Equipo</h2>
         </div>
         <button class="btn btn-primary" type="button" data-action="new-task" onclick="window.florangelAction(event)">➕ Agregar tarea</button>
       </div>
+      <div id="tasks-kpi-grid" class="kpi-grid"></div>
       <div id="kanban-board" class="kanban-board"></div>
     </section>
 
@@ -91,9 +92,9 @@
         <div class="field field-full">
           <label for="field-task-stage">Columna</label>
           <select id="field-task-stage" class="input" name="stage">
-            <option value="todo">Por hacer</option>
-            <option value="doing">En progreso</option>
-            <option value="done">Hecho</option>
+            <option value="todo">Pendiente (Por hacer)</option>
+            <option value="doing">En proceso (En progreso)</option>
+            <option value="done">Listo (Hecho)</option>
           </select>
         </div>
       </div>
