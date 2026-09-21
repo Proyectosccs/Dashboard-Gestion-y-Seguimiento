@@ -256,7 +256,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .community-dot { width: 12px; height: 12px; flex: none; border-radius: 50%; background: var(--community-color, var(--color-accent)); }
 .community-count { padding: 3px 9px; border-radius: 999px; background: var(--color-neutral-200); color: var(--color-neutral-700); font-size: 11.5px; font-weight: 700; }
 
-.contact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.contact-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1200px) { .contact-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .contact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .contact-grid { grid-template-columns: 1fr; } }
 .contact-card { --affiliation-color: var(--color-neutral-500); min-height: 220px; position: relative; display: flex; flex-direction: column; gap: 12px; overflow: hidden; padding: 18px; border: 1px solid color-mix(in srgb, var(--affiliation-color) 42%, var(--color-neutral-300)); border-left: 7px solid var(--affiliation-color); border-radius: 26px; background: rgba(255,255,255,.88); box-shadow: var(--shadow-sm); }
 .contact-card::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(135deg, color-mix(in srgb, var(--affiliation-color) 11%, transparent), transparent 48%); }
 .contact-card > * { position: relative; z-index: 1; }
