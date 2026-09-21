@@ -31,6 +31,9 @@
     coalicion: './evento-coalicion-venezuela.html',
     florangel: './dra-florangel.html'
   };
+  // La pestaña Organizaciones no lista "networking": es este mismo
+  // dashboard, no una organización externa con tablero propio.
+  const ORG_DIRECTORY = ['coalicion', 'florangel', 'ucv'];
 
   const TEAM_TASKS_KEY = 'ingenia-team-tasks-v1';
   const TASK_STATUSES = [
@@ -618,7 +621,7 @@
   // ---------- Organizaciones ----------
 
   function renderOrganizations() {
-    const fixedCards = REAL_ORGS.map(function (key) {
+    const fixedCards = ORG_DIRECTORY.map(function (key) {
       return orgCardHtml(FIXED_SOURCE_EMOJI[key], SOURCE_LABELS[key], FIXED_SOURCE_COLOR[key], ORG_LINKS[key]);
     });
     const customCards = state.customCalendars.map(function (c) {
