@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=4">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=5">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=4" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=5" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -84,6 +84,51 @@
         <button class="btn btn-primary" type="button" id="new-org-btn" onclick="window.ingeniaAction(event)">➕ Agregar organización</button>
       </div>
       <div id="organizations-grid" class="org-grid"></div>
+    </section>
+
+    <section id="org-board-view" class="view" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">🏢 Organización</p>
+          <h2 id="org-board-title">Organización</h2>
+          <p class="view-description">Tablero en construcción — por ahora, calendario y tareas propias de esta organización.</p>
+        </div>
+        <button class="btn btn-secondary" type="button" id="org-board-back" onclick="window.ingeniaAction(event)">← Volver a Organizaciones</button>
+      </div>
+
+      <nav class="tab-nav org-sub-nav" aria-label="Secciones de la organización">
+        <button class="org-tab-button" type="button" data-org-subview="calendar" aria-current="page" onclick="window.ingeniaAction(event)">🗓️ Calendario</button>
+        <button class="org-tab-button" type="button" data-org-subview="tasks" onclick="window.ingeniaAction(event)">📋 Tareas</button>
+      </nav>
+
+      <section id="org-calendar-subview" class="org-subview">
+        <div class="calendar-toolbar panel">
+          <button id="org-calendar-prev" class="icon-button" type="button" aria-label="Mes anterior" onclick="window.ingeniaAction(event)">‹</button>
+          <h3 id="org-calendar-month-label"></h3>
+          <button id="org-calendar-next" class="icon-button" type="button" aria-label="Mes siguiente" onclick="window.ingeniaAction(event)">›</button>
+          <button id="org-calendar-today" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)">Hoy</button>
+          <button class="btn btn-primary" type="button" id="org-new-event-btn" onclick="window.ingeniaAction(event)">➕ Agregar evento</button>
+        </div>
+        <div id="org-calendar-grid" class="calendar-grid panel"></div>
+
+        <section class="panel" style="margin-top: 14px">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">📋 Agenda del día</p>
+              <h3 id="org-agenda-title">Selecciona un día</h3>
+            </div>
+          </div>
+          <div id="org-agenda-list" class="agenda-list"></div>
+        </section>
+      </section>
+
+      <section id="org-tasks-subview" class="org-subview" hidden>
+        <div class="view-heading">
+          <div></div>
+          <button class="btn btn-primary" type="button" id="org-new-task-btn" onclick="window.ingeniaAction(event)">➕ Agregar tarea</button>
+        </div>
+        <div id="org-tasks-board" class="kanban-board"></div>
+      </section>
     </section>
 
     <section id="leaders-view" class="view" hidden>
