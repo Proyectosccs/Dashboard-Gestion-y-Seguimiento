@@ -13,6 +13,10 @@
   const TABLE = 'ingenia_board_state';
   const CUSTOM_CALENDARS_KEY = 'ingenia-custom-calendars-v1';
   const TEAM_TASKS_KEY = 'ingenia-team-tasks-v1';
+  // Roster de responsables compartido con todos los espacios de tareas del
+  // sitio (este tablero, Networking Fundación Ingenia y Dra Florangel).
+  const TEAM_MEMBERS_KEY = 'ingenia-team-members-v1';
+  const NEW_MEMBER_VALUE = '__new_member__';
 
   const ORG_ID = new URLSearchParams(window.location.search).get('org') || '';
   const EVENTS_KEY = 'ingenia-custom-' + ORG_ID + '-events-v1';
@@ -32,6 +36,7 @@
     org: null,
     events: [],
     allTasks: [],
+    teamMembers: [],
     calendarMonth: new Date().toISOString().slice(0, 7),
     selectedDay: new Date().toISOString().slice(0, 10),
     editingEvent: null,
@@ -62,7 +67,8 @@
       'new-task-btn': openTaskDialog,
       'task-dialog-close': closeTaskDialog,
       'task-dialog-cancel': closeTaskDialog,
-      'task-delete': deleteEditingTask
+      'task-delete': deleteEditingTask,
+      'responsable-delete': deleteResponsableFromRoster
     };
     const action = actionsById[target.id];
     if (action) action();
@@ -90,6 +96,7 @@
     dom.eventDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeEventDialog(); });
     dom.taskForm.addEventListener('submit', onTaskSubmit);
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
+    dom.taskResponsableSelect.addEventListener('change', onResponsableChange);
     if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) return showConnectionFailure();
     state.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     loadAll(true);
@@ -117,6 +124,8 @@
     dom.taskForm = document.getElementById('task-form');
     dom.taskError = document.getElementById('task-error');
     dom.taskDelete = document.getElementById('task-delete');
+    dom.taskResponsableSelect = document.getElementById('field-task-responsable');
+    dom.newResponsableField = document.getElementById('new-responsable-field');
     dom.toastRegion = document.getElementById('toast-region');
   }
 
@@ -159,10 +168,11 @@
     if (showSpinner !== false) dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
 
-    const [registryRes, tasksRes, eventsRes] = await Promise.all([
+    const [registryRes, tasksRes, eventsRes, membersRes] = await Promise.all([
       state.client.from(TABLE).select('value').eq('key', CUSTOM_CALENDARS_KEY).maybeSingle(),
       state.client.from(TABLE).select('value').eq('key', TEAM_TASKS_KEY).maybeSingle(),
-      state.client.from(TABLE).select('value').eq('key', EVENTS_KEY).maybeSingle()
+      state.client.from(TABLE).select('value').eq('key', EVENTS_KEY).maybeSingle(),
+      state.client.from(TABLE).select('value').eq('key', TEAM_MEMBERS_KEY).maybeSingle()
     ]);
 
     if (registryRes.error && tasksRes.error && eventsRes.error) return showConnectionFailure();
@@ -174,6 +184,7 @@
 
     state.allTasks = Array.isArray(tasksRes.data && tasksRes.data.value) ? tasksRes.data.value : [];
     state.events = (Array.isArray(eventsRes.data && eventsRes.data.value) ? eventsRes.data.value : []).filter(function (e) { return !!e.event_date; });
+    state.teamMembers = Array.isArray(membersRes.data && membersRes.data.value) ? membersRes.data.value : [];
 
     applyOrgTheme();
     dom.loadingState.hidden = true;
@@ -357,13 +368,64 @@
     const moveButtons = [];
     if (statusIndex > 0) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task-status" data-id="' + safe(task.id) + '" data-status="' + TASK_STATUSES[statusIndex - 1].key + '" onclick="window.orgAction(event)">← ' + safe(TASK_STATUSES[statusIndex - 1].label) + '</button>');
     if (statusIndex < TASK_STATUSES.length - 1) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task-status" data-id="' + safe(task.id) + '" data-status="' + TASK_STATUSES[statusIndex + 1].key + '" onclick="window.orgAction(event)">' + safe(TASK_STATUSES[statusIndex + 1].label) + ' →</button>');
+    const responsable = responsableName(task.responsable);
     return '<article class="kanban-card" draggable="true" data-id="' + safe(task.id) + '" style="--status-color:' + safe(status.color) + '">' +
       '<button type="button" style="all:unset;cursor:pointer" data-task-id="' + safe(task.id) + '" onclick="window.orgAction(event)">' +
         '<p class="kanban-card-title">' + safe(task.title) + '</p>' +
         (task.notes ? '<p class="kanban-card-notes">' + safe(task.notes) + '</p>' : '') +
+        (responsable ? '<span class="responsable-tag">👤 ' + safe(responsable) + '</span>' : '') +
       '</button>' +
       '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' +
     '</article>';
+  }
+
+  // ---------- Responsables (roster compartido con todos los espacios de tareas) ----------
+
+  function findTeamMember(id) {
+    return state.teamMembers.find(function (m) { return m.id === id; }) || null;
+  }
+
+  function responsableName(id) {
+    const member = id ? findTeamMember(id) : null;
+    return member ? member.name : '';
+  }
+
+  function populateResponsableSelect(currentId) {
+    const options = ['<option value="">Sin asignar</option>'].concat(state.teamMembers.map(function (m) {
+      return '<option value="' + safe(m.id) + '">👤 ' + safe(m.name) + '</option>';
+    }), ['<option value="' + NEW_MEMBER_VALUE + '">➕ Otro (agregar miembro nuevo)</option>']);
+    renderMarkup(dom.taskResponsableSelect, options.join(''));
+    dom.taskResponsableSelect.value = currentId || '';
+    dom.newResponsableField.hidden = true;
+  }
+
+  function onResponsableChange() {
+    const isNew = dom.taskResponsableSelect.value === NEW_MEMBER_VALUE;
+    dom.newResponsableField.hidden = !isNew;
+    if (isNew) dom.taskForm.elements.new_responsable_name.focus();
+  }
+
+  async function createTeamMember(name) {
+    const entry = { id: uid(), name: name, created_at: new Date().toISOString() };
+    const next = state.teamMembers.concat(entry);
+    const ok = await writeBoardKey(TEAM_MEMBERS_KEY, next);
+    if (!ok) return null;
+    state.teamMembers = next;
+    return entry;
+  }
+
+  async function deleteResponsableFromRoster() {
+    const selectedId = dom.taskResponsableSelect.value;
+    if (!selectedId || selectedId === NEW_MEMBER_VALUE) return;
+    const member = findTeamMember(selectedId);
+    if (!member) return;
+    const next = state.teamMembers.filter(function (m) { return m.id !== selectedId; });
+    const ok = await writeBoardKey(TEAM_MEMBERS_KEY, next);
+    if (!ok) { toast('No se pudo eliminar al responsable — revisa tu conexión.', 'error'); return; }
+    state.teamMembers = next;
+    populateResponsableSelect('');
+    renderTasksBoard();
+    toast('Responsable eliminado del equipo.', 'success');
   }
 
   async function moveTaskStatus(id, status) {
@@ -383,6 +445,7 @@
     state.editingTask = existing || null;
     dom.taskDialogTitle.textContent = existing ? 'Editar tarea' : 'Agregar tarea';
     dom.taskDelete.hidden = !existing;
+    populateResponsableSelect(existing ? existing.responsable : '');
     if (existing) {
       dom.taskForm.elements.title.value = existing.title || '';
       dom.taskForm.elements.notes.value = existing.notes || '';
@@ -399,6 +462,14 @@
     hideError(dom.taskError);
     const title = dom.taskForm.elements.title.value.trim();
     if (!title) { showError(dom.taskError, 'El título es obligatorio.'); return; }
+    let responsable = dom.taskForm.elements.responsable.value;
+    if (responsable === NEW_MEMBER_VALUE) {
+      const newName = dom.taskForm.elements.new_responsable_name.value.trim();
+      if (!newName) { showError(dom.taskError, 'Escribe el nombre del nuevo responsable.'); return; }
+      const created = await createTeamMember(newName);
+      if (!created) { showError(dom.taskError, 'No se pudo guardar el responsable — revisa tu conexión.'); return; }
+      responsable = created.id;
+    }
     const existing = state.editingTask;
     const payload = {
       id: existing ? existing.id : uid(),
@@ -406,6 +477,7 @@
       title: title,
       notes: dom.taskForm.elements.notes.value.trim(),
       status: dom.taskForm.elements.status.value,
+      responsable: responsable,
       created_at: existing ? existing.created_at : new Date().toISOString()
     };
     const next = existing

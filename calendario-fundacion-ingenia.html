@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=7">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=8">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=7" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=8" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -184,6 +184,17 @@
             <option value="listo">Listo (ejecutado)</option>
             <option value="bloqueada">Bloqueada</option>
           </select>
+        </div>
+        <div class="field field-full">
+          <label for="field-task-responsable">Responsable</label>
+          <div class="responsable-row">
+            <select id="field-task-responsable" class="input" name="responsable"></select>
+            <button id="responsable-delete" class="icon-button" type="button" aria-label="Eliminar responsable seleccionado del equipo" title="Eliminar responsable seleccionado del equipo" onclick="window.ingeniaAction(event)">🗑️</button>
+          </div>
+        </div>
+        <div class="field field-full" id="new-responsable-field" hidden>
+          <label for="field-new-responsable-name">Nombre del nuevo responsable</label>
+          <input id="field-new-responsable-name" class="input" name="new_responsable_name" type="text" placeholder="Ej. Andrea Pérez">
         </div>
       </div>
       <div class="dialog-actions">

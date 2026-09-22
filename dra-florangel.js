@@ -10,6 +10,14 @@
   const TASKS_KEY = 'florangel-tasks-v1';
   const EVENTS_KEY = 'florangel-events-v1';
 
+  // Roster de responsables compartido con TODOS los espacios de tareas del
+  // sitio (este tablero, Networking Fundación Ingenia y cada página de
+  // organización) — vive en ingenia_board_state, no en florangel_board_state,
+  // aunque se lea/escriba con el mismo cliente de Supabase (mismo proyecto).
+  const SHARED_TABLE = 'ingenia_board_state';
+  const TEAM_MEMBERS_KEY = 'ingenia-team-members-v1';
+  const NEW_MEMBER_VALUE = '__new_member__';
+
   // Misma nomenclatura que Tareas de Equipo en Networking Fundación
   // Ingenia — la columna sigue siendo "todo/doing/done" internamente,
   // solo cambia la etiqueta visible.
@@ -26,6 +34,7 @@
     view: 'tasks',
     tasks: [],
     events: [],
+    teamMembers: [],
     calendarMonth: new Date().toISOString().slice(0, 7),
     taskEditor: null,
     eventEditor: null,
@@ -49,6 +58,7 @@
       'task-dialog-close': closeTaskDialog,
       'task-dialog-cancel': closeTaskDialog,
       'task-delete': deleteEditingTask,
+      'responsable-delete': deleteResponsableFromRoster,
       'event-dialog-close': closeEventDialog,
       'event-dialog-cancel': closeEventDialog,
       'event-delete': deleteEditingEvent
@@ -86,6 +96,8 @@
     dom.taskDialogTitle = document.getElementById('task-dialog-title');
     dom.taskError = document.getElementById('task-error');
     dom.taskDelete = document.getElementById('task-delete');
+    dom.taskResponsableSelect = document.getElementById('field-task-responsable');
+    dom.newResponsableField = document.getElementById('new-responsable-field');
     dom.eventDialog = document.getElementById('event-dialog');
     dom.eventForm = document.getElementById('event-form');
     dom.eventDialogTitle = document.getElementById('event-dialog-title');
@@ -98,6 +110,7 @@
     dom.eventForm.addEventListener('submit', onEventSubmit);
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
     dom.eventDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeEventDialog(); });
+    dom.taskResponsableSelect.addEventListener('change', onResponsableChange);
   }
 
   function showConnectionFailure() {
@@ -133,15 +146,32 @@
     }
   }
 
+  // El roster de responsables vive en la tabla compartida (SHARED_TABLE),
+  // no en la propia de este tablero — por eso no reusa readKey/writeKey.
+  async function loadTeamMembers() {
+    if (!state.client) return [];
+    const res = await state.client.from(SHARED_TABLE).select('value').eq('key', TEAM_MEMBERS_KEY).maybeSingle();
+    if (res.error || !res.data) return [];
+    return Array.isArray(res.data.value) ? res.data.value : [];
+  }
+
+  async function writeTeamMembers(list) {
+    if (!state.client) return false;
+    const res = await state.client.from(SHARED_TABLE).upsert({ key: TEAM_MEMBERS_KEY, value: list, updated_at: new Date().toISOString() });
+    return !res.error;
+  }
+
   async function loadAllData(background) {
     if (!state.client) return;
     if (!background) dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
 
-    const [tasksValue, eventsValue] = await Promise.all([
+    const [tasksValue, eventsValue, teamMembers] = await Promise.all([
       readKey(TASKS_KEY, null),
-      readKey(EVENTS_KEY, null)
+      readKey(EVENTS_KEY, null),
+      loadTeamMembers()
     ]);
+    state.teamMembers = teamMembers;
 
     let tasks = Array.isArray(tasksValue) ? tasksValue : [];
     let events = Array.isArray(eventsValue) ? eventsValue : [];
@@ -222,13 +252,64 @@
     const moveButtons = [];
     if (stageIndex > 0) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task" data-id="' + safe(task.id) + '" data-stage="' + STAGES[stageIndex - 1].key + '" onclick="window.florangelAction(event)">← ' + safe(STAGES[stageIndex - 1].short) + '</button>');
     if (stageIndex < STAGES.length - 1) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task" data-id="' + safe(task.id) + '" data-stage="' + STAGES[stageIndex + 1].key + '" onclick="window.florangelAction(event)">' + safe(STAGES[stageIndex + 1].short) + ' →</button>');
+    const responsable = responsableName(task.responsable);
     return '<article class="kanban-card" draggable="true" data-id="' + safe(task.id) + '">' +
       '<button type="button" style="all:unset;cursor:pointer" data-action="edit-task" data-id="' + safe(task.id) + '" onclick="window.florangelAction(event)">' +
         '<p class="kanban-card-title">' + safe(task.title) + '</p>' +
         (task.notes ? '<p class="kanban-card-notes">' + safe(task.notes) + '</p>' : '') +
+        (responsable ? '<span class="responsable-tag">👤 ' + safe(responsable) + '</span>' : '') +
       '</button>' +
       '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' +
     '</article>';
+  }
+
+  // ---------- Responsables (roster compartido con todos los espacios de tareas) ----------
+
+  function findTeamMember(id) {
+    return state.teamMembers.find(function (m) { return m.id === id; }) || null;
+  }
+
+  function responsableName(id) {
+    const member = id ? findTeamMember(id) : null;
+    return member ? member.name : '';
+  }
+
+  function populateResponsableSelect(currentId) {
+    const options = ['<option value="">Sin asignar</option>'].concat(state.teamMembers.map(function (m) {
+      return '<option value="' + safe(m.id) + '">👤 ' + safe(m.name) + '</option>';
+    }), ['<option value="' + NEW_MEMBER_VALUE + '">➕ Otro (agregar miembro nuevo)</option>']);
+    renderMarkup(dom.taskResponsableSelect, options.join(''));
+    dom.taskResponsableSelect.value = currentId || '';
+    dom.newResponsableField.hidden = true;
+  }
+
+  function onResponsableChange() {
+    const isNew = dom.taskResponsableSelect.value === NEW_MEMBER_VALUE;
+    dom.newResponsableField.hidden = !isNew;
+    if (isNew) dom.taskForm.elements.new_responsable_name.focus();
+  }
+
+  async function createTeamMember(name) {
+    const entry = { id: uid(), name: name, created_at: new Date().toISOString() };
+    const next = state.teamMembers.concat(entry);
+    const ok = await writeTeamMembers(next);
+    if (!ok) return null;
+    state.teamMembers = next;
+    return entry;
+  }
+
+  async function deleteResponsableFromRoster() {
+    const selectedId = dom.taskResponsableSelect.value;
+    if (!selectedId || selectedId === NEW_MEMBER_VALUE) return;
+    const member = findTeamMember(selectedId);
+    if (!member) return;
+    const next = state.teamMembers.filter(function (m) { return m.id !== selectedId; });
+    const ok = await writeTeamMembers(next);
+    if (!ok) { toast('No se pudo eliminar al responsable — revisa tu conexión.', 'error'); return; }
+    state.teamMembers = next;
+    populateResponsableSelect('');
+    renderKanban();
+    toast('Responsable eliminado del equipo.', 'success');
   }
 
   function moveTask(id, stage) {
@@ -247,21 +328,31 @@
     dom.taskForm.elements.title.value = task ? task.title : '';
     dom.taskForm.elements.notes.value = task ? (task.notes || '') : '';
     dom.taskForm.elements.stage.value = task ? task.stage : 'todo';
+    populateResponsableSelect(task ? task.responsable : '');
     dom.taskDialog.showModal();
     dom.taskForm.elements.title.focus();
   }
 
   function closeTaskDialog() { dom.taskDialog.close(); state.taskEditor = null; }
 
-  function onTaskSubmit(e) {
+  async function onTaskSubmit(e) {
     e.preventDefault();
     const title = dom.taskForm.elements.title.value.trim();
     if (!title) { showError(dom.taskError, 'El título es obligatorio.'); return; }
+    let responsable = dom.taskForm.elements.responsable.value;
+    if (responsable === NEW_MEMBER_VALUE) {
+      const newName = dom.taskForm.elements.new_responsable_name.value.trim();
+      if (!newName) { showError(dom.taskError, 'Escribe el nombre del nuevo responsable.'); return; }
+      const created = await createTeamMember(newName);
+      if (!created) { showError(dom.taskError, 'No se pudo guardar el responsable — revisa tu conexión.'); return; }
+      responsable = created.id;
+    }
     const payload = {
       id: state.taskEditor || uid(),
       title: title,
       notes: dom.taskForm.elements.notes.value.trim(),
       stage: dom.taskForm.elements.stage.value,
+      responsable: responsable,
       created_at: new Date().toISOString()
     };
     if (state.taskEditor) {

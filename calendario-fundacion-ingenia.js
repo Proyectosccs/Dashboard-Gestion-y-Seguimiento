@@ -43,12 +43,20 @@
     { key: 'bloqueada', label: 'Bloqueada', color: '#a02525' }
   ];
 
+  // Roster de responsables compartido por TODOS los espacios de tareas del
+  // sitio (este tablero, cada página de organización, y Dra Florangel) —
+  // vive siempre en ingenia_board_state aunque el dashboard que lo consuma
+  // guarde sus tareas en otra tabla.
+  const TEAM_MEMBERS_KEY = 'ingenia-team-members-v1';
+  const NEW_MEMBER_VALUE = '__new_member__';
+
   const state = {
     client: null,
     view: 'calendar',
     events: [],
     customCalendars: [],
     tasks: [],
+    teamMembers: [],
     calendarMonth: new Date().toISOString().slice(0, 7),
     selectedDay: new Date().toISOString().slice(0, 10),
     editingEvent: null,
@@ -88,7 +96,8 @@
       },
       'new-org-btn': openOrgDialog,
       'org-dialog-close': closeOrgDialog,
-      'org-dialog-cancel': closeOrgDialog
+      'org-dialog-cancel': closeOrgDialog,
+      'responsable-delete': deleteResponsableFromRoster
     };
     const action = actionsById[target.id];
     if (action) action();
@@ -152,6 +161,7 @@
       state.taskOrgFilter = dom.tasksOrgFilter.value;
       refreshTaskBoards();
     });
+    dom.taskResponsableSelect.addEventListener('change', onResponsableChange);
     dom.orgForm.addEventListener('submit', onOrgSubmit);
     dom.orgDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeOrgDialog(); });
     if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) return showConnectionFailure();
@@ -182,6 +192,8 @@
     dom.taskError = document.getElementById('task-error');
     dom.taskDelete = document.getElementById('task-delete');
     dom.taskOrgSelect = document.getElementById('field-task-org');
+    dom.taskResponsableSelect = document.getElementById('field-task-responsable');
+    dom.newResponsableField = document.getElementById('new-responsable-field');
     dom.tasksOrgFilter = document.getElementById('tasks-org-filter');
     dom.tasksKpiGrid = document.getElementById('tasks-kpi-grid');
     dom.organizationsGrid = document.getElementById('organizations-grid');
@@ -229,7 +241,7 @@
       state.client.from('coalicion_events').select('id,title,event_date,start_time,location,maps_url,notes,status').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
-      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY])
+      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY])
     ]);
 
     const anyFailed = coalicionRes.error && florangelRes.error && ucvRes.error && ingeniaRes.error;
@@ -244,6 +256,8 @@
     state.customCalendars = Array.isArray(registryRaw && registryRaw.value) ? registryRaw.value : [];
     const tasksRaw = ingeniaRowsEarly.find(function (r) { return r.key === TEAM_TASKS_KEY; });
     state.tasks = Array.isArray(tasksRaw && tasksRaw.value) ? tasksRaw.value : [];
+    const membersRaw = ingeniaRowsEarly.find(function (r) { return r.key === TEAM_MEMBERS_KEY; });
+    state.teamMembers = Array.isArray(membersRaw && membersRaw.value) ? membersRaw.value : [];
 
     let customEvents = [];
     if (state.customCalendars.length) {
@@ -397,6 +411,55 @@
     }));
     renderMarkup(dom.taskOrgSelect, options.join(''));
     if (currentOrg) dom.taskOrgSelect.value = currentOrg;
+  }
+
+  // ---------- Responsables (roster compartido con todos los espacios de tareas) ----------
+
+  function findTeamMember(id) {
+    return state.teamMembers.find(function (m) { return m.id === id; }) || null;
+  }
+
+  function responsableName(id) {
+    const member = id ? findTeamMember(id) : null;
+    return member ? member.name : '';
+  }
+
+  function populateResponsableSelect(currentId) {
+    const options = ['<option value="">Sin asignar</option>'].concat(state.teamMembers.map(function (m) {
+      return '<option value="' + safe(m.id) + '">👤 ' + safe(m.name) + '</option>';
+    }), ['<option value="' + NEW_MEMBER_VALUE + '">➕ Otro (agregar miembro nuevo)</option>']);
+    renderMarkup(dom.taskResponsableSelect, options.join(''));
+    dom.taskResponsableSelect.value = currentId || '';
+    dom.newResponsableField.hidden = true;
+  }
+
+  function onResponsableChange() {
+    const isNew = dom.taskResponsableSelect.value === NEW_MEMBER_VALUE;
+    dom.newResponsableField.hidden = !isNew;
+    if (isNew) dom.taskForm.elements.new_responsable_name.focus();
+  }
+
+  async function createTeamMember(name) {
+    const entry = { id: uid(), name: name, created_at: new Date().toISOString() };
+    const next = state.teamMembers.concat(entry);
+    const ok = await writeBoardKey('ingenia_board_state', TEAM_MEMBERS_KEY, next);
+    if (!ok) return null;
+    state.teamMembers = next;
+    return entry;
+  }
+
+  async function deleteResponsableFromRoster() {
+    const selectedId = dom.taskResponsableSelect.value;
+    if (!selectedId || selectedId === NEW_MEMBER_VALUE) return;
+    const member = findTeamMember(selectedId);
+    if (!member) return;
+    const next = state.teamMembers.filter(function (m) { return m.id !== selectedId; });
+    const ok = await writeBoardKey('ingenia_board_state', TEAM_MEMBERS_KEY, next);
+    if (!ok) { toast('No se pudo eliminar al responsable — revisa tu conexión.', 'error'); return; }
+    state.teamMembers = next;
+    populateResponsableSelect('');
+    refreshTaskBoards();
+    toast('Responsable eliminado del equipo.', 'success');
   }
 
   // ---------- Agregar evento (a la fuente elegida) ----------
@@ -598,11 +661,13 @@
     const moveButtons = [];
     if (statusIndex > 0) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task-status" data-id="' + safe(task.id) + '" data-status="' + TASK_STATUSES[statusIndex - 1].key + '" onclick="window.ingeniaAction(event)">← ' + safe(TASK_STATUSES[statusIndex - 1].label) + '</button>');
     if (statusIndex < TASK_STATUSES.length - 1) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task-status" data-id="' + safe(task.id) + '" data-status="' + TASK_STATUSES[statusIndex + 1].key + '" onclick="window.ingeniaAction(event)">' + safe(TASK_STATUSES[statusIndex + 1].label) + ' →</button>');
+    const responsable = responsableName(task.responsable);
     return '<article class="kanban-card" draggable="true" data-id="' + safe(task.id) + '" style="--status-color:' + safe(status.color) + '">' +
       '<button type="button" style="all:unset;cursor:pointer" data-task-id="' + safe(task.id) + '" onclick="window.ingeniaAction(event)">' +
         '<span class="org-tag" style="--source-color:' + safe(info.color) + '">' + safe(info.label) + '</span>' +
         '<p class="kanban-card-title">' + safe(task.title) + '</p>' +
         (task.notes ? '<p class="kanban-card-notes">' + safe(task.notes) + '</p>' : '') +
+        (responsable ? '<span class="responsable-tag">👤 ' + safe(responsable) + '</span>' : '') +
       '</button>' +
       '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' +
     '</article>';
@@ -627,6 +692,7 @@
     dom.taskOrgSelect.disabled = !existing && !!lockedOrg;
     dom.taskDialogTitle.textContent = existing ? 'Editar tarea' : 'Agregar tarea';
     dom.taskDelete.hidden = !existing;
+    populateResponsableSelect(existing ? existing.responsable : '');
     if (existing) {
       dom.taskForm.elements.title.value = existing.title || '';
       dom.taskForm.elements.notes.value = existing.notes || '';
@@ -644,12 +710,21 @@
     const org = dom.taskForm.elements.org.value;
     const title = dom.taskForm.elements.title.value.trim();
     if (!org || !title) { showError(dom.taskError, 'Organización y título son obligatorios.'); return; }
+    let responsable = dom.taskForm.elements.responsable.value;
+    if (responsable === NEW_MEMBER_VALUE) {
+      const newName = dom.taskForm.elements.new_responsable_name.value.trim();
+      if (!newName) { showError(dom.taskError, 'Escribe el nombre del nuevo responsable.'); return; }
+      const created = await createTeamMember(newName);
+      if (!created) { showError(dom.taskError, 'No se pudo guardar el responsable — revisa tu conexión.'); return; }
+      responsable = created.id;
+    }
     const payload = {
       id: state.editingTask ? state.editingTask.id : uid(),
       org: org,
       title: title,
       notes: dom.taskForm.elements.notes.value.trim(),
       status: dom.taskForm.elements.status.value,
+      responsable: responsable,
       created_at: state.editingTask ? state.editingTask.created_at : new Date().toISOString()
     };
     const next = state.editingTask
