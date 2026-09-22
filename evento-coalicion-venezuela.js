@@ -515,7 +515,6 @@
     dom.taskPrioritySelect = document.getElementById('field-task-priority');
     dom.taskDetail = document.getElementById('field-task-detail');
     dom.taskNextAction = document.getElementById('field-task-next-action');
-    dom.taskEvidence = document.getElementById('field-task-evidence');
   }
 
   function bindStaticEvents() {
@@ -1950,7 +1949,6 @@
     dom.taskDueDate.value = existing ? (existing.dueDate || '') : '';
     dom.taskDetail.value = existing ? taskDetailText(existing) : '';
     dom.taskNextAction.value = existing ? (existing.nextAction || '') : '';
-    dom.taskEvidence.value = existing ? (existing.evidence || '') : '';
     dom.taskPrioritySelect.value = existing ? (existing.priority || 'media') : 'media';
     dom.taskStatusSelect.value = existing ? (existing.status || 'pendiente') : 'pendiente';
     dom.taskFollowupSelect.value = existing ? (existing.followupStatus || 'in_progress') : 'in_progress';
@@ -1991,7 +1989,6 @@
       responsable: responsable,
       dueDate: dom.taskDueDate.value,
       nextAction: dom.taskNextAction.value.trim(),
-      evidence: dom.taskEvidence.value.trim(),
       created_at: existing ? existing.created_at : new Date().toISOString()
     };
     const next = existing

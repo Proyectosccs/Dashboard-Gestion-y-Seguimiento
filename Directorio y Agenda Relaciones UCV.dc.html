@@ -132,9 +132,6 @@
                     </sc-if>
                     <div>➡️ {{ task.nextAction }}</div>
                   </div>
-                  <sc-if value="{{ task.evidence }}" hint-placeholder-val="{{ false }}">
-                    <div style="background: #eafbf0; border: 1px solid #b7e4c7; border-radius: 10px; padding: 6px 9px; font-size: 11px; color: #1f7a3d; text-wrap: pretty">📎 Evidencia: {{ task.evidence }}</div>
-                  </sc-if>
                   <div style="display: flex; gap: 6px; padding-top: 2px">
                     <button aria-label="Mover tarea a la columna anterior" onClick="{{ task.movePrev }}" disabled="{{ task.noPrev }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); border-radius: 999px; width: 32px; height: 32px; cursor: pointer">←</button>
                     <button onClick="{{ task.edit }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); border-radius: 999px; padding: 7px 11px; font-size: 11.5px; font-weight: 700; cursor: pointer; flex: 1">Editar</button>
@@ -906,9 +903,6 @@
         <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Próxima acción
           <textarea value="{{ taskForm.nextAction }}" onChange="{{ onTaskNextAction }}" rows="2" style="border: 1px solid var(--color-neutral-300); border-radius: 16px; padding: 11px 12px; background: #fff; color: var(--color-text); resize: none"></textarea>
         </label>
-        <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Evidencia
-          <textarea value="{{ taskForm.evidence }}" onChange="{{ onTaskEvidence }}" rows="2" placeholder="Prueba o resultado de la ejecución…" style="border: 1px solid var(--color-neutral-300); border-radius: 16px; padding: 11px 12px; background: #fff; color: var(--color-text); resize: none"></textarea>
-        </label>
         <div style="display: flex; gap: 10px; justify-content: flex-end">
           <button onClick="{{ closeTaskModal }}" style="border: 1px solid var(--color-neutral-300); background: transparent; border-radius: 999px; padding: 11px 18px; font-weight: 700; cursor: pointer">Cancelar</button>
           <sc-if value="{{ isEditingTask }}" hint-placeholder-val="{{ false }}">
@@ -1322,37 +1316,6 @@
     </div>
   </sc-if>
 
-  <sc-if value="{{ doneCaptureOpen }}" hint-placeholder-val="{{ false }}">
-    <div style="position: fixed; inset: 0; background: rgba(32,30,29,.4); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px" onClick="{{ closeDoneCapture }}">
-      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Objetivo alcanzado" style="background: #fff; border: 3px solid #2f9e56; border-radius: 22px; padding: 20px 24px; box-shadow: var(--shadow-lg); max-width: 420px; width: 100%; display: flex; flex-direction: column; gap: 14px">
-        <sc-if value="{{ !doneCaptureSubmitted }}" hint-placeholder-val="{{ true }}">
-          <div style="display: flex; gap: 10px; align-items: center">
-            <span style="font-size: 26px">✅</span>
-            <div>
-              <div style="font-family: var(--font-heading); font-size: 16px; color: #1f7a3d">¡Tarea completada!</div>
-              <div style="font-size: 12px; color: var(--color-neutral-700)">{{ doneCaptureTitle }}</div>
-            </div>
-          </div>
-          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">¿Cuál fue el objetivo alcanzado?
-            <textarea value="{{ doneCaptureText }}" onChange="{{ onDoneCaptureText }}" rows="3" placeholder="Escribe el resultado o logro obtenido…" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: var(--color-neutral-100); color: var(--color-text); resize: none"></textarea>
-          </label>
-          <div style="display: flex; gap: 10px; justify-content: flex-end">
-            <button onClick="{{ skipDoneCapture }}" style="border: 1px solid var(--color-neutral-300); background: transparent; border-radius: 999px; padding: 9px 16px; font-weight: 700; cursor: pointer">Omitir</button>
-            <button onClick="{{ submitDoneCapture }}" style="border: none; background: #2f9e56; color: #fff; border-radius: 999px; padding: 9px 18px; font-weight: 700; cursor: pointer">Guardar</button>
-          </div>
-        </sc-if>
-        <sc-if value="{{ doneCaptureSubmitted }}" hint-placeholder-val="{{ false }}">
-          <div style="display: flex; gap: 10px; align-items: flex-start">
-            <span style="font-size: 28px">🎯</span>
-            <div>
-              <div style="font-family: var(--font-heading); font-size: 16px; color: #1f7a3d">¡Objetivo alcanzado!</div>
-              <div style="font-size: 13px; color: var(--color-neutral-800); margin-top: 4px; text-wrap: pretty">{{ doneCaptureDisplayText }}</div>
-            </div>
-          </div>
-        </sc-if>
-      </div>
-    </div>
-  </sc-if>
 </div>
 
 </x-dc>
@@ -1695,7 +1658,7 @@ function fmt(d) {
 class Component extends DCLogic {
   state = {
     view: 'board', query: '', faculty: 'all', role: 'all', onlyFollow: false,
-    dragTaskId: null, dragOverCol: null, dragOverIndex: null, doneCapture: null, taskResponsableFilter: '',
+    dragTaskId: null, dragOverCol: null, dragOverIndex: null, taskResponsableFilter: '',
     dragContactId: null, dragOverUnit: null,
     contacts: readStore('ucv-contacts-v1', CONTACTS),
     interactions: readStore('ucv-interactions-v2', SEED),
@@ -1725,7 +1688,7 @@ class Component extends DCLogic {
     journeyForm: { title: '', eventType: 'health', dates: [TODAY], time: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, specialtyUnit: '', doctors: '', students: '' },
     modal: null, type: 'meeting', notes: '', date: TODAY, follow: '',
     taskModal: null,
-    taskForm: { title: '', responsable: '', newResponsableName: '', status: 'pendiente', followupStatus: '', priority: 'media', detail: '', nextAction: '', dueDate: '', evidence: '' },
+    taskForm: { title: '', responsable: '', newResponsableName: '', status: 'pendiente', followupStatus: '', priority: 'media', detail: '', nextAction: '', dueDate: '' },
     contactModal: null,
     contactForm: { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar', function: '', extraUnits: [] }
   };
@@ -2046,45 +2009,16 @@ class Component extends DCLogic {
 
   newTask = () => this.setState({
     taskModal: 'new',
-    taskForm: { title: '', responsable: '', newResponsableName: '', status: 'pendiente', followupStatus: '', priority: 'media', detail: '', nextAction: '', dueDate: '', evidence: '' }
+    taskForm: { title: '', responsable: '', newResponsableName: '', status: 'pendiente', followupStatus: '', priority: 'media', detail: '', nextAction: '', dueDate: '' }
   });
 
   openTask(id) {
     const task = this.state.tasks.find(t => t.id === id);
     if (!task) return;
-    this.setState({ taskModal: id, taskForm: Object.assign({ newResponsableName: '', followupStatus: '', dueDate: '', evidence: '' }, task) });
+    this.setState({ taskModal: id, taskForm: Object.assign({ newResponsableName: '', followupStatus: '', dueDate: '' }, task) });
   }
 
   closeTaskModal = () => this.setState({ taskModal: null });
-
-  promptDoneCapture(taskId, title) {
-    if (this._doneCaptureTimer) clearTimeout(this._doneCaptureTimer);
-    this.setState({ doneCapture: { taskId: taskId, title: title, text: '', submitted: false } });
-  }
-
-  submitDoneCapture = async () => {
-    const s = this.state;
-    if (!s.doneCapture) return;
-    const text = s.doneCapture.text.trim();
-    const rawList = this._sharedTasksRaw || [];
-    const nextRaw = rawList.map(t => t.id === s.doneCapture.taskId ? Object.assign({}, t, { evidence: text }) : t);
-    const ok = await this._writeSharedTasks(nextRaw);
-    if (!ok) return;
-    this._sharedTasksRaw = nextRaw;
-    this.setState({ tasks: nextRaw.filter(t => t.org === 'ucv'), doneCapture: Object.assign({}, s.doneCapture, { text: text, submitted: true }) });
-    if (this._doneCaptureTimer) clearTimeout(this._doneCaptureTimer);
-    this._doneCaptureTimer = setTimeout(() => this.setState({ doneCapture: null }), 3600);
-  };
-
-  skipDoneCapture = () => {
-    if (this._doneCaptureTimer) clearTimeout(this._doneCaptureTimer);
-    this.setState({ doneCapture: null });
-  };
-
-  closeDoneCapture = () => {
-    if (this._doneCaptureTimer) clearTimeout(this._doneCaptureTimer);
-    this.setState({ doneCapture: null });
-  };
 
   async _writeSharedTasks(list) {
     if (!sb) return false;
@@ -2112,7 +2046,6 @@ class Component extends DCLogic {
 
   saveTask = async () => {
     const s = this.state;
-    const prevTask = s.taskModal !== 'new' ? s.tasks.find(t => t.id === s.taskModal) : null;
     let responsable = s.taskForm.responsable;
     if (responsable === NEW_MEMBER_VALUE) {
       const name = (s.taskForm.newResponsableName || '').trim();
@@ -2136,7 +2069,6 @@ class Component extends DCLogic {
     if (!ok) return;
     this._sharedTasksRaw = nextRaw;
     this.setState({ tasks: nextRaw.filter(t => t.org === 'ucv'), taskModal: null });
-    if (clean.status === 'listo' && (!prevTask || prevTask.status !== 'listo')) this.promptDoneCapture(id, clean.title);
   };
 
   deleteTask = async () => {
@@ -2159,14 +2091,12 @@ class Component extends DCLogic {
     const current = order.indexOf(original.status);
     const next = Math.max(0, Math.min(order.length - 1, current + direction));
     const nextStatus = order[next];
-    const celebrated = nextStatus === 'listo' && original.status !== 'listo';
     const updated = applyTaskStatus(original, nextStatus);
     const nextRaw = rawList.map(t => t.id === id ? updated : t);
     this._sharedTasksRaw = nextRaw;
     this.setState({ tasks: nextRaw.filter(t => t.org === 'ucv') });
     const ok = await this._writeSharedTasks(nextRaw);
-    if (!ok) { this._sharedTasksRaw = rawList; this.setState({ tasks: rawList.filter(t => t.org === 'ucv') }); return; }
-    if (celebrated) this.promptDoneCapture(id, original.title || 'La tarea');
+    if (!ok) { this._sharedTasksRaw = rawList; this.setState({ tasks: rawList.filter(t => t.org === 'ucv') }); }
   };
 
   reorderTask = async (id, targetStatus, targetIndex) => {
@@ -2185,8 +2115,7 @@ class Component extends DCLogic {
     rawList.splice(insertAt, 0, moved);
     this._sharedTasksRaw = rawList;
     this.setState({ tasks: rawList.filter(t => t.org === 'ucv'), dragTaskId: null, dragOverCol: null, dragOverIndex: null });
-    const ok = await this._writeSharedTasks(rawList);
-    if (ok && targetStatus === 'listo' && original.status !== 'listo') this.promptDoneCapture(id, original.title || 'La tarea');
+    await this._writeSharedTasks(rawList);
   };
 
   blankJourney(date) {
@@ -3233,15 +3162,6 @@ class Component extends DCLogic {
       newTask: this.newTask,
       closeTaskModal: this.closeTaskModal,
       saveTask: this.saveTask,
-      doneCaptureOpen: !!s.doneCapture,
-      doneCaptureSubmitted: !!(s.doneCapture && s.doneCapture.submitted),
-      doneCaptureTitle: s.doneCapture ? s.doneCapture.title : '',
-      doneCaptureText: s.doneCapture ? s.doneCapture.text : '',
-      doneCaptureDisplayText: s.doneCapture && s.doneCapture.text ? s.doneCapture.text : 'Se completó sin detalles adicionales.',
-      onDoneCaptureText: e => this.setState({ doneCapture: Object.assign({}, s.doneCapture, { text: e.target.value }) }),
-      submitDoneCapture: this.submitDoneCapture,
-      skipDoneCapture: this.skipDoneCapture,
-      closeDoneCapture: this.closeDoneCapture,
       onTaskTitle: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { title: e.target.value }) }),
       onTaskResponsable: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { responsable: e.target.value }) }),
       onNewResponsableName: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { newResponsableName: e.target.value }) }),
@@ -3251,7 +3171,6 @@ class Component extends DCLogic {
       onTaskDetail: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { detail: e.target.value }) }),
       onTaskNextAction: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { nextAction: e.target.value }) }),
       onTaskDueDate: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { dueDate: e.target.value }) }),
-      onTaskEvidence: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { evidence: e.target.value }) }),
       newContact: this.newContact,
       closeContactModal: this.closeContactModal,
       saveContact: this.saveContact,

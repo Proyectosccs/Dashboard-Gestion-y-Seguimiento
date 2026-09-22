@@ -118,7 +118,6 @@
     dom.taskPrioritySelect = document.getElementById('field-task-priority');
     dom.taskDetail = document.getElementById('field-task-detail');
     dom.taskNextAction = document.getElementById('field-task-next-action');
-    dom.taskEvidence = document.getElementById('field-task-evidence');
     dom.eventDialog = document.getElementById('event-dialog');
     dom.eventForm = document.getElementById('event-form');
     dom.eventDialogTitle = document.getElementById('event-dialog-title');
@@ -388,7 +387,6 @@
     dom.taskDueDate.value = task ? (task.dueDate || '') : '';
     dom.taskDetail.value = task ? taskDetailText(task) : '';
     dom.taskNextAction.value = task ? (task.nextAction || '') : '';
-    dom.taskEvidence.value = task ? (task.evidence || '') : '';
     dom.taskPrioritySelect.value = task ? (task.priority || 'media') : 'media';
     dom.taskStageSelect.value = task ? task.stage : 'todo';
     dom.taskFollowupSelect.value = task ? (task.followupStatus || 'in_progress') : 'in_progress';
@@ -423,7 +421,6 @@
       responsable: responsable,
       dueDate: dom.taskDueDate.value,
       nextAction: dom.taskNextAction.value.trim(),
-      evidence: dom.taskEvidence.value.trim(),
       created_at: new Date().toISOString()
     };
     if (state.taskEditor) {

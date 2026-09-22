@@ -239,7 +239,6 @@
     dom.taskPrioritySelect = document.getElementById('field-task-priority');
     dom.taskDetail = document.getElementById('field-task-detail');
     dom.taskNextAction = document.getElementById('field-task-next-action');
-    dom.taskEvidence = document.getElementById('field-task-evidence');
     dom.tasksOrgFilter = document.getElementById('tasks-org-filter');
     dom.tasksResponsableFilter = document.getElementById('tasks-responsable-filter');
     dom.tasksKpiGrid = document.getElementById('tasks-kpi-grid');
@@ -868,7 +867,6 @@
     dom.taskDueDate.value = existing ? (existing.dueDate || '') : '';
     dom.taskDetail.value = existing ? taskDetailText(existing) : '';
     dom.taskNextAction.value = existing ? (existing.nextAction || '') : '';
-    dom.taskEvidence.value = existing ? (existing.evidence || '') : '';
     dom.taskPrioritySelect.value = existing ? (existing.priority || 'media') : 'media';
     dom.taskStatusSelect.value = existing ? (existing.status || 'pendiente') : 'pendiente';
     dom.taskFollowupSelect.value = existing ? (existing.followupStatus || 'in_progress') : 'in_progress';
@@ -906,7 +904,6 @@
       responsable: responsable,
       dueDate: dom.taskDueDate.value,
       nextAction: dom.taskNextAction.value.trim(),
-      evidence: dom.taskEvidence.value.trim(),
       created_at: state.editingTask ? state.editingTask.created_at : new Date().toISOString()
     };
     const next = state.editingTask
