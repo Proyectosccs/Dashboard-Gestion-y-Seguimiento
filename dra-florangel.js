@@ -14,9 +14,9 @@
   // Ingenia — la columna sigue siendo "todo/doing/done" internamente,
   // solo cambia la etiqueta visible.
   const STAGES = [
-    { key: 'todo', label: 'Pendiente (Por hacer)', short: 'Pendiente', color: '#a15a7c' },
-    { key: 'doing', label: 'En proceso (En progreso)', short: 'En proceso', color: '#7c3aed' },
-    { key: 'done', label: 'Listo (Hecho)', short: 'Listo', color: '#0f7a3d' }
+    { key: 'todo', label: 'Pendiente', short: 'Pendiente', color: '#a15a7c' },
+    { key: 'doing', label: 'En proceso', short: 'En proceso', color: '#7c3aed' },
+    { key: 'done', label: 'Listo', short: 'Listo', color: '#0f7a3d' }
   ];
   const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
