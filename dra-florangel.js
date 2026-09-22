@@ -24,7 +24,13 @@
   const STAGES = [
     { key: 'todo', label: 'Pendiente', short: 'Pendiente', color: '#a15a7c' },
     { key: 'doing', label: 'En proceso', short: 'En proceso', color: '#7c3aed' },
-    { key: 'done', label: 'Listo', short: 'Listo', color: '#0f7a3d' }
+    { key: 'done', label: 'Listo', short: 'Listo', color: '#0f7a3d' },
+    { key: 'blocked', label: 'Bloqueada', short: 'Bloqueada', color: '#a02525' }
+  ];
+  const FOLLOWUP_STATUSES = [
+    { key: 'contacted', label: 'Contactado' },
+    { key: 'in_progress', label: 'En seguimiento' },
+    { key: 'waiting_response', label: 'Esperando respuesta' }
   ];
   const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -105,6 +111,14 @@
     dom.taskDelete = document.getElementById('task-delete');
     dom.taskResponsableSelect = document.getElementById('field-task-responsable');
     dom.newResponsableField = document.getElementById('new-responsable-field');
+    dom.taskDueDate = document.getElementById('field-task-due-date');
+    dom.taskStageSelect = document.getElementById('field-task-stage');
+    dom.taskFollowupField = document.getElementById('task-followup-field');
+    dom.taskFollowupSelect = document.getElementById('field-task-followup');
+    dom.taskPrioritySelect = document.getElementById('field-task-priority');
+    dom.taskDetail = document.getElementById('field-task-detail');
+    dom.taskNextAction = document.getElementById('field-task-next-action');
+    dom.taskEvidence = document.getElementById('field-task-evidence');
     dom.eventDialog = document.getElementById('event-dialog');
     dom.eventForm = document.getElementById('event-form');
     dom.eventDialogTitle = document.getElementById('event-dialog-title');
@@ -118,6 +132,7 @@
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
     dom.eventDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeEventDialog(); });
     dom.taskResponsableSelect.addEventListener('change', onResponsableChange);
+    dom.taskStageSelect.addEventListener('change', onTaskStageChange);
     dom.tasksResponsableFilter.addEventListener('change', function () {
       state.taskResponsableFilter = dom.tasksResponsableFilter.value;
       renderKanban();
@@ -220,11 +235,11 @@
     const responsableFilter = state.taskResponsableFilter || null;
     const scoped = state.tasks.filter(function (t) { return !responsableFilter || t.responsable === responsableFilter; });
     const cards = [
-      { icon: '🧩', value: scoped.length, label: 'Tareas operativas', cls: 'kpi-primary' }
+      { icon: '🧩', value: scoped.length, label: 'Tareas', cls: 'kpi-primary' }
     ].concat(STAGES.map(function (stage, idx) {
       const count = scoped.filter(function (t) { return t.stage === stage.key; }).length;
-      const icons = ['○', '↻', '✓'];
-      const classes = ['kpi-neutral', 'kpi-sky', 'kpi-good'];
+      const icons = ['○', '↻', '✓', '⛔'];
+      const classes = ['kpi-neutral', 'kpi-sky', 'kpi-good', 'kpi-danger'];
       return { icon: icons[idx], value: count, label: stage.label, cls: classes[idx] };
     }));
     renderMarkup(dom.tasksKpiGrid, cards.map(function (c) {
@@ -262,17 +277,29 @@
     });
   }
 
+  function taskDetailText(task) { return task.detail != null ? task.detail : (task.notes || ''); }
+
+  function taskFollowupLabel(task) {
+    if (task.stage !== 'doing' || !task.followupStatus) return '';
+    const f = FOLLOWUP_STATUSES.find(function (x) { return x.key === task.followupStatus; });
+    return f ? f.label : '';
+  }
+
   function renderTaskCard(task) {
     const stageIndex = STAGES.findIndex(function (s) { return s.key === task.stage; });
     const moveButtons = [];
     if (stageIndex > 0) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task" data-id="' + safe(task.id) + '" data-stage="' + STAGES[stageIndex - 1].key + '" onclick="window.florangelAction(event)">← ' + safe(STAGES[stageIndex - 1].short) + '</button>');
     if (stageIndex < STAGES.length - 1) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task" data-id="' + safe(task.id) + '" data-stage="' + STAGES[stageIndex + 1].key + '" onclick="window.florangelAction(event)">' + safe(STAGES[stageIndex + 1].short) + ' →</button>');
     const responsable = responsableName(task.responsable);
+    const detailText = taskDetailText(task);
+    const followupLabel = taskFollowupLabel(task);
     return '<article class="kanban-card" draggable="true" data-id="' + safe(task.id) + '">' +
       '<button type="button" style="all:unset;cursor:pointer" data-action="edit-task" data-id="' + safe(task.id) + '" onclick="window.florangelAction(event)">' +
         '<p class="kanban-card-title">' + safe(task.title) + '</p>' +
-        (task.notes ? '<p class="kanban-card-notes">' + safe(task.notes) + '</p>' : '') +
+        (detailText ? '<p class="kanban-card-notes">' + safe(detailText) + '</p>' : '') +
         (responsable ? '<span class="responsable-tag">👤 ' + safe(responsable) + '</span>' : '') +
+        (followupLabel ? '<span class="responsable-tag">↻ ' + safe(followupLabel) + '</span>' : '') +
+        (task.dueDate ? '<span class="responsable-tag">⏰ ' + safe(formatDate(task.dueDate)) + '</span>' : '') +
       '</button>' +
       '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' +
     '</article>';
@@ -302,6 +329,10 @@
     const isNew = dom.taskResponsableSelect.value === NEW_MEMBER_VALUE;
     dom.newResponsableField.hidden = !isNew;
     if (isNew) dom.taskForm.elements.new_responsable_name.focus();
+  }
+
+  function onTaskStageChange() {
+    dom.taskFollowupField.hidden = dom.taskStageSelect.value !== 'doing';
   }
 
   function populateTasksResponsableFilter() {
@@ -353,9 +384,15 @@
     dom.taskDelete.hidden = !task;
     hideError(dom.taskError);
     dom.taskForm.elements.title.value = task ? task.title : '';
-    dom.taskForm.elements.notes.value = task ? (task.notes || '') : '';
-    dom.taskForm.elements.stage.value = task ? task.stage : 'todo';
     populateResponsableSelect(task ? task.responsable : '');
+    dom.taskDueDate.value = task ? (task.dueDate || '') : '';
+    dom.taskDetail.value = task ? taskDetailText(task) : '';
+    dom.taskNextAction.value = task ? (task.nextAction || '') : '';
+    dom.taskEvidence.value = task ? (task.evidence || '') : '';
+    dom.taskPrioritySelect.value = task ? (task.priority || 'media') : 'media';
+    dom.taskStageSelect.value = task ? task.stage : 'todo';
+    dom.taskFollowupSelect.value = task ? (task.followupStatus || 'in_progress') : 'in_progress';
+    onTaskStageChange();
     dom.taskDialog.showModal();
     dom.taskForm.elements.title.focus();
   }
@@ -375,12 +412,18 @@
       responsable = created.id;
       populateTasksResponsableFilter();
     }
+    const stage = dom.taskStageSelect.value;
     const payload = {
       id: state.taskEditor || uid(),
       title: title,
-      notes: dom.taskForm.elements.notes.value.trim(),
-      stage: dom.taskForm.elements.stage.value,
+      detail: dom.taskDetail.value.trim(),
+      stage: stage,
+      followupStatus: stage === 'doing' ? dom.taskFollowupSelect.value : '',
+      priority: dom.taskPrioritySelect.value,
       responsable: responsable,
+      dueDate: dom.taskDueDate.value,
+      nextAction: dom.taskNextAction.value.trim(),
+      evidence: dom.taskEvidence.value.trim(),
       created_at: new Date().toISOString()
     };
     if (state.taskEditor) {
@@ -528,6 +571,12 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  function formatDate(iso) {
+    const parts = String(iso || '').split('-');
+    const month = MONTHS[Number(parts[1] || 1) - 1] || '';
+    return (parts[2] || '—') + ' de ' + month + ' ' + (parts[0] || '');
   }
 
   function formatTime(value) {

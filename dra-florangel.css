@@ -279,7 +279,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   box-shadow: var(--shadow-sm);
 }
 
-.kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+.kpi-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
 .kpi-card { min-height: 110px; display: flex; flex-direction: column; gap: 4px; padding: 18px 20px; border-radius: 24px; }
 .kpi-icon { font-size: 20px; line-height: 1; margin-bottom: 4px; }
 .kpi-card strong { font-family: var(--font-heading); font-size: 38px; line-height: 1; }
@@ -290,7 +290,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .kpi-indigo { background: var(--coalition-indigo-soft); color: var(--coalition-indigo); }
 .kpi-good { background: var(--coalition-good-soft); color: var(--coalition-good); }
 .kpi-neutral { background: var(--color-neutral-200); color: var(--color-neutral-800); }
-@media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kpi-danger { background: var(--coalition-danger-soft); color: var(--coalition-danger); }
+@media (max-width: 1180px) { .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .empty-state { min-height: 170px; display: grid; place-items: center; align-content: center; gap: 8px; padding: 22px; text-align: center; color: var(--color-neutral-700); }
 .empty-state strong { color: var(--color-text); font-family: var(--font-heading); font-size: 20px; }
@@ -363,7 +365,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .status-pill.status-completed { background: var(--coalition-teal-soft); color: var(--coalition-teal); }
 
 /* ---------- Tareas (kanban) ---------- */
-.kanban-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-items: start; }
+.kanban-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; align-items: start; }
 @media (max-width: 860px) { .kanban-board { grid-template-columns: 1fr; } }
 .kanban-column { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 24px; background: rgba(255,255,255,.6); border: 1px solid var(--color-neutral-300); min-height: 120px; }
 .kanban-column.drag-over { border-color: var(--color-accent); background: var(--color-accent-100); }

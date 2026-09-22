@@ -6,9 +6,9 @@
   <meta name="description" content="Tareas y calendario de jornadas — Dra Florangel.">
   <title>Dra Florangel — Tareas y jornadas</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./dra-florangel.css?v=5">
+  <link rel="stylesheet" href="./dra-florangel.css?v=6">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./dra-florangel.js?v=5" defer></script>
+  <script src="./dra-florangel.js?v=6" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -90,19 +90,7 @@
           <label for="field-task-title">Título</label>
           <input id="field-task-title" class="input" name="title" type="text" required>
         </div>
-        <div class="field field-full">
-          <label for="field-task-notes">Notas</label>
-          <textarea id="field-task-notes" class="input" name="notes"></textarea>
-        </div>
-        <div class="field field-full">
-          <label for="field-task-stage">Columna</label>
-          <select id="field-task-stage" class="input" name="stage">
-            <option value="todo">Pendiente</option>
-            <option value="doing">En proceso</option>
-            <option value="done">Listo</option>
-          </select>
-        </div>
-        <div class="field field-full">
+        <div class="field">
           <label for="field-task-responsable">Responsable</label>
           <div class="responsable-row">
             <select id="field-task-responsable" class="input" name="responsable"></select>
@@ -112,6 +100,48 @@
         <div class="field field-full" id="new-responsable-field" hidden>
           <label for="field-new-responsable-name">Nombre del nuevo responsable</label>
           <input id="field-new-responsable-name" class="input" name="new_responsable_name" type="text" placeholder="Ej. Andrea Pérez">
+        </div>
+        <div class="field">
+          <label for="field-task-due-date">Fecha límite</label>
+          <input id="field-task-due-date" class="input" name="due_date" type="date">
+        </div>
+        <div class="field">
+          <label for="field-task-stage">Estado</label>
+          <select id="field-task-stage" class="input" name="stage">
+            <option value="todo">Pendiente</option>
+            <option value="doing">En proceso</option>
+            <option value="done">Listo</option>
+            <option value="blocked">Bloqueada</option>
+          </select>
+        </div>
+        <div class="field field-full" id="task-followup-field" hidden>
+          <label for="field-task-followup">¿Cómo va el seguimiento?</label>
+          <select id="field-task-followup" class="input" name="followup_status">
+            <option value="contacted">Contactado</option>
+            <option value="in_progress">En seguimiento</option>
+            <option value="waiting_response">Esperando respuesta</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="field-task-priority">Prioridad</label>
+          <select id="field-task-priority" class="input" name="priority">
+            <option value="critica">Crítica</option>
+            <option value="alta">Alta</option>
+            <option value="media" selected>Media</option>
+            <option value="baja">Baja</option>
+          </select>
+        </div>
+        <div class="field field-full">
+          <label for="field-task-detail">Detalle</label>
+          <textarea id="field-task-detail" class="input" name="detail"></textarea>
+        </div>
+        <div class="field field-full">
+          <label for="field-task-next-action">Próxima acción</label>
+          <textarea id="field-task-next-action" class="input" name="next_action"></textarea>
+        </div>
+        <div class="field field-full">
+          <label for="field-task-evidence">Evidencia</label>
+          <textarea id="field-task-evidence" class="input" name="evidence" placeholder="Prueba o resultado de la ejecución…"></textarea>
         </div>
       </div>
       <div class="dialog-actions">
