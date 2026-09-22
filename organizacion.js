@@ -74,7 +74,6 @@
       'task-dialog-close': closeTaskDialog,
       'task-dialog-cancel': closeTaskDialog,
       'task-delete': deleteEditingTask,
-      'responsable-delete': deleteResponsableFromRoster,
       'tasks-filter-clear': function () {
         state.taskResponsableFilter = '';
         dom.tasksResponsableFilter.value = '';
@@ -108,7 +107,7 @@
     dom.eventDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeEventDialog(); });
     dom.taskForm.addEventListener('submit', onTaskSubmit);
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
-    dom.taskResponsableSelect.addEventListener('change', onResponsableChange);
+    dom.responsableChecklist.addEventListener('change', onResponsableChecklistChange);
     dom.taskStatusSelect.addEventListener('change', onTaskStatusChange);
     dom.tasksResponsableFilter.addEventListener('change', function () {
       state.taskResponsableFilter = dom.tasksResponsableFilter.value;
@@ -143,7 +142,7 @@
     dom.taskForm = document.getElementById('task-form');
     dom.taskError = document.getElementById('task-error');
     dom.taskDelete = document.getElementById('task-delete');
-    dom.taskResponsableSelect = document.getElementById('field-task-responsable');
+    dom.responsableChecklist = document.getElementById('responsable-checklist');
     dom.newResponsableField = document.getElementById('new-responsable-field');
     dom.taskDueDate = document.getElementById('field-task-due-date');
     dom.taskStatusSelect = document.getElementById('field-task-status');
@@ -208,7 +207,9 @@
     state.org = registry.find(function (o) { return o.id === ORG_ID; }) || null;
     if (!state.org) { dom.loadingState.hidden = true; return showNotFound(); }
 
-    state.allTasks = Array.isArray(tasksRes.data && tasksRes.data.value) ? tasksRes.data.value : [];
+    state.allTasks = (Array.isArray(tasksRes.data && tasksRes.data.value) ? tasksRes.data.value : []).map(function (t) {
+      return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) });
+    });
     state.events = (Array.isArray(eventsRes.data && eventsRes.data.value) ? eventsRes.data.value : []).filter(function (e) { return !!e.event_date; });
     state.teamMembers = Array.isArray(membersRes.data && membersRes.data.value) ? membersRes.data.value : [];
 
@@ -350,7 +351,7 @@
 
   function renderKpis() {
     const responsableFilter = state.taskResponsableFilter || null;
-    const scoped = state.allTasks.filter(function (t) { return t.org === ORG_ID && (!responsableFilter || t.responsable === responsableFilter); });
+    const scoped = state.allTasks.filter(function (t) { return t.org === ORG_ID && (!responsableFilter || t.responsable.indexOf(responsableFilter) > -1); });
     function count(statusKey) { return scoped.filter(function (t) { return (t.status || 'pendiente') === statusKey; }).length; }
     const cards = [
       { icon: '🧩', value: scoped.length, label: 'Tareas', cls: 'kpi-primary' },
@@ -366,7 +367,7 @@
 
   function renderTasksBoard() {
     const responsableFilter = state.taskResponsableFilter || null;
-    const scoped = state.allTasks.filter(function (t) { return t.org === ORG_ID && (!responsableFilter || t.responsable === responsableFilter); });
+    const scoped = state.allTasks.filter(function (t) { return t.org === ORG_ID && (!responsableFilter || t.responsable.indexOf(responsableFilter) > -1); });
     renderMarkup(dom.tasksBoard, TASK_STATUSES.map(function (status) {
       const items = scoped.filter(function (t) { return (t.status || 'pendiente') === status.key; });
       return '<div class="kanban-column" data-status="' + status.key + '">' +
@@ -405,7 +406,7 @@
     const moveButtons = [];
     if (statusIndex > 0) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task-status" data-id="' + safe(task.id) + '" data-status="' + TASK_STATUSES[statusIndex - 1].key + '" onclick="window.orgAction(event)">← ' + safe(TASK_STATUSES[statusIndex - 1].label) + '</button>');
     if (statusIndex < TASK_STATUSES.length - 1) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task-status" data-id="' + safe(task.id) + '" data-status="' + TASK_STATUSES[statusIndex + 1].key + '" onclick="window.orgAction(event)">' + safe(TASK_STATUSES[statusIndex + 1].label) + ' →</button>');
-    const responsable = responsableName(task.responsable);
+    const responsable = responsableNamesLabel(task.responsable);
     const detailText = taskDetailText(task);
     const followupLabel = taskFollowupLabel(task);
     return '<article class="kanban-card" draggable="true" data-id="' + safe(task.id) + '" style="--status-color:' + safe(status.color) + '">' +
@@ -431,19 +432,44 @@
     return member ? member.name : '';
   }
 
-  function populateResponsableSelect(currentId) {
-    const options = ['<option value="">Sin asignar</option>'].concat(state.teamMembers.map(function (m) {
-      return '<option value="' + safe(m.id) + '">👤 ' + safe(m.name) + '</option>';
-    }), ['<option value="' + NEW_MEMBER_VALUE + '">➕ Otro (agregar miembro nuevo)</option>']);
-    renderMarkup(dom.taskResponsableSelect, options.join(''));
-    dom.taskResponsableSelect.value = currentId || '';
+  // Acepta tanto el formato viejo (un solo id como string) como el actual
+  // (arreglo de ids) — así las tareas guardadas antes de permitir varios
+  // responsables se siguen mostrando bien sin necesidad de migrarlas.
+  function normalizeResponsableList(value) {
+    if (Array.isArray(value)) return value.filter(Boolean);
+    return value ? [value] : [];
+  }
+
+  function responsableNamesLabel(value) {
+    return normalizeResponsableList(value).map(responsableName).filter(Boolean).join(', ');
+  }
+
+  function populateResponsableChecklist(currentIds) {
+    const selected = normalizeResponsableList(currentIds);
+    const rows = state.teamMembers.map(function (m) {
+      const checked = selected.indexOf(m.id) > -1 ? ' checked' : '';
+      return '<label class="responsable-check-row"><input type="checkbox" value="' + safe(m.id) + '"' + checked + '> 👤 ' + safe(m.name) + '</label>';
+    });
+    rows.push('<label class="responsable-check-row"><input type="checkbox" id="responsable-check-new" value="' + NEW_MEMBER_VALUE + '"> ➕ Otro (agregar miembro nuevo)</label>');
+    renderMarkup(dom.responsableChecklist, rows.join(''));
     dom.newResponsableField.hidden = true;
   }
 
-  function onResponsableChange() {
-    const isNew = dom.taskResponsableSelect.value === NEW_MEMBER_VALUE;
-    dom.newResponsableField.hidden = !isNew;
-    if (isNew) dom.taskForm.elements.new_responsable_name.focus();
+  function onResponsableChecklistChange(e) {
+    if (!e.target || e.target.id !== 'responsable-check-new') return;
+    dom.newResponsableField.hidden = !e.target.checked;
+    if (e.target.checked) dom.taskForm.elements.new_responsable_name.focus();
+  }
+
+  function getSelectedResponsableIds() {
+    return Array.from(dom.responsableChecklist.querySelectorAll('input[type="checkbox"]:checked'))
+      .map(function (cb) { return cb.value; })
+      .filter(function (v) { return v && v !== NEW_MEMBER_VALUE; });
+  }
+
+  function isNewResponsableChecked() {
+    const cb = document.getElementById('responsable-check-new');
+    return !!(cb && cb.checked);
   }
 
   function onTaskStatusChange() {
@@ -470,21 +496,6 @@
     return entry;
   }
 
-  async function deleteResponsableFromRoster() {
-    const selectedId = dom.taskResponsableSelect.value;
-    if (!selectedId || selectedId === NEW_MEMBER_VALUE) return;
-    const member = findTeamMember(selectedId);
-    if (!member) return;
-    const next = state.teamMembers.filter(function (m) { return m.id !== selectedId; });
-    const ok = await writeBoardKey(TEAM_MEMBERS_KEY, next);
-    if (!ok) { toast('No se pudo eliminar al responsable — revisa tu conexión.', 'error'); return; }
-    state.teamMembers = next;
-    populateResponsableSelect('');
-    populateTasksResponsableFilter();
-    renderTasksBoard();
-    renderKpis();
-    toast('Responsable eliminado del equipo.', 'success');
-  }
 
   async function moveTaskStatus(id, status) {
     const task = findById(state.allTasks, id);
@@ -504,7 +515,7 @@
     dom.taskDialogTitle.textContent = existing ? 'Editar tarea' : 'Agregar tarea';
     dom.taskDelete.hidden = !existing;
     dom.taskForm.elements.title.value = existing ? (existing.title || '') : '';
-    populateResponsableSelect(existing ? existing.responsable : '');
+    populateResponsableChecklist(existing ? existing.responsable : []);
     dom.taskDueDate.value = existing ? (existing.dueDate || '') : '';
     dom.taskDetail.value = existing ? taskDetailText(existing) : '';
     dom.taskNextAction.value = existing ? (existing.nextAction || '') : '';
@@ -523,13 +534,13 @@
     hideError(dom.taskError);
     const title = dom.taskForm.elements.title.value.trim();
     if (!title) { showError(dom.taskError, 'El título es obligatorio.'); return; }
-    let responsable = dom.taskForm.elements.responsable.value;
-    if (responsable === NEW_MEMBER_VALUE) {
+    let responsableIds = getSelectedResponsableIds();
+    if (isNewResponsableChecked()) {
       const newName = dom.taskForm.elements.new_responsable_name.value.trim();
       if (!newName) { showError(dom.taskError, 'Escribe el nombre del nuevo responsable.'); return; }
       const created = await createTeamMember(newName);
       if (!created) { showError(dom.taskError, 'No se pudo guardar el responsable — revisa tu conexión.'); return; }
-      responsable = created.id;
+      responsableIds = responsableIds.concat([created.id]);
       populateTasksResponsableFilter();
     }
     const existing = state.editingTask;
@@ -542,7 +553,7 @@
       status: status,
       followupStatus: status === 'en_proceso' ? dom.taskFollowupSelect.value : '',
       priority: dom.taskPrioritySelect.value,
-      responsable: responsable,
+      responsable: responsableIds,
       dueDate: dom.taskDueDate.value,
       nextAction: dom.taskNextAction.value.trim(),
       created_at: existing ? existing.created_at : new Date().toISOString()
