@@ -88,6 +88,16 @@
         <button onClick="{{ newTask }}" style="align-self: flex-start; border: none; border-radius: 999px; padding: 14px 22px; background: var(--color-accent-400); color: var(--color-neutral-900); font-weight: 700; cursor: pointer; font-size: 15px" style-hover="{{ lightHover }}">＋ Agregar tarea</button>
       </div>
 
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--color-neutral-100); border-radius: 999px; padding: 10px 14px; box-shadow: var(--shadow-sm)">
+        <label style="font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 8px">Responsable
+          <select value="{{ taskResponsableFilter }}" onChange="{{ onTaskResponsableFilter }}" style="border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 8px 14px; font-size: 13px; color: var(--color-text); cursor: pointer">
+            <option value="">Todos los responsables</option>
+            <sc-for list="{{ taskResponsableFilterOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+          </select>
+        </label>
+        <button onClick="{{ clearTaskResponsableFilter }}" style="border: none; background: transparent; color: var(--color-neutral-700); font-size: 13px; cursor: pointer; text-decoration: underline; padding: 8px">Limpiar</button>
+      </div>
+
       <div style="{{ boardSectionStyles.kanban }}">
         <sc-for list="{{ boardColumns }}" as="col" hint-placeholder-count="4">
           <section style="{{ col.sectionStyle }}" aria-label="{{ col.label }}" onDragOver="{{ col.onDragOver }}" onDragLeave="{{ col.onDragLeave }}" onDrop="{{ col.onDrop }}">
@@ -1676,7 +1686,7 @@ function fmt(d) {
 class Component extends DCLogic {
   state = {
     view: 'board', query: '', faculty: 'all', role: 'all', onlyFollow: false,
-    dragTaskId: null, dragOverCol: null, dragOverIndex: null, doneCapture: null,
+    dragTaskId: null, dragOverCol: null, dragOverIndex: null, doneCapture: null, taskResponsableFilter: '',
     dragContactId: null, dragOverUnit: null,
     contacts: readStore('ucv-contacts-v1', CONTACTS),
     interactions: readStore('ucv-interactions-v2', SEED),
@@ -2445,12 +2455,13 @@ class Component extends DCLogic {
     const count = r => all.filter(c => c.role === r).length;
     const kpiBase = { borderRadius: bubble.radius + 4, padding: (bubble.padding + 2) + 'px ' + (bubble.padding + 4) + 'px', display: 'flex', flexDirection: 'column', gap: 4, boxShadow: 'var(--shadow-sm)' };
     const kpi = (bg, fg) => Object.assign({}, kpiBase, { background: bg, color: fg });
+    const kpiTasksScoped = s.tasks.filter(t => !s.taskResponsableFilter || t.owner === s.taskResponsableFilter);
     const kpis = s.view === 'board' ? [
-      { emoji: '🧩', value: s.tasks.length, label: 'Tareas', style: kpi('#fff', 'var(--color-text)') },
-      { emoji: '○', value: s.tasks.filter(t => t.status === 'pending').length, label: 'Pendiente', style: kpi('#f1ede6', '#645c50') },
-      { emoji: '↻', value: s.tasks.filter(t => t.status === 'following').length, label: 'En proceso', style: kpi('#eaf1fc', '#315a9d') },
-      { emoji: '✓', value: s.tasks.filter(t => t.status === 'executed').length, label: 'Listo', style: kpi('#e6f6f3', '#14584f') },
-      { emoji: '⛔', value: s.tasks.filter(t => t.status === 'blocked').length, label: 'Bloqueada', style: kpi('#fdebeb', '#a02525') }
+      { emoji: '🧩', value: kpiTasksScoped.length, label: 'Tareas', style: kpi('#fff', 'var(--color-text)') },
+      { emoji: '○', value: kpiTasksScoped.filter(t => t.status === 'pending').length, label: 'Pendiente', style: kpi('#f1ede6', '#645c50') },
+      { emoji: '↻', value: kpiTasksScoped.filter(t => t.status === 'following').length, label: 'En proceso', style: kpi('#eaf1fc', '#315a9d') },
+      { emoji: '✓', value: kpiTasksScoped.filter(t => t.status === 'executed').length, label: 'Listo', style: kpi('#e6f6f3', '#14584f') },
+      { emoji: '⛔', value: kpiTasksScoped.filter(t => t.status === 'blocked').length, label: 'Bloqueada', style: kpi('#fdebeb', '#a02525') }
     ] : s.view === 'calendar' ? [
       { emoji: '🗓️', value: s.journeys.length, label: 'Eventos registrados', style: kpi('#fff', 'var(--color-text)') },
       { emoji: '📍', value: s.journeys.filter(j => (j.dates || []).some(d => d.slice(0, 7) === s.calendarMonth)).length, label: 'En este mes', style: kpi('#fff0e6', '#8c491a') },
@@ -2676,7 +2687,7 @@ class Component extends DCLogic {
     const placeholderStyle = { height: 64, borderRadius: bubble.radius, border: '2px dashed var(--color-accent-500)', background: 'var(--color-accent-100)', flex: 'none' };
     const boardColumns = BOARD_STATUS.map(col => {
       const isOver = s.dragOverCol === col.id;
-      const rawTasks = s.tasks.filter(t => t.status === col.id);
+      const rawTasks = s.tasks.filter(t => t.status === col.id && (!s.taskResponsableFilter || t.owner === s.taskResponsableFilter));
       const tasks = rawTasks.map((t, i) => {
         const p = priorityMeta[t.priority] || priorityMeta.medium;
         const pos = statusOrder.indexOf(t.status);
@@ -2780,6 +2791,8 @@ class Component extends DCLogic {
       const seen = {};
       return list.filter(n => { if (seen[n]) return false; seen[n] = true; return true; }).map(n => ({ id: n, label: n === 'Por confirmar' ? n : '👤 ' + n }));
     })();
+
+    const taskResponsableFilterOptions = s.teamMembers.map(m => ({ id: m.name, label: '👤 ' + m.name }));
 
     const unitBox = { background: '#fff', borderRadius: 14, padding: '9px 10px', display: 'flex', flexDirection: 'column', gap: 6, borderWidth: 1.5, borderStyle: 'solid' };
     const hasMedicalPerson = unitId => {
@@ -3076,6 +3089,9 @@ class Component extends DCLogic {
       isEditingTask: !!s.taskModal && s.taskModal !== 'new', deleteCurrentTask: this.deleteTask,
       taskStatusOptions: taskStatusOptions, taskFollowupOptions: taskFollowupOptions, taskFollowupOpen: s.taskForm.status === 'following', taskPriorityOptions: taskPriorityOptions, extraUnitChips: extraUnitChips, contactOwnerOptions: contactOwnerOptions,
       taskOwnerOptions: taskOwnerOptions,
+      taskResponsableFilter: s.taskResponsableFilter, taskResponsableFilterOptions: taskResponsableFilterOptions,
+      onTaskResponsableFilter: e => this.setState({ taskResponsableFilter: e.target.value }),
+      clearTaskResponsableFilter: () => this.setState({ taskResponsableFilter: '' }),
       contactModalOpen: !!s.contactModal, contactModalTitle: s.contactModal === 'new' ? 'Nuevo contacto' : 'Editar contacto',
       isEditingContact: !!s.contactModal && s.contactModal !== 'new',
       contactForm: s.contactForm, roleOptions: Object.keys(ROLE).map(k => ({ id: k, label: ROLE[k].emoji + ' ' + ROLE[k].short })),
