@@ -865,42 +865,22 @@
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Fecha límite
             <input type="date" value="{{ taskForm.dueDate }}" onChange="{{ onTaskDueDate }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
-        </div>
-
-        <div style="background: var(--color-accent-2-100); border: 1px solid var(--color-accent-2-300); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 12px">
-          <div>
-            <div style="font-family: var(--font-heading); font-size: 16px">Clasificación de la tarea</div>
-            <div style="font-size: 11.5px; color: var(--color-neutral-700)">Elige el área, el estado y la prioridad con las etiquetas de color.</div>
-          </div>
-          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 6px">Área
-            <span style="display: flex; flex-wrap: wrap; gap: 7px">
-              <sc-for list="{{ taskAreaChips }}" as="o" hint-placeholder-count="6">
-                <button type="button" onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
-              </sc-for>
-            </span>
-          </label>
-          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 6px">Estado
-            <span style="display: flex; flex-wrap: wrap; gap: 7px">
-              <sc-for list="{{ taskStatusChips }}" as="o" hint-placeholder-count="4">
-                <button type="button" onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.emoji }} {{ o.label }}</button>
-              </sc-for>
-            </span>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Estado
+            <select value="{{ taskForm.status }}" onChange="{{ onTaskStatus }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <sc-for list="{{ taskStatusOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+            </select>
           </label>
           <sc-if value="{{ taskFollowupOpen }}" hint-placeholder-val="{{ false }}">
-            <label style="font-size: 12px; font-weight: 700; display: grid; gap: 6px">¿Cómo va el seguimiento?
-              <span style="display: flex; flex-wrap: wrap; gap: 7px">
-                <sc-for list="{{ taskFollowupChips }}" as="o" hint-placeholder-count="3">
-                  <button type="button" onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.emoji }} {{ o.label }}</button>
-                </sc-for>
-              </span>
+            <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px; grid-column: 1 / -1">¿Cómo va el seguimiento?
+              <select value="{{ taskForm.followupStatus }}" onChange="{{ onTaskFollowup }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+                <sc-for list="{{ taskFollowupOptions }}" as="o" hint-placeholder-count="3"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+              </select>
             </label>
           </sc-if>
-          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 6px">Prioridad
-            <span style="display: flex; flex-wrap: wrap; gap: 7px">
-              <sc-for list="{{ taskPriorityChips }}" as="o" hint-placeholder-count="3">
-                <button type="button" onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
-              </sc-for>
-            </span>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Prioridad
+            <select value="{{ taskForm.priority }}" onChange="{{ onTaskPriority }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <sc-for list="{{ taskPriorityOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+            </select>
           </label>
         </div>
         <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Detalle
@@ -914,6 +894,9 @@
         </label>
         <div style="display: flex; gap: 10px; justify-content: flex-end">
           <button onClick="{{ closeTaskModal }}" style="border: 1px solid var(--color-neutral-300); background: transparent; border-radius: 999px; padding: 11px 18px; font-weight: 700; cursor: pointer">Cancelar</button>
+          <sc-if value="{{ isEditingTask }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ deleteCurrentTask }}" style="border: 1px solid #f0bcbc; background: #fdebeb; color: #a02525; border-radius: 999px; padding: 11px 18px; font-weight: 700; cursor: pointer">🗑️ Eliminar</button>
+          </sc-if>
           <button onClick="{{ saveTask }}" style="border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 11px 20px; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">Guardar tarea</button>
         </div>
       </div>
@@ -2069,6 +2052,14 @@ class Component extends DCLogic {
     if (clean.status === 'executed' && (!prevTask || prevTask.status !== 'executed')) this.promptDoneCapture(s.taskModal === 'new' ? list[list.length - 1].id : s.taskModal, clean.title);
   };
 
+  deleteTask = () => {
+    const s = this.state;
+    if (!s.taskModal || s.taskModal === 'new') return;
+    const list = s.tasks.filter(t => t.id !== s.taskModal);
+    writeStore('ucv-tasks-v2', list);
+    this.setState({ tasks: list, taskModal: null });
+  };
+
   moveTask(id, direction) {
     const order = BOARD_STATUS.map(x => x.id);
     let celebrated = null;
@@ -2455,11 +2446,11 @@ class Component extends DCLogic {
     const kpiBase = { borderRadius: bubble.radius + 4, padding: (bubble.padding + 2) + 'px ' + (bubble.padding + 4) + 'px', display: 'flex', flexDirection: 'column', gap: 4, boxShadow: 'var(--shadow-sm)' };
     const kpi = (bg, fg) => Object.assign({}, kpiBase, { background: bg, color: fg });
     const kpis = s.view === 'board' ? [
-      { emoji: '🧩', value: s.tasks.length, label: 'Tareas operativas', style: kpi('#fff', 'var(--color-text)') },
+      { emoji: '🧩', value: s.tasks.length, label: 'Tareas', style: kpi('#fff', 'var(--color-text)') },
+      { emoji: '○', value: s.tasks.filter(t => t.status === 'pending').length, label: 'Pendiente', style: kpi('#f1ede6', '#645c50') },
       { emoji: '↻', value: s.tasks.filter(t => t.status === 'following').length, label: 'En proceso', style: kpi('#eaf1fc', '#315a9d') },
-      { emoji: '✓', value: s.tasks.filter(t => t.status === 'executed').length, label: 'Listas', style: kpi('#e6f6f3', '#14584f') },
-      { emoji: '⛔', value: s.tasks.filter(t => t.status === 'blocked').length, label: 'Bloqueadas', style: kpi('#fdebeb', '#a02525') },
-      { emoji: '⚑', value: s.tasks.filter(t => t.priority === 'high' && t.status !== 'executed').length, label: 'Prioridad alta', style: kpi('#fdf4de', '#855d09') }
+      { emoji: '✓', value: s.tasks.filter(t => t.status === 'executed').length, label: 'Listo', style: kpi('#e6f6f3', '#14584f') },
+      { emoji: '⛔', value: s.tasks.filter(t => t.status === 'blocked').length, label: 'Bloqueada', style: kpi('#fdebeb', '#a02525') }
     ] : s.view === 'calendar' ? [
       { emoji: '🗓️', value: s.journeys.length, label: 'Eventos registrados', style: kpi('#fff', 'var(--color-text)') },
       { emoji: '📍', value: s.journeys.filter(j => (j.dates || []).some(d => d.slice(0, 7) === s.calendarMonth)).length, label: 'En este mes', style: kpi('#fff0e6', '#8c491a') },
@@ -2676,6 +2667,7 @@ class Component extends DCLogic {
       : [];
 
     const priorityMeta = {
+      critical: { label: 'Crítica', bg: '#f4d6d6', fg: '#7a1315' },
       high: { label: 'Alta', bg: '#fdebeb', fg: '#a02525' },
       medium: { label: 'Media', bg: '#fdf4de', fg: '#855d09' },
       low: { label: 'Baja', bg: '#e6f6f3', fg: '#14584f' }
@@ -2751,27 +2743,13 @@ class Component extends DCLogic {
       };
     });
 
-    const TASK_AREAS = ['Estructura', 'Contactos', 'Cronograma', 'Datos', 'Evento', 'Florangel'];
     const tagChipStyle = (color, active) => ({
       border: '1.5px solid ' + color, background: active ? color : '#fff', color: active ? '#fff' : color,
       borderRadius: 999, padding: '7px 13px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer'
     });
-    const taskAreaChips = TASK_AREAS.map(a => ({
-      id: a, label: a, style: tagChipStyle(AREA_COLORS[a] || '#82796a', s.taskForm.area === a),
-      onClick: () => this.setState({ taskForm: Object.assign({}, s.taskForm, { area: a }) })
-    }));
-    const taskStatusChips = BOARD_STATUS.map(st => ({
-      id: st.id, label: st.label, emoji: st.emoji, style: tagChipStyle(st.color, s.taskForm.status === st.id),
-      onClick: () => this.setState({ taskForm: applyTaskStatus(s.taskForm, st.id) })
-    }));
-    const taskFollowupChips = FOLLOWUP_STATUS.map(st => ({
-      id: st.id, label: st.label, emoji: st.emoji, style: tagChipStyle('#2fa89b', s.taskForm.followupStatus === st.id),
-      onClick: () => this.setState({ taskForm: Object.assign({}, s.taskForm, { followupStatus: st.id }) })
-    }));
-    const taskPriorityChips = Object.keys(priorityMeta).map(p => ({
-      id: p, label: priorityMeta[p].label, style: tagChipStyle(priorityMeta[p].fg, s.taskForm.priority === p),
-      onClick: () => this.setState({ taskForm: Object.assign({}, s.taskForm, { priority: p }) })
-    }));
+    const taskStatusOptions = BOARD_STATUS.map(st => ({ id: st.id, label: st.label }));
+    const taskFollowupOptions = FOLLOWUP_STATUS.map(st => ({ id: st.id, label: st.label }));
+    const taskPriorityOptions = Object.keys(priorityMeta).map(p => ({ id: p, label: priorityMeta[p].label }));
     const extraUnitChips = this.unitOptionsList().filter(o => o.id !== s.contactForm.unit).map(o => {
       const active = (s.contactForm.extraUnits || []).indexOf(o.id) > -1;
       return {
@@ -3095,7 +3073,8 @@ class Component extends DCLogic {
       primaryHover: { background: 'var(--color-accent-600)' },
       modalOpen: !!s.modal, modal: modal, form: { notes: s.notes, date: s.date, follow: s.follow },
       taskModalOpen: !!s.taskModal, taskModalTitle: s.taskModal === 'new' ? 'Nueva tarea' : 'Editar tarea', taskForm: s.taskForm,
-      taskAreaChips: taskAreaChips, taskStatusChips: taskStatusChips, taskFollowupChips: taskFollowupChips, taskFollowupOpen: s.taskForm.status === 'following', taskPriorityChips: taskPriorityChips, extraUnitChips: extraUnitChips, contactOwnerOptions: contactOwnerOptions,
+      isEditingTask: !!s.taskModal && s.taskModal !== 'new', deleteCurrentTask: this.deleteTask,
+      taskStatusOptions: taskStatusOptions, taskFollowupOptions: taskFollowupOptions, taskFollowupOpen: s.taskForm.status === 'following', taskPriorityOptions: taskPriorityOptions, extraUnitChips: extraUnitChips, contactOwnerOptions: contactOwnerOptions,
       taskOwnerOptions: taskOwnerOptions,
       contactModalOpen: !!s.contactModal, contactModalTitle: s.contactModal === 'new' ? 'Nuevo contacto' : 'Editar contacto',
       isEditingContact: !!s.contactModal && s.contactModal !== 'new',
@@ -3164,8 +3143,8 @@ class Component extends DCLogic {
       closeDoneCapture: this.closeDoneCapture,
       onTaskTitle: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { title: e.target.value }) }),
       onTaskOwner: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { owner: e.target.value }) }),
-      onTaskArea: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { area: e.target.value }) }),
-      onTaskStatus: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { status: e.target.value }) }),
+      onTaskStatus: e => this.setState({ taskForm: applyTaskStatus(s.taskForm, e.target.value) }),
+      onTaskFollowup: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { followupStatus: e.target.value }) }),
       onTaskPriority: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { priority: e.target.value }) }),
       onTaskDetail: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { detail: e.target.value }) }),
       onTaskNextAction: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { nextAction: e.target.value }) }),
