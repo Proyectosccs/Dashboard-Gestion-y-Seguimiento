@@ -89,30 +89,6 @@
         <button onClick="{{ newTask }}" style="align-self: flex-start; border: none; border-radius: 999px; padding: 14px 22px; background: var(--color-accent-400); color: var(--color-neutral-900); font-weight: 700; cursor: pointer; font-size: 15px" style-hover="{{ lightHover }}">＋ Agregar tarea</button>
       </div>
 
-      <div style="{{ boardSectionStyles.upcoming }}">
-        <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
-          <div>
-            <div style="font-family: var(--font-heading); font-size: 19px">{{ uiText.upcomingTitle }}</div>
-            <div style="font-size: 12px; color: var(--color-neutral-700)">Se alimentan automáticamente desde el calendario.</div>
-          </div>
-          <button onClick="{{ newJourney }}" style="margin-left: auto; border: none; border-radius: 999px; padding: 9px 14px; background: var(--color-accent-500); color: #fff; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">＋ Agregar evento</button>
-        </div>
-        <div style="display: flex; gap: 9px; overflow-x: auto; padding-bottom: 4px">
-          <sc-for list="{{ upcomingJourneys }}" as="j" hint-placeholder-count="3">
-            <button onClick="{{ j.edit }}" style="{{ j.cardStyle }}">
-              <div style="font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: {{ j.color }}; font-weight: 700">{{ j.dateLabel }} · {{ j.statusLabel }}</div>
-              <div style="font-size: 13px; font-weight: 700; margin-top: 3px">{{ j.title }}</div>
-              <div style="font-size: 10.5px; color: var(--color-accent-700); margin-top: 3px; font-weight: 700">{{ j.eventTypeLabel }}</div>
-              <div style="font-size: 11.5px; color: var(--color-neutral-700); margin-top: 3px">{{ j.location }}</div>
-              <div style="font-size: 11px; margin-top: 6px">Auditoría interna: <strong>{{ j.readiness }}</strong></div>
-            </button>
-          </sc-for>
-          <sc-if value="{{ upcomingEmpty }}" hint-placeholder-val="{{ true }}">
-            <div style="width: 100%; border: 1px dashed var(--color-neutral-400); border-radius: 16px; padding: 16px; text-align: center; font-size: 12.5px; color: var(--color-neutral-600)">Todavía no hay eventos agendados. Usa “Agregar evento” para crear el primero.</div>
-          </sc-if>
-        </div>
-      </div>
-
       <div style="{{ boardSectionStyles.kanban }}">
         <sc-for list="{{ boardColumns }}" as="col" hint-placeholder-count="4">
           <section style="{{ col.sectionStyle }}" aria-label="{{ col.label }}" onDragOver="{{ col.onDragOver }}" onDragLeave="{{ col.onDragLeave }}" onDrop="{{ col.onDrop }}">
@@ -664,9 +640,6 @@
             </label>
             <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px; grid-column: 1 / -1">Subtítulo principal
               <textarea value="{{ customizeForm.pageSubtitle }}" onChange="{{ onCustomPageSubtitle }}" rows="2" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: var(--color-neutral-100); color: var(--color-text); resize: none"></textarea>
-            </label>
-            <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Título de próximos eventos
-              <input type="text" value="{{ customizeForm.upcomingTitle }}" onChange="{{ onCustomUpcomingTitle }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: var(--color-neutral-100); color: var(--color-text)" />
             </label>
             <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Título del calendario
               <input type="text" value="{{ customizeForm.calendarTitle }}" onChange="{{ onCustomCalendarTitle }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: var(--color-neutral-100); color: var(--color-text)" />
@@ -1579,11 +1552,10 @@ const DEFAULT_UI = {
   pageSubtitle: 'Mapa de responsables, comunicaciones, cronograma y acciones pendientes para coordinar los eventos de la UCV con CONEKTADOS.',
   boardIntro: 'De contactos dispersos a una agenda semanal accionable.',
   questionsTitle: 'Checklist de auditoría interna por evento',
-  upcomingTitle: 'Próximos eventos',
   calendarTitle: 'Calendario de eventos',
   bubbleSize: 'normal', titleSize: '40', showAppStatus: true,
   tabOrder: ['board', 'calendar', 'hierarchy', 'list', 'timeline', 'volunteers'],
-  boardOrder: ['intro', 'upcoming', 'kanban']
+  boardOrder: ['intro', 'kanban']
 };
 
 const NAV_ITEMS = {
@@ -1597,7 +1569,6 @@ const NAV_ITEMS = {
 
 const BOARD_ITEMS = {
   intro: { emoji: '🧭', label: 'Presentación y preparación' },
-  upcoming: { emoji: '🗓️', label: 'Próximos eventos' },
   kanban: { emoji: '🧩', label: 'Tablero Kanban' }
 };
 
@@ -1664,14 +1635,13 @@ function normalizeJourney(j) {
 function normalizeUI(value) {
   const v = value || {};
   const tabs = Array.isArray(v.tabOrder) && v.tabOrder.length === 6 ? v.tabOrder.filter(x => NAV_ITEMS[x]) : DEFAULT_UI.tabOrder.slice();
-  const sections = Array.isArray(v.boardOrder) && v.boardOrder.length === 3 ? v.boardOrder.filter(x => BOARD_ITEMS[x]) : DEFAULT_UI.boardOrder.slice();
+  const sections = Array.isArray(v.boardOrder) && v.boardOrder.length === 2 ? v.boardOrder.filter(x => BOARD_ITEMS[x]) : DEFAULT_UI.boardOrder.slice();
   const merged = Object.assign({}, DEFAULT_UI, v, {
     tabOrder: tabs.length === 6 ? tabs : DEFAULT_UI.tabOrder.slice(),
-    boardOrder: sections.length === 3 ? sections : DEFAULT_UI.boardOrder.slice()
+    boardOrder: sections.length === 2 ? sections : DEFAULT_UI.boardOrder.slice()
   });
   if (merged.pageSubtitle === 'Mapa de responsables, comunicaciones, cronograma y acciones pendientes para coordinar las jornadas de la UCV con CONEKTADOS.') merged.pageSubtitle = DEFAULT_UI.pageSubtitle;
   if (merged.questionsTitle === 'Preguntas obligatorias por jornada') merged.questionsTitle = DEFAULT_UI.questionsTitle;
-  if (merged.upcomingTitle === 'Próximas jornadas') merged.upcomingTitle = DEFAULT_UI.upcomingTitle;
   if (merged.calendarTitle === 'Calendario de jornadas') merged.calendarTitle = DEFAULT_UI.calendarTitle;
   return merged;
 }
@@ -2345,7 +2315,6 @@ class Component extends DCLogic {
       pageSubtitle: draft.pageSubtitle.trim() || DEFAULT_UI.pageSubtitle,
       boardIntro: draft.boardIntro.trim() || DEFAULT_UI.boardIntro,
       questionsTitle: draft.questionsTitle.trim() || DEFAULT_UI.questionsTitle,
-      upcomingTitle: draft.upcomingTitle.trim() || DEFAULT_UI.upcomingTitle,
       calendarTitle: draft.calendarTitle.trim() || DEFAULT_UI.calendarTitle
     });
     writeStore('ucv-ui-v1', clean);
@@ -2400,7 +2369,6 @@ class Component extends DCLogic {
       });
     };
     const sortedJourneys = s.journeys.slice().sort((a, b) => (primaryDate(a) + (a.time || '')).localeCompare(primaryDate(b) + (b.time || '')));
-    const upcomingJourneys = sortedJourneys.filter(j => (j.dates || []).some(d => d >= TODAY) && j.status !== 'closed').slice(0, 6).map(journeyCard);
 
     const monthParts = s.calendarMonth.split('-');
     const calendarYear = Number(monthParts[0]);
@@ -2988,7 +2956,6 @@ class Component extends DCLogic {
     }));
     const boardSectionStyles = {
       intro: { order: ui.boardOrder.indexOf('intro'), display: 'flex' },
-      upcoming: { order: ui.boardOrder.indexOf('upcoming'), background: '#fff', borderRadius: 22, padding: '14px 16px', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: 10 },
       kanban: { order: ui.boardOrder.indexOf('kanban'), display: 'flex', gap: 12, overflowX: 'auto', padding: '2px 2px 14px', scrollbarGutter: 'stable' }
     };
 
@@ -3010,7 +2977,6 @@ class Component extends DCLogic {
       navigationTabs: navigationTabs, boardSectionStyles: boardSectionStyles,
       kpis: kpis, medCards: medCards, otherCards: otherCards, adminUnits: adminUnits, listContacts: listContacts, timeline: timeline,
       boardColumns: boardColumns,
-      upcomingJourneys: upcomingJourneys, upcomingEmpty: upcomingJourneys.length === 0,
       calendarMonthLabel: MONTH_NAMES[calendarMonthNum] + ' ' + calendarYear,
       journeyLegend: Object.keys(JOURNEY_STATUS).map(key => ({ label: JOURNEY_STATUS[key].label, color: JOURNEY_STATUS[key].color })),
       weekDays: WEEK_DAYS, calendarCells: calendarCells,
@@ -3094,7 +3060,6 @@ class Component extends DCLogic {
       onCustomPageSubtitle: e => this.setState({ customizeForm: Object.assign({}, draftUI, { pageSubtitle: e.target.value }) }),
       onCustomBoardIntro: e => this.setState({ customizeForm: Object.assign({}, draftUI, { boardIntro: e.target.value }) }),
       onCustomQuestionsTitle: e => this.setState({ customizeForm: Object.assign({}, draftUI, { questionsTitle: e.target.value }) }),
-      onCustomUpcomingTitle: e => this.setState({ customizeForm: Object.assign({}, draftUI, { upcomingTitle: e.target.value }) }),
       onCustomCalendarTitle: e => this.setState({ customizeForm: Object.assign({}, draftUI, { calendarTitle: e.target.value }) }),
       onCustomBubbleSize: e => this.setState({ customizeForm: Object.assign({}, draftUI, { bubbleSize: e.target.value }) }),
       onCustomTitleSize: e => this.setState({ customizeForm: Object.assign({}, draftUI, { titleSize: e.target.value }) }),
