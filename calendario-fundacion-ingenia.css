@@ -485,6 +485,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .dialog-fields select.input { cursor: pointer; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px 20px; border-top: 1px solid var(--color-neutral-200); background: #fff; }
 
+.customize-btn { border: 1px solid var(--color-neutral-400); cursor: pointer; border-radius: 999px; padding: 9px 14px; font-size: 13px; font-weight: 700; background: #fff; color: var(--color-neutral-800); }
+.customize-btn:hover { background: var(--color-neutral-100); }
+.customize-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; padding: 0 20px 12px; }
+.reorder-list { display: flex; flex-direction: column; gap: 8px; }
+.reorder-row { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 14px; background: var(--color-neutral-100); border: 1px solid var(--color-neutral-300); }
+.reorder-row-label { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 700; }
+.icon-button-sm { width: 30px; height: 30px; font-size: 14px; }
+.icon-button-sm:disabled { opacity: .35; cursor: not-allowed; }
+
 .toast-region { position: fixed; top: 16px; right: 16px; z-index: 1000; width: min(380px, calc(100vw - 32px)); display: grid; gap: 8px; }
 .toast { padding: 12px 14px; border: 1px solid var(--color-neutral-300); border-radius: 14px; background: #fff; box-shadow: var(--shadow-lg); font-size: 13px; }
 .toast-success { border-color: #99d5cf; background: var(--coalition-teal-soft); color: var(--coalition-teal); }

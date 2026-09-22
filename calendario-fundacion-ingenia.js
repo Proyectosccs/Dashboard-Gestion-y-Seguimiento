@@ -63,6 +63,47 @@
   const TEAM_MEMBERS_KEY = 'ingenia-team-members-v1';
   const NEW_MEMBER_VALUE = '__new_member__';
 
+  const UI_KEY = 'ingenia-ui-v1';
+
+  // Modo edición: textos y orden personalizables, igual que en el tablero
+  // UCV — pero sin los controles de tamaño de burbuja/título, porque este
+  // sitio usa una hoja de estilos fija en vez de estilos calculados en JS.
+  const DEFAULT_UI = {
+    pageTitle: 'Networking Fundación Ingenia',
+    pageSubtitle: 'Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.',
+    tasksTitle: 'Tareas de Equipo',
+    organizationsTitle: 'Organizaciones',
+    leadersTitle: 'Líderes de Comunidades',
+    tabOrder: ['calendar', 'tasks', 'organizations', 'leaders'],
+    boardOrder: ['kpis', 'board']
+  };
+  const NAV_ITEMS = {
+    calendar: { emoji: '🗓️', label: 'Calendario' },
+    tasks: { emoji: '📋', label: 'Tareas de Equipo' },
+    organizations: { emoji: '🏢', label: 'Organizaciones' },
+    leaders: { emoji: '🧑‍🤝‍🧑', label: 'Líderes de Comunidades' }
+  };
+  const BOARD_ITEMS = {
+    kpis: { emoji: '📊', label: 'Indicadores' },
+    board: { emoji: '🗂️', label: 'Tablero de tareas' }
+  };
+
+  function normalizeUI(value) {
+    const v = value || {};
+    const tabIds = Object.keys(NAV_ITEMS);
+    const sectionIds = Object.keys(BOARD_ITEMS);
+    const tabs = Array.isArray(v.tabOrder) ? v.tabOrder.filter(function (x) { return NAV_ITEMS[x]; }) : [];
+    tabIds.forEach(function (id) { if (tabs.indexOf(id) === -1) tabs.push(id); });
+    const sections = Array.isArray(v.boardOrder) ? v.boardOrder.filter(function (x) { return BOARD_ITEMS[x]; }) : [];
+    sectionIds.forEach(function (id) { if (sections.indexOf(id) === -1) sections.push(id); });
+    return Object.assign({}, DEFAULT_UI, v, { tabOrder: tabs, boardOrder: sections });
+  }
+
+  function cloneUI(value) {
+    const v = normalizeUI(value);
+    return Object.assign({}, v, { tabOrder: v.tabOrder.slice(), boardOrder: v.boardOrder.slice() });
+  }
+
   const state = {
     client: null,
     view: 'calendar',
@@ -77,7 +118,9 @@
     dragTaskId: null,
     taskOrgFilter: '',
     taskResponsableFilter: '',
-    editingResponsableId: null
+    editingResponsableId: null,
+    ui: cloneUI(DEFAULT_UI),
+    customizeForm: cloneUI(DEFAULT_UI)
   };
 
   const dom = {};
@@ -117,7 +160,11 @@
       'new-responsable-btn': openResponsablesDialog,
       'responsables-dialog-close': closeResponsablesDialog,
       'responsables-dialog-done': closeResponsablesDialog,
-      'responsable-add-only': addResponsableOnly
+      'responsable-add-only': addResponsableOnly,
+      'customize-open': openCustomize,
+      'customize-dialog-close': closeCustomize,
+      'customize-dialog-cancel': closeCustomize,
+      'customize-reset': resetCustomize
     };
     const action = actionsById[target.id];
     if (action) action();
@@ -201,6 +248,8 @@
     dom.taskStatusSelect.addEventListener('change', onTaskStatusChange);
     dom.orgForm.addEventListener('submit', onOrgSubmit);
     dom.orgDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeOrgDialog(); });
+    dom.customizeForm.addEventListener('submit', onCustomizeSubmit);
+    dom.customizeDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeCustomize(); });
     if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) return showConnectionFailure();
     state.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     loadAll();
@@ -250,6 +299,22 @@
     dom.orgForm = document.getElementById('org-form');
     dom.orgError = document.getElementById('org-error');
     dom.toastRegion = document.getElementById('toast-region');
+    dom.pageTitle = document.getElementById('page-title');
+    dom.pageSubtitle = document.getElementById('page-subtitle');
+    dom.tabNav = document.getElementById('tab-nav');
+    dom.tasksBlocks = document.getElementById('tasks-blocks');
+    dom.tasksViewTitle = document.getElementById('tasks-view-title');
+    dom.organizationsViewTitle = document.getElementById('organizations-view-title');
+    dom.leadersViewTitle = document.getElementById('leaders-view-title');
+    dom.customizeDialog = document.getElementById('customize-dialog');
+    dom.customizeForm = document.getElementById('customize-form');
+    dom.customPageTitle = document.getElementById('field-custom-page-title');
+    dom.customSubtitle = document.getElementById('field-custom-subtitle');
+    dom.customTasksTitle = document.getElementById('field-custom-tasks-title');
+    dom.customOrganizationsTitle = document.getElementById('field-custom-organizations-title');
+    dom.customLeadersTitle = document.getElementById('field-custom-leaders-title');
+    dom.customizeTabsList = document.getElementById('customize-tabs-list');
+    dom.customizeSectionsList = document.getElementById('customize-sections-list');
   }
 
   function toast(message, tone) {
@@ -290,7 +355,7 @@
       state.client.from('coalicion_events').select('id,title,event_date,start_time,location,maps_url,notes,status').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
-      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY])
+      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
     ]);
 
     const anyFailed = coalicionRes.error && florangelRes.error && ucvRes.error && ingeniaRes.error;
@@ -309,6 +374,9 @@
     });
     const membersRaw = ingeniaRowsEarly.find(function (r) { return r.key === TEAM_MEMBERS_KEY; });
     state.teamMembers = Array.isArray(membersRaw && membersRaw.value) ? membersRaw.value : [];
+    const uiRaw = ingeniaRowsEarly.find(function (r) { return r.key === UI_KEY; });
+    state.ui = cloneUI(uiRaw && uiRaw.value);
+    applyUI();
 
     let customEvents = [];
     if (state.customCalendars.length) {
@@ -360,6 +428,107 @@
     renderOrganizations();
     setView(state.view);
     renderCalendar();
+  }
+
+  // ---------- Modo edición ----------
+
+  function applyUI() {
+    const ui = state.ui;
+    dom.pageTitle.textContent = ui.pageTitle;
+    dom.pageSubtitle.textContent = ui.pageSubtitle;
+    dom.tasksViewTitle.textContent = ui.tasksTitle;
+    dom.organizationsViewTitle.textContent = ui.organizationsTitle;
+    dom.leadersViewTitle.textContent = ui.leadersTitle;
+    reorderChildren(dom.tabNav, ui.tabOrder, function (id) { return dom.tabNav.querySelector('[data-view="' + id + '"]'); });
+    reorderChildren(dom.tasksBlocks, ui.boardOrder, function (id) { return document.getElementById('tasks-block-' + id); });
+  }
+
+  function reorderChildren(parent, order, findChild) {
+    order.forEach(function (id) {
+      const child = findChild(id);
+      if (child) parent.appendChild(child);
+    });
+  }
+
+  function openCustomize() {
+    state.customizeForm = cloneUI(state.ui);
+    dom.customPageTitle.value = state.customizeForm.pageTitle;
+    dom.customSubtitle.value = state.customizeForm.pageSubtitle;
+    dom.customTasksTitle.value = state.customizeForm.tasksTitle;
+    dom.customOrganizationsTitle.value = state.customizeForm.organizationsTitle;
+    dom.customLeadersTitle.value = state.customizeForm.leadersTitle;
+    renderCustomizeLists();
+    dom.customizeDialog.showModal();
+  }
+
+  function closeCustomize() { dom.customizeDialog.close(); }
+
+  function resetCustomize() {
+    state.customizeForm = cloneUI(DEFAULT_UI);
+    dom.customPageTitle.value = state.customizeForm.pageTitle;
+    dom.customSubtitle.value = state.customizeForm.pageSubtitle;
+    dom.customTasksTitle.value = state.customizeForm.tasksTitle;
+    dom.customOrganizationsTitle.value = state.customizeForm.organizationsTitle;
+    dom.customLeadersTitle.value = state.customizeForm.leadersTitle;
+    renderCustomizeLists();
+  }
+
+  function renderCustomizeLists() {
+    renderReorderList(dom.customizeTabsList, state.customizeForm.tabOrder, NAV_ITEMS, moveTabOrder);
+    renderReorderList(dom.customizeSectionsList, state.customizeForm.boardOrder, BOARD_ITEMS, moveSectionOrder);
+  }
+
+  function renderReorderList(node, order, items, mover) {
+    renderMarkup(node, order.map(function (id, index) {
+      const item = items[id];
+      return '<div class="reorder-row">' +
+        '<span>' + item.emoji + '</span><span class="reorder-row-label">' + safe(item.label) + '</span>' +
+        '<button type="button" class="icon-button icon-button-sm" data-reorder-id="' + id + '" data-reorder-dir="-1" aria-label="Mover hacia arriba"' + (index === 0 ? ' disabled' : '') + '>↑</button>' +
+        '<button type="button" class="icon-button icon-button-sm" data-reorder-id="' + id + '" data-reorder-dir="1" aria-label="Mover hacia abajo"' + (index === order.length - 1 ? ' disabled' : '') + '>↓</button>' +
+      '</div>';
+    }).join(''));
+    node.querySelectorAll('[data-reorder-id]').forEach(function (button) {
+      button.addEventListener('click', function () { mover(button.dataset.reorderId, Number(button.dataset.reorderDir)); });
+    });
+  }
+
+  function moveInArray(list, id, delta) {
+    const index = list.indexOf(id);
+    const target = index + delta;
+    if (index === -1 || target < 0 || target >= list.length) return list;
+    const next = list.slice();
+    next.splice(index, 1);
+    next.splice(target, 0, id);
+    return next;
+  }
+
+  function moveTabOrder(id, delta) {
+    state.customizeForm.tabOrder = moveInArray(state.customizeForm.tabOrder, id, delta);
+    renderCustomizeLists();
+  }
+
+  function moveSectionOrder(id, delta) {
+    state.customizeForm.boardOrder = moveInArray(state.customizeForm.boardOrder, id, delta);
+    renderCustomizeLists();
+  }
+
+  async function onCustomizeSubmit(e) {
+    e.preventDefault();
+    const next = {
+      pageTitle: dom.customPageTitle.value.trim() || DEFAULT_UI.pageTitle,
+      pageSubtitle: dom.customSubtitle.value.trim() || DEFAULT_UI.pageSubtitle,
+      tasksTitle: dom.customTasksTitle.value.trim() || DEFAULT_UI.tasksTitle,
+      organizationsTitle: dom.customOrganizationsTitle.value.trim() || DEFAULT_UI.organizationsTitle,
+      leadersTitle: dom.customLeadersTitle.value.trim() || DEFAULT_UI.leadersTitle,
+      tabOrder: state.customizeForm.tabOrder,
+      boardOrder: state.customizeForm.boardOrder
+    };
+    const ok = await writeBoardKey('ingenia_board_state', UI_KEY, next);
+    if (!ok) { toast('No se pudo guardar el diseño — revisa tu conexión.', 'error'); return; }
+    state.ui = cloneUI(next);
+    applyUI();
+    closeCustomize();
+    toast('Diseño guardado.', 'success');
   }
 
   function changeMonth(delta) {

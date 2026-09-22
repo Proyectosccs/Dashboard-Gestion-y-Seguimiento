@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=12">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=13">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=12" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=13" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -17,12 +17,15 @@
     <header class="app-header">
       <div class="header-copy">
         <p class="eyebrow">💡 Fundación Ingenia</p>
-        <h1>Networking Fundación Ingenia</h1>
-        <p>Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.</p>
+        <h1 id="page-title">Networking Fundación Ingenia</h1>
+        <p id="page-subtitle">Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.</p>
+      </div>
+      <div class="session-card">
+        <button id="customize-open" class="customize-btn" type="button" onclick="window.ingeniaAction(event)">✏️ Modo edición</button>
       </div>
     </header>
 
-    <nav class="tab-nav" aria-label="Secciones">
+    <nav id="tab-nav" class="tab-nav" aria-label="Secciones">
       <button class="tab-button" type="button" data-view="calendar" aria-current="page" onclick="window.ingeniaAction(event)">🗓️ Calendario</button>
       <button class="tab-button" type="button" data-view="tasks" onclick="window.ingeniaAction(event)">📋 Tareas de Equipo</button>
       <button class="tab-button" type="button" data-view="organizations" onclick="window.ingeniaAction(event)">🏢 Organizaciones</button>
@@ -66,7 +69,7 @@
       <div class="view-heading">
         <div>
           <p class="eyebrow">📋 Seguimiento</p>
-          <h2>Tareas de Equipo</h2>
+          <h2 id="tasks-view-title">Tareas de Equipo</h2>
           <p class="view-description">Tareas del equipo etiquetadas por organización.</p>
         </div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap">
@@ -74,22 +77,28 @@
           <button class="btn btn-primary" type="button" id="new-task-btn" onclick="window.ingeniaAction(event)">➕ Agregar tarea</button>
         </div>
       </div>
-      <div class="kpi-grid" id="tasks-kpi-grid"></div>
-      <div class="list-toolbar panel">
-        <label class="sr-only" for="tasks-org-filter">Filtrar por organización</label>
-        <select id="tasks-org-filter" class="toolbar-select"><option value="">Todas las organizaciones</option></select>
-        <label class="sr-only" for="tasks-responsable-filter">Filtrar por responsable</label>
-        <select id="tasks-responsable-filter" class="toolbar-select"><option value="">Todos los responsables</option></select>
-        <button id="tasks-filter-clear" class="link-button" type="button" onclick="window.ingeniaAction(event)">Limpiar</button>
+      <div id="tasks-blocks">
+        <div id="tasks-block-kpis" data-block="kpis">
+          <div class="kpi-grid" id="tasks-kpi-grid"></div>
+        </div>
+        <div id="tasks-block-board" data-block="board">
+          <div class="list-toolbar panel">
+            <label class="sr-only" for="tasks-org-filter">Filtrar por organización</label>
+            <select id="tasks-org-filter" class="toolbar-select"><option value="">Todas las organizaciones</option></select>
+            <label class="sr-only" for="tasks-responsable-filter">Filtrar por responsable</label>
+            <select id="tasks-responsable-filter" class="toolbar-select"><option value="">Todos los responsables</option></select>
+            <button id="tasks-filter-clear" class="link-button" type="button" onclick="window.ingeniaAction(event)">Limpiar</button>
+          </div>
+          <div id="tasks-board" class="kanban-board"></div>
+        </div>
       </div>
-      <div id="tasks-board" class="kanban-board"></div>
     </section>
 
     <section id="organizations-view" class="view" hidden>
       <div class="view-heading">
         <div>
           <p class="eyebrow">🏢 Directorio</p>
-          <h2>Organizaciones</h2>
+          <h2 id="organizations-view-title">Organizaciones</h2>
           <p class="view-description">Accesos directos a cada tablero, y las organizaciones creadas desde el calendario o las tareas.</p>
         </div>
         <button class="btn btn-primary" type="button" id="new-org-btn" onclick="window.ingeniaAction(event)">➕ Agregar organización</button>
@@ -101,7 +110,7 @@
       <div class="view-heading">
         <div>
           <p class="eyebrow">🧑‍🤝‍🧑 Comunidades</p>
-          <h2>Líderes de Comunidades</h2>
+          <h2 id="leaders-view-title">Líderes de Comunidades</h2>
           <p class="view-description">Directorio y tablero operativo de líderes comunitarios.</p>
         </div>
         <a class="btn btn-secondary" href="./lideres-comunidades.html" target="_blank" rel="noopener noreferrer">↗ Abrir en pestaña nueva</a>
@@ -279,6 +288,55 @@
       <div class="dialog-actions">
         <button id="org-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)">Cancelar</button>
         <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="customize-dialog" class="editor-dialog" aria-labelledby="customize-dialog-title">
+    <form id="customize-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">✏️ Personalización</p>
+          <h2 id="customize-dialog-title">Modo edición</h2>
+        </div>
+        <button id="customize-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.ingeniaAction(event)">×</button>
+      </div>
+      <div class="dialog-fields">
+        <div class="field">
+          <label for="field-custom-page-title">Título principal</label>
+          <input id="field-custom-page-title" class="input" name="pageTitle" type="text">
+        </div>
+        <div class="field field-full">
+          <label for="field-custom-subtitle">Subtítulo principal</label>
+          <textarea id="field-custom-subtitle" class="input" name="pageSubtitle"></textarea>
+        </div>
+        <div class="field">
+          <label for="field-custom-tasks-title">Título de tareas</label>
+          <input id="field-custom-tasks-title" class="input" name="tasksTitle" type="text">
+        </div>
+        <div class="field">
+          <label for="field-custom-organizations-title">Título de organizaciones</label>
+          <input id="field-custom-organizations-title" class="input" name="organizationsTitle" type="text">
+        </div>
+        <div class="field">
+          <label for="field-custom-leaders-title">Título de líderes</label>
+          <input id="field-custom-leaders-title" class="input" name="leadersTitle" type="text">
+        </div>
+      </div>
+      <div class="customize-grid">
+        <div>
+          <p class="eyebrow">Orden de las pestañas</p>
+          <div id="customize-tabs-list" class="reorder-list"></div>
+        </div>
+        <div>
+          <p class="eyebrow">Orden del tablero</p>
+          <div id="customize-sections-list" class="reorder-list"></div>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="customize-reset" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)">Restablecer</button>
+        <button id="customize-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)">Cancelar</button>
+        <button class="btn btn-primary" type="submit">Guardar diseño</button>
       </div>
     </form>
   </dialog>
