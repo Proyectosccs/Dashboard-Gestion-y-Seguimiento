@@ -53,15 +53,8 @@
     selectedDay: new Date().toISOString().slice(0, 10),
     editingEvent: null,
     editingTask: null,
-    eventLockedOrg: null,
     dragTaskId: null,
-    taskOrgFilter: '',
-    orgBoard: {
-      orgId: null,
-      subview: 'calendar',
-      month: new Date().toISOString().slice(0, 7),
-      selectedDay: new Date().toISOString().slice(0, 10)
-    }
+    taskOrgFilter: ''
   };
 
   const dom = {};
@@ -71,8 +64,6 @@
     const target = event.currentTarget;
     if (!target) return;
     if (target.dataset.view) return setView(target.dataset.view);
-    if (target.dataset.orgSubview) return setOrgSubview(target.dataset.orgSubview);
-    if (target.dataset.orgBoard) return openOrgBoard(target.dataset.orgBoard);
     const actionsById = {
       'retry-load': loadAll,
       'calendar-prev': function () { changeMonth(-1); },
@@ -97,17 +88,7 @@
       },
       'new-org-btn': openOrgDialog,
       'org-dialog-close': closeOrgDialog,
-      'org-dialog-cancel': closeOrgDialog,
-      'org-board-back': function () { setView('organizations'); },
-      'org-calendar-prev': function () { changeOrgMonth(-1); },
-      'org-calendar-next': function () { changeOrgMonth(1); },
-      'org-calendar-today': function () {
-        state.orgBoard.month = new Date().toISOString().slice(0, 7);
-        state.orgBoard.selectedDay = new Date().toISOString().slice(0, 10);
-        renderOrgCalendar();
-      },
-      'org-new-event-btn': function () { openEventDialog(null, state.orgBoard.orgId); },
-      'org-new-task-btn': function () { openTaskDialog(null, state.orgBoard.orgId); }
+      'org-dialog-cancel': closeOrgDialog
     };
     const action = actionsById[target.id];
     if (action) action();
@@ -119,15 +100,8 @@
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 50);
     }
-    if (target.dataset.orgDay) {
-      state.orgBoard.selectedDay = target.dataset.orgDay;
-      renderOrgCalendar();
-    }
     if (target.dataset.eventId) {
       openEventDialog(findById(state.events, target.dataset.eventId));
-    }
-    if (target.dataset.orgEventId) {
-      openEventDialog(findById(state.events, target.dataset.orgEventId), state.orgBoard.orgId);
     }
     if (target.dataset.taskId) {
       openTaskDialog(findById(state.tasks, target.dataset.taskId));
@@ -214,14 +188,6 @@
     dom.orgDialog = document.getElementById('org-dialog');
     dom.orgForm = document.getElementById('org-form');
     dom.orgError = document.getElementById('org-error');
-    dom.orgBoardTitle = document.getElementById('org-board-title');
-    dom.orgCalendarSubview = document.getElementById('org-calendar-subview');
-    dom.orgTasksSubview = document.getElementById('org-tasks-subview');
-    dom.orgCalendarMonthLabel = document.getElementById('org-calendar-month-label');
-    dom.orgCalendarGrid = document.getElementById('org-calendar-grid');
-    dom.orgAgendaTitle = document.getElementById('org-agenda-title');
-    dom.orgAgendaList = document.getElementById('org-agenda-list');
-    dom.orgTasksBoard = document.getElementById('org-tasks-board');
     dom.toastRegion = document.getElementById('toast-region');
   }
 
@@ -242,89 +208,6 @@
     document.querySelectorAll('.view').forEach(function (view) { view.hidden = true; });
     const active = document.getElementById(viewName + '-view');
     if (active) active.hidden = false;
-  }
-
-  // ---------- Tablero de una organización (calendario + tareas propios) ----------
-  // V1 a propósito acotado: solo estas dos secciones. Se irá ampliando según
-  // se necesite (ver pestaña Organizaciones).
-
-  function openOrgBoard(orgId) {
-    const org = findCustomCalendar(orgId);
-    if (!org) return;
-    state.orgBoard.orgId = orgId;
-    state.orgBoard.month = new Date().toISOString().slice(0, 7);
-    state.orgBoard.selectedDay = new Date().toISOString().slice(0, 10);
-    dom.orgBoardTitle.textContent = org.name;
-    setView('org-board');
-    setOrgSubview('calendar');
-    renderOrgCalendar();
-    renderTasksBoard(orgId, dom.orgTasksBoard);
-  }
-
-  function setOrgSubview(name) {
-    state.orgBoard.subview = name;
-    document.querySelectorAll('.org-tab-button').forEach(function (button) {
-      if (button.dataset.orgSubview === name) button.setAttribute('aria-current', 'page');
-      else button.removeAttribute('aria-current');
-    });
-    dom.orgCalendarSubview.hidden = name !== 'calendar';
-    dom.orgTasksSubview.hidden = name !== 'tasks';
-  }
-
-  function changeOrgMonth(delta) {
-    const parts = state.orgBoard.month.split('-').map(Number);
-    const date = new Date(Date.UTC(parts[0], parts[1] - 1 + delta, 1));
-    state.orgBoard.month = date.getUTCFullYear() + '-' + String(date.getUTCMonth() + 1).padStart(2, '0');
-    renderOrgCalendar();
-  }
-
-  function renderOrgCalendar() {
-    const orgId = state.orgBoard.orgId;
-    const parts = state.orgBoard.month.split('-').map(Number);
-    const year = parts[0];
-    const monthIndex = parts[1] - 1;
-    dom.orgCalendarMonthLabel.textContent = MONTHS[monthIndex] + ' ' + year;
-    const first = new Date(Date.UTC(year, monthIndex, 1));
-    const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
-    const mondayOffset = (first.getUTCDay() + 6) % 7;
-    const today = new Date().toISOString().slice(0, 10);
-    let markup = WEEKDAYS.map(function (day) { return '<div class="calendar-weekday">' + day + '</div>'; }).join('');
-    for (let blank = 0; blank < mondayOffset; blank += 1) markup += '<div class="calendar-day is-blank" aria-hidden="true"></div>';
-    for (let day = 1; day <= lastDay; day += 1) {
-      const iso = year + '-' + String(monthIndex + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-      const dayEvents = state.events.filter(function (e) { return e.date === iso && e.source === orgId; });
-      const isSelected = iso === state.orgBoard.selectedDay;
-      markup += '<button type="button" class="calendar-day' + (iso === today ? ' is-today' : '') + (isSelected ? ' is-selected' : '') + '" data-org-day="' + iso + '" onclick="window.ingeniaAction(event)" style="' + (isSelected ? 'outline:2px solid var(--color-accent);outline-offset:-2px;' : '') + 'text-align:left;font:inherit;cursor:pointer">' +
-        '<span class="calendar-number">' + day + '</span>' +
-        dayEvents.map(function (e) {
-          const cs = sourceClassStyle(e.source);
-          return '<span class="calendar-event ' + cs.cls + '" ' + cs.style + ' data-org-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)">' + safe(e.title) + '</span>';
-        }).join('') +
-      '</button>';
-    }
-    renderMarkup(dom.orgCalendarGrid, markup);
-    renderOrgAgenda();
-  }
-
-  function renderOrgAgenda() {
-    const orgId = state.orgBoard.orgId;
-    const iso = state.orgBoard.selectedDay;
-    const dayEvents = state.events.filter(function (e) { return e.date === iso && e.source === orgId; })
-      .sort(function (a, b) { return (a.time || '99:99').localeCompare(b.time || '99:99'); });
-    dom.orgAgendaTitle.textContent = formatDate(iso) + (dayEvents.length ? ' · ' + dayEvents.length + (dayEvents.length === 1 ? ' evento' : ' eventos') : '');
-    if (!dayEvents.length) {
-      renderMarkup(dom.orgAgendaList, '<div class="empty-state"><strong>Sin eventos</strong><span>No hay nada registrado para este día.</span></div>');
-      return;
-    }
-    renderMarkup(dom.orgAgendaList, dayEvents.map(function (e) {
-      const timeLabel = e.time ? formatTime(e.time) : (e.timeText || 'Hora por confirmar');
-      return '<button type="button" class="agenda-row" data-org-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
-        '<div>' +
-          '<p class="agenda-row-title">' + safe(e.title) + '</p>' +
-          '<p class="agenda-row-meta">◷ ' + safe(timeLabel) + (e.location ? ' · ⌖ ' + safe(e.location) : '') + '</p>' +
-        '</div>' +
-      '</button>';
-    }).join(''));
   }
 
   function showConnectionFailure() {
@@ -409,7 +292,6 @@
     populateTasksOrgFilter();
     refreshTaskBoards();
     renderOrganizations();
-    if (state.orgBoard.orgId) renderOrgCalendar();
     setView(state.view);
     renderCalendar();
   }
@@ -519,15 +401,14 @@
 
   // ---------- Agregar evento (a la fuente elegida) ----------
 
-  function openEventDialog(existing, lockedOrg) {
+  function openEventDialog(existing) {
     hideError(dom.eventError);
     dom.eventForm.reset();
     state.editingEvent = existing || null;
-    state.eventLockedOrg = lockedOrg || null;
     populateSourceSelect();
     dom.newCalendarField.hidden = true;
     dom.eventDialogTitle.textContent = existing ? 'Editar evento' : 'Agregar evento';
-    dom.eventForm.elements.source.disabled = !!existing || !!lockedOrg;
+    dom.eventForm.elements.source.disabled = !!existing;
     dom.eventDelete.hidden = !existing || existing.source === 'coalicion';
     if (existing) {
       dom.eventForm.elements.source.value = existing.source;
@@ -537,24 +418,17 @@
       dom.eventForm.elements.location.value = existing.location || '';
       dom.eventForm.elements.notes.value = existing.notes || '';
     } else {
-      dom.eventForm.elements.event_date.value = (lockedOrg ? state.orgBoard.selectedDay : state.selectedDay) || new Date().toISOString().slice(0, 10);
-      if (lockedOrg) dom.eventForm.elements.source.value = lockedOrg;
+      dom.eventForm.elements.event_date.value = state.selectedDay || new Date().toISOString().slice(0, 10);
     }
     dom.eventDialog.showModal();
     dom.eventForm.elements.title.focus();
   }
 
-  function closeEventDialog() { dom.eventDialog.close(); dom.eventForm.elements.source.disabled = false; state.editingEvent = null; state.eventLockedOrg = null; }
+  function closeEventDialog() { dom.eventDialog.close(); dom.eventForm.elements.source.disabled = false; state.editingEvent = null; }
 
-  // Tras guardar/eliminar, refresca el calendario principal y, si estamos
-  // dentro del tablero de una organización, también su propio calendario.
   function refreshCalendarsAfterChange(eventDate) {
     if (eventDate) state.selectedDay = eventDate;
     renderCalendar();
-    if (state.orgBoard.orgId) {
-      if (eventDate) state.orgBoard.selectedDay = eventDate;
-      renderOrgCalendar();
-    }
   }
 
   async function onEventSubmit(e) {
@@ -687,7 +561,6 @@
   function refreshTaskBoards() {
     renderTasksBoard(state.taskOrgFilter || null, dom.tasksBoard);
     renderTasksKpis();
-    if (state.orgBoard.orgId) renderTasksBoard(state.orgBoard.orgId, dom.orgTasksBoard);
   }
 
   function renderTasksKpis() {
@@ -805,23 +678,21 @@
 
   function renderOrganizations() {
     const fixedCards = ORG_DIRECTORY.map(function (key) {
-      return orgCardHtml(FIXED_SOURCE_EMOJI[key], SOURCE_LABELS[key], FIXED_SOURCE_COLOR[key], ORG_LINKS[key], null);
+      return orgCardHtml(FIXED_SOURCE_EMOJI[key], SOURCE_LABELS[key], FIXED_SOURCE_COLOR[key], ORG_LINKS[key]);
     });
     const customCards = state.customCalendars.map(function (c) {
-      return orgCardHtml('🏷️', c.name, c.color, null, c.id);
+      return orgCardHtml('🏷️', c.name, c.color, './organizacion.html?org=' + encodeURIComponent(c.id));
     });
     renderMarkup(dom.organizationsGrid, fixedCards.concat(customCards).join(''));
   }
 
-  // Las organizaciones con tablero externo (link) abren esa página; las
-  // creadas al vuelo (orgId) abren su propio tablero interno — por ahora
-  // Calendario y Tareas, se irá ampliando (ver openOrgBoard).
-  function orgCardHtml(emoji, name, color, link, orgId) {
+  // Las organizaciones con tablero propio en el sitio (UCV/Coalición/
+  // Florangel) abren esa página; las creadas al vuelo abren su propio
+  // tablero (Calendario + Tareas) en organizacion.html.
+  function orgCardHtml(emoji, name, color, link) {
     return '<article class="org-card" style="--source-color:' + safe(color) + '">' +
       '<h3>' + emoji + ' ' + safe(name) + '</h3>' +
-      (link
-        ? '<a class="btn btn-secondary" href="' + safe(link) + '" target="_blank" rel="noopener noreferrer">Abrir tablero ↗</a>'
-        : '<button class="btn btn-secondary" type="button" data-org-board="' + safe(orgId) + '" onclick="window.ingeniaAction(event)">Abrir tablero</button>') +
+      '<a class="btn btn-secondary" href="' + safe(link) + '" target="_blank" rel="noopener noreferrer">Abrir tablero ↗</a>' +
     '</article>';
   }
 
