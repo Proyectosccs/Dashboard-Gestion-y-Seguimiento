@@ -62,7 +62,8 @@
     editingEvent: null,
     editingTask: null,
     dragTaskId: null,
-    taskOrgFilter: ''
+    taskOrgFilter: '',
+    taskResponsableFilter: ''
   };
 
   const dom = {};
@@ -91,7 +92,9 @@
       'task-delete': deleteEditingTask,
       'tasks-filter-clear': function () {
         state.taskOrgFilter = '';
+        state.taskResponsableFilter = '';
         dom.tasksOrgFilter.value = '';
+        dom.tasksResponsableFilter.value = '';
         refreshTaskBoards();
       },
       'new-org-btn': openOrgDialog,
@@ -161,6 +164,10 @@
       state.taskOrgFilter = dom.tasksOrgFilter.value;
       refreshTaskBoards();
     });
+    dom.tasksResponsableFilter.addEventListener('change', function () {
+      state.taskResponsableFilter = dom.tasksResponsableFilter.value;
+      refreshTaskBoards();
+    });
     dom.taskResponsableSelect.addEventListener('change', onResponsableChange);
     dom.orgForm.addEventListener('submit', onOrgSubmit);
     dom.orgDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeOrgDialog(); });
@@ -195,6 +202,7 @@
     dom.taskResponsableSelect = document.getElementById('field-task-responsable');
     dom.newResponsableField = document.getElementById('new-responsable-field');
     dom.tasksOrgFilter = document.getElementById('tasks-org-filter');
+    dom.tasksResponsableFilter = document.getElementById('tasks-responsable-filter');
     dom.tasksKpiGrid = document.getElementById('tasks-kpi-grid');
     dom.organizationsGrid = document.getElementById('organizations-grid');
     dom.orgDialog = document.getElementById('org-dialog');
@@ -304,6 +312,7 @@
     renderLegend();
     populateSourceSelect();
     populateTasksOrgFilter();
+    populateTasksResponsableFilter();
     refreshTaskBoards();
     renderOrganizations();
     setView(state.view);
@@ -458,6 +467,7 @@
     if (!ok) { toast('No se pudo eliminar al responsable — revisa tu conexión.', 'error'); return; }
     state.teamMembers = next;
     populateResponsableSelect('');
+    populateTasksResponsableFilter();
     refreshTaskBoards();
     toast('Responsable eliminado del equipo.', 'success');
   }
@@ -594,8 +604,11 @@
 
   function renderTasksBoard(orgFilter, targetEl) {
     targetEl = targetEl || dom.tasksBoard;
+    const responsableFilter = state.taskResponsableFilter || null;
     renderMarkup(targetEl, TASK_STATUSES.map(function (status) {
-      const items = state.tasks.filter(function (t) { return (t.status || 'pendiente') === status.key && (!orgFilter || t.org === orgFilter); });
+      const items = state.tasks.filter(function (t) {
+        return (t.status || 'pendiente') === status.key && (!orgFilter || t.org === orgFilter) && (!responsableFilter || t.responsable === responsableFilter);
+      });
       return '<div class="kanban-column" data-status="' + status.key + '">' +
         '<div class="kanban-column-head"><h3>' + safe(status.label) + '</h3><span class="kanban-count">' + items.length + '</span></div>' +
         (items.length ? items.map(renderTaskCard).join('') : '<div class="kanban-empty">Sin tareas</div>') +
@@ -628,7 +641,10 @@
 
   function renderTasksKpis() {
     const orgFilter = state.taskOrgFilter || null;
-    const scoped = state.tasks.filter(function (t) { return !orgFilter || t.org === orgFilter; });
+    const responsableFilter = state.taskResponsableFilter || null;
+    const scoped = state.tasks.filter(function (t) {
+      return (!orgFilter || t.org === orgFilter) && (!responsableFilter || t.responsable === responsableFilter);
+    });
     function count(statusKey) { return scoped.filter(function (t) { return (t.status || 'pendiente') === statusKey; }).length; }
     const cards = [
       { icon: '🧩', value: scoped.length, label: 'Tareas operativas', cls: 'kpi-primary' },
@@ -652,6 +668,17 @@
     renderMarkup(dom.tasksOrgFilter, ['<option value="">Todas las organizaciones</option>'].concat(options).join(''));
     dom.tasksOrgFilter.value = current || '';
     state.taskOrgFilter = dom.tasksOrgFilter.value;
+  }
+
+  function populateTasksResponsableFilter() {
+    const current = dom.tasksResponsableFilter.value;
+    const options = state.teamMembers.map(function (m) {
+      return '<option value="' + safe(m.id) + '">👤 ' + safe(m.name) + '</option>';
+    });
+    renderMarkup(dom.tasksResponsableFilter, ['<option value="">Todos los responsables</option>'].concat(options).join(''));
+    const stillExists = state.teamMembers.some(function (m) { return m.id === current; });
+    dom.tasksResponsableFilter.value = stillExists ? current : '';
+    state.taskResponsableFilter = dom.tasksResponsableFilter.value;
   }
 
   function renderTaskCard(task) {
@@ -717,6 +744,7 @@
       const created = await createTeamMember(newName);
       if (!created) { showError(dom.taskError, 'No se pudo guardar el responsable — revisa tu conexión.'); return; }
       responsable = created.id;
+      populateTasksResponsableFilter();
     }
     const payload = {
       id: state.editingTask ? state.editingTask.id : uid(),

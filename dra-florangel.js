@@ -35,6 +35,7 @@
     tasks: [],
     events: [],
     teamMembers: [],
+    taskResponsableFilter: '',
     calendarMonth: new Date().toISOString().slice(0, 7),
     taskEditor: null,
     eventEditor: null,
@@ -59,6 +60,11 @@
       'task-dialog-cancel': closeTaskDialog,
       'task-delete': deleteEditingTask,
       'responsable-delete': deleteResponsableFromRoster,
+      'tasks-filter-clear': function () {
+        state.taskResponsableFilter = '';
+        dom.tasksResponsableFilter.value = '';
+        renderKanban();
+      },
       'event-dialog-close': closeEventDialog,
       'event-dialog-cancel': closeEventDialog,
       'event-delete': deleteEditingEvent
@@ -89,6 +95,7 @@
     dom.toastRegion = document.getElementById('toast-region');
     dom.kanbanBoard = document.getElementById('kanban-board');
     dom.tasksKpiGrid = document.getElementById('tasks-kpi-grid');
+    dom.tasksResponsableFilter = document.getElementById('tasks-responsable-filter');
     dom.calendarMonthLabel = document.getElementById('calendar-month-label');
     dom.calendarGrid = document.getElementById('calendar-grid');
     dom.taskDialog = document.getElementById('task-dialog');
@@ -111,6 +118,10 @@
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
     dom.eventDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeEventDialog(); });
     dom.taskResponsableSelect.addEventListener('change', onResponsableChange);
+    dom.tasksResponsableFilter.addEventListener('change', function () {
+      state.taskResponsableFilter = dom.tasksResponsableFilter.value;
+      renderKanban();
+    });
   }
 
   function showConnectionFailure() {
@@ -190,6 +201,7 @@
     state.tasks = tasks;
     state.events = events;
     dom.loadingState.hidden = true;
+    populateTasksResponsableFilter();
     renderKanban();
     if (state.view === 'calendar') renderCalendar();
     if (!background) setView(state.view);
@@ -205,10 +217,12 @@
   // ---------- Tareas (kanban) ----------
 
   function renderKpis() {
+    const responsableFilter = state.taskResponsableFilter || null;
+    const scoped = state.tasks.filter(function (t) { return !responsableFilter || t.responsable === responsableFilter; });
     const cards = [
-      { icon: '🧩', value: state.tasks.length, label: 'Tareas operativas', cls: 'kpi-primary' }
+      { icon: '🧩', value: scoped.length, label: 'Tareas operativas', cls: 'kpi-primary' }
     ].concat(STAGES.map(function (stage, idx) {
-      const count = state.tasks.filter(function (t) { return t.stage === stage.key; }).length;
+      const count = scoped.filter(function (t) { return t.stage === stage.key; }).length;
       const icons = ['○', '↻', '✓'];
       const classes = ['kpi-neutral', 'kpi-sky', 'kpi-good'];
       return { icon: icons[idx], value: count, label: stage.label, cls: classes[idx] };
@@ -220,8 +234,9 @@
 
   function renderKanban() {
     renderKpis();
+    const responsableFilter = state.taskResponsableFilter || null;
     renderMarkup(dom.kanbanBoard, STAGES.map(function (stage) {
-      const items = state.tasks.filter(function (t) { return t.stage === stage.key; });
+      const items = state.tasks.filter(function (t) { return t.stage === stage.key && (!responsableFilter || t.responsable === responsableFilter); });
       return '<div class="kanban-column" data-stage="' + stage.key + '">' +
         '<div class="kanban-column-head"><h3>' + safe(stage.label) + '</h3><span class="kanban-count">' + items.length + '</span></div>' +
         (items.length ? items.map(renderTaskCard).join('') : '<div class="kanban-empty">Sin tareas</div>') +
@@ -289,6 +304,17 @@
     if (isNew) dom.taskForm.elements.new_responsable_name.focus();
   }
 
+  function populateTasksResponsableFilter() {
+    const current = dom.tasksResponsableFilter.value;
+    const options = state.teamMembers.map(function (m) {
+      return '<option value="' + safe(m.id) + '">👤 ' + safe(m.name) + '</option>';
+    });
+    renderMarkup(dom.tasksResponsableFilter, ['<option value="">Todos los responsables</option>'].concat(options).join(''));
+    const stillExists = state.teamMembers.some(function (m) { return m.id === current; });
+    dom.tasksResponsableFilter.value = stillExists ? current : '';
+    state.taskResponsableFilter = dom.tasksResponsableFilter.value;
+  }
+
   async function createTeamMember(name) {
     const entry = { id: uid(), name: name, created_at: new Date().toISOString() };
     const next = state.teamMembers.concat(entry);
@@ -308,6 +334,7 @@
     if (!ok) { toast('No se pudo eliminar al responsable — revisa tu conexión.', 'error'); return; }
     state.teamMembers = next;
     populateResponsableSelect('');
+    populateTasksResponsableFilter();
     renderKanban();
     toast('Responsable eliminado del equipo.', 'success');
   }
@@ -346,6 +373,7 @@
       const created = await createTeamMember(newName);
       if (!created) { showError(dom.taskError, 'No se pudo guardar el responsable — revisa tu conexión.'); return; }
       responsable = created.id;
+      populateTasksResponsableFilter();
     }
     const payload = {
       id: state.taskEditor || uid(),

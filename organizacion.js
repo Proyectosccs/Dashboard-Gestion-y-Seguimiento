@@ -37,6 +37,7 @@
     events: [],
     allTasks: [],
     teamMembers: [],
+    taskResponsableFilter: '',
     calendarMonth: new Date().toISOString().slice(0, 7),
     selectedDay: new Date().toISOString().slice(0, 10),
     editingEvent: null,
@@ -68,7 +69,13 @@
       'task-dialog-close': closeTaskDialog,
       'task-dialog-cancel': closeTaskDialog,
       'task-delete': deleteEditingTask,
-      'responsable-delete': deleteResponsableFromRoster
+      'responsable-delete': deleteResponsableFromRoster,
+      'tasks-filter-clear': function () {
+        state.taskResponsableFilter = '';
+        dom.tasksResponsableFilter.value = '';
+        renderTasksBoard();
+        renderKpis();
+      }
     };
     const action = actionsById[target.id];
     if (action) action();
@@ -97,6 +104,11 @@
     dom.taskForm.addEventListener('submit', onTaskSubmit);
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
     dom.taskResponsableSelect.addEventListener('change', onResponsableChange);
+    dom.tasksResponsableFilter.addEventListener('change', function () {
+      state.taskResponsableFilter = dom.tasksResponsableFilter.value;
+      renderTasksBoard();
+      renderKpis();
+    });
     if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) return showConnectionFailure();
     state.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     loadAll(true);
@@ -118,6 +130,7 @@
     dom.eventError = document.getElementById('event-error');
     dom.eventDelete = document.getElementById('event-delete');
     dom.tasksKpiGrid = document.getElementById('tasks-kpi-grid');
+    dom.tasksResponsableFilter = document.getElementById('tasks-responsable-filter');
     dom.tasksBoard = document.getElementById('tasks-board');
     dom.taskDialog = document.getElementById('task-dialog');
     dom.taskDialogTitle = document.getElementById('task-dialog-title');
@@ -189,6 +202,7 @@
     applyOrgTheme();
     dom.loadingState.hidden = true;
     dom.tabNav.hidden = false;
+    populateTasksResponsableFilter();
     renderTasksBoard();
     renderKpis();
     setView(state.view);
@@ -322,7 +336,8 @@
   // ---------- Tareas ----------
 
   function renderKpis() {
-    const scoped = state.allTasks.filter(function (t) { return t.org === ORG_ID; });
+    const responsableFilter = state.taskResponsableFilter || null;
+    const scoped = state.allTasks.filter(function (t) { return t.org === ORG_ID && (!responsableFilter || t.responsable === responsableFilter); });
     function count(statusKey) { return scoped.filter(function (t) { return (t.status || 'pendiente') === statusKey; }).length; }
     const cards = [
       { icon: '🧩', value: scoped.length, label: 'Tareas operativas', cls: 'kpi-primary' },
@@ -337,7 +352,8 @@
   }
 
   function renderTasksBoard() {
-    const scoped = state.allTasks.filter(function (t) { return t.org === ORG_ID; });
+    const responsableFilter = state.taskResponsableFilter || null;
+    const scoped = state.allTasks.filter(function (t) { return t.org === ORG_ID && (!responsableFilter || t.responsable === responsableFilter); });
     renderMarkup(dom.tasksBoard, TASK_STATUSES.map(function (status) {
       const items = scoped.filter(function (t) { return (t.status || 'pendiente') === status.key; });
       return '<div class="kanban-column" data-status="' + status.key + '">' +
@@ -405,6 +421,17 @@
     if (isNew) dom.taskForm.elements.new_responsable_name.focus();
   }
 
+  function populateTasksResponsableFilter() {
+    const current = dom.tasksResponsableFilter.value;
+    const options = state.teamMembers.map(function (m) {
+      return '<option value="' + safe(m.id) + '">👤 ' + safe(m.name) + '</option>';
+    });
+    renderMarkup(dom.tasksResponsableFilter, ['<option value="">Todos los responsables</option>'].concat(options).join(''));
+    const stillExists = state.teamMembers.some(function (m) { return m.id === current; });
+    dom.tasksResponsableFilter.value = stillExists ? current : '';
+    state.taskResponsableFilter = dom.tasksResponsableFilter.value;
+  }
+
   async function createTeamMember(name) {
     const entry = { id: uid(), name: name, created_at: new Date().toISOString() };
     const next = state.teamMembers.concat(entry);
@@ -424,7 +451,9 @@
     if (!ok) { toast('No se pudo eliminar al responsable — revisa tu conexión.', 'error'); return; }
     state.teamMembers = next;
     populateResponsableSelect('');
+    populateTasksResponsableFilter();
     renderTasksBoard();
+    renderKpis();
     toast('Responsable eliminado del equipo.', 'success');
   }
 
@@ -469,6 +498,7 @@
       const created = await createTeamMember(newName);
       if (!created) { showError(dom.taskError, 'No se pudo guardar el responsable — revisa tu conexión.'); return; }
       responsable = created.id;
+      populateTasksResponsableFilter();
     }
     const existing = state.editingTask;
     const payload = {

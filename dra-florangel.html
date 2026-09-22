@@ -6,9 +6,9 @@
   <meta name="description" content="Tareas y calendario de jornadas — Dra Florangel.">
   <title>Dra Florangel — Tareas y jornadas</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./dra-florangel.css?v=4">
+  <link rel="stylesheet" href="./dra-florangel.css?v=5">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./dra-florangel.js?v=4" defer></script>
+  <script src="./dra-florangel.js?v=5" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -49,6 +49,11 @@
         <button class="btn btn-primary" type="button" data-action="new-task" onclick="window.florangelAction(event)">➕ Agregar tarea</button>
       </div>
       <div id="tasks-kpi-grid" class="kpi-grid"></div>
+      <div class="list-toolbar panel">
+        <label class="sr-only" for="tasks-responsable-filter">Filtrar por responsable</label>
+        <select id="tasks-responsable-filter" class="toolbar-select"><option value="">Todos los responsables</option></select>
+        <button id="tasks-filter-clear" class="link-button" type="button" onclick="window.florangelAction(event)">Limpiar</button>
+      </div>
       <div id="kanban-board" class="kanban-board"></div>
     </section>
 

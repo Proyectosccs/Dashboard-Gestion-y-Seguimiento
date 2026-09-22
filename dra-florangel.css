@@ -327,6 +327,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .search-field input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; }
 .search-clear { width: 30px; height: 30px; border: 0; border-radius: 50%; background: var(--color-neutral-300); color: var(--color-neutral-800); cursor: pointer; }
 .search-clear:hover { background: var(--color-neutral-400); }
+.toolbar-select { min-height: 44px; padding: 0 14px; border: 1px solid var(--color-neutral-300); border-radius: 999px; background: var(--color-neutral-100); color: var(--color-text); font-size: 13px; font-weight: 600; cursor: pointer; }
+.link-button { border: 0; background: transparent; padding: 0 2px; color: var(--color-accent-700); font-size: 13px; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .result-count { min-width: max-content; margin: 0; color: var(--color-neutral-600); font-size: 12px; }
 .contact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
 .contact-card { --affiliation-color: var(--color-neutral-500); min-height: 250px; position: relative; display: flex; flex-direction: column; gap: 12px; overflow: hidden; padding: 18px; border: 1px solid color-mix(in srgb, var(--affiliation-color) 42%, var(--color-neutral-300)); border-left: 7px solid var(--affiliation-color); border-radius: 26px; background: rgba(255,255,255,.88); box-shadow: var(--shadow-sm); }

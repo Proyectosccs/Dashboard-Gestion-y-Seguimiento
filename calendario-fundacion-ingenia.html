@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=8">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=9">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=8" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=9" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -75,6 +75,8 @@
       <div class="list-toolbar panel">
         <label class="sr-only" for="tasks-org-filter">Filtrar por organización</label>
         <select id="tasks-org-filter" class="toolbar-select"><option value="">Todas las organizaciones</option></select>
+        <label class="sr-only" for="tasks-responsable-filter">Filtrar por responsable</label>
+        <select id="tasks-responsable-filter" class="toolbar-select"><option value="">Todos los responsables</option></select>
         <button id="tasks-filter-clear" class="link-button" type="button" onclick="window.ingeniaAction(event)">Limpiar</button>
       </div>
       <div id="tasks-board" class="kanban-board"></div>

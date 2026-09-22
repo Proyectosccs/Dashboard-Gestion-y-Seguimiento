@@ -115,6 +115,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .empty-state { min-height: 170px; display: grid; place-items: center; align-content: center; gap: 8px; padding: 22px; text-align: center; color: var(--color-neutral-700); }
 .empty-state strong { color: var(--color-text); font-family: var(--font-heading); font-size: 20px; }
 
+.list-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; padding: 12px; }
+.toolbar-select { min-height: 44px; padding: 0 14px; border: 1px solid var(--color-neutral-300); border-radius: 999px; background: var(--color-neutral-100); color: var(--color-text); font-size: 13px; font-weight: 600; cursor: pointer; }
+.link-button { border: 0; background: transparent; padding: 0 2px; color: var(--org-color); font-size: 13px; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.result-count { min-width: max-content; margin: 0 0 0 auto; color: var(--color-neutral-600); font-size: 12px; }
+
 .kanban-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; align-items: start; }
 .kanban-column { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 24px; background: rgba(255,255,255,.6); border: 1px solid var(--color-neutral-300); min-height: 120px; }
 .kanban-column.drag-over { border-color: var(--org-color); background: color-mix(in srgb, var(--org-color) 10%, white); }
@@ -164,6 +169,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .view-heading .btn { width: 100%; }
   .calendar-toolbar h3 { order: -1; width: 100%; }
   .calendar-grid { min-width: 620px; }
+  .list-toolbar { align-items: stretch; flex-direction: column; }
+  .result-count { padding-inline: 10px; }
   .dialog-fields { grid-template-columns: 1fr; }
   .dialog-fields .field-full { grid-column: auto; }
   .dialog-actions .btn { flex: 1; }
