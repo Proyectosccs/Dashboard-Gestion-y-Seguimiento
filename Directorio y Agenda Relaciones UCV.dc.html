@@ -863,12 +863,18 @@
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px; grid-column: 1 / -1">Título
             <input type="text" value="{{ taskForm.title }}" onChange="{{ onTaskTitle }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
-          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Responsable
-            <div style="display: flex; gap: 8px">
-              <select value="{{ taskForm.responsable }}" onChange="{{ onTaskResponsable }}" style="flex: 1; min-width: 0; border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
-                <sc-for list="{{ taskResponsableOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
-              </select>
-              <button type="button" onClick="{{ deleteResponsableFromRoster }}" aria-label="Eliminar responsable seleccionado del equipo" title="Eliminar responsable seleccionado del equipo" style="border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 14px; width: 44px; font-size: 15px; cursor: pointer">🗑️</button>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px; grid-column: 1 / -1">Responsables
+            <div style="display: flex; flex-direction: column; gap: 4px; max-height: 190px; overflow-y: auto; border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff">
+              <sc-for list="{{ taskResponsableChecklist }}" as="o" hint-placeholder-count="4">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; padding: 3px 0">
+                  <input type="checkbox" checked="{{ o.checked }}" onChange="{{ o.toggle }}" />
+                  {{ o.label }}
+                </label>
+              </sc-for>
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; padding: 3px 0">
+                <input type="checkbox" checked="{{ taskResponsableIsNew }}" onChange="{{ onToggleNewResponsable }}" />
+                ➕ Otro (agregar miembro nuevo)
+              </label>
             </div>
           </label>
           <sc-if value="{{ taskResponsableIsNew }}" hint-placeholder-val="{{ false }}">
@@ -1466,10 +1472,15 @@ function normalizeTaskStatus(t) {
   if (status !== 'en_proceso') followupStatus = '';
   const FINAL_PRIORITY = { critical: 'critica', high: 'alta', medium: 'media', low: 'baja', critica: 'critica', alta: 'alta', media: 'media', baja: 'baja' };
   const priority = FINAL_PRIORITY[t.priority] || 'media';
-  return Object.assign({}, t, { status: status, followupStatus: followupStatus, priority: priority });
+  const responsable = normalizeResponsableList(t.responsable);
+  return Object.assign({}, t, { status: status, followupStatus: followupStatus, priority: priority, responsable: responsable });
 }
 function applyTaskStatus(task, status) {
   return normalizeTaskStatus(Object.assign({}, task, { status: status }));
+}
+function normalizeResponsableList(value) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  return value ? [value] : [];
 }
 
 const AREA_COLORS = { Estructura: '#6b5bd6', Contactos: '#c67139', Cronograma: '#4a7fd4', Datos: '#2fa89b', Evento: '#e0a423', Jornada: '#e0a423', Florangel: '#7a8a5e' };
@@ -1568,7 +1579,6 @@ const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE
 const TEAM_MEMBERS_TABLE = 'ingenia_board_state';
 const TEAM_MEMBERS_KEY = 'ingenia-team-members-v1';
 const SHARED_TASKS_KEY = 'ingenia-team-tasks-v1';
-const NEW_MEMBER_VALUE = '__new_member__';
 
 /* Alimentación desde el Panel de Networking (Fundación INGENIA): proyecto
    Supabase distinto y de solo lectura para este tablero. Solo se leen los
@@ -2009,13 +2019,13 @@ class Component extends DCLogic {
 
   newTask = () => this.setState({
     taskModal: 'new',
-    taskForm: { title: '', responsable: '', newResponsableName: '', status: 'pendiente', followupStatus: '', priority: 'media', detail: '', nextAction: '', dueDate: '' }
+    taskForm: { title: '', responsable: [], newResponsableName: '', newResponsableChecked: false, status: 'pendiente', followupStatus: '', priority: 'media', detail: '', nextAction: '', dueDate: '' }
   });
 
   openTask(id) {
     const task = this.state.tasks.find(t => t.id === id);
     if (!task) return;
-    this.setState({ taskModal: id, taskForm: Object.assign({ newResponsableName: '', followupStatus: '', dueDate: '' }, task) });
+    this.setState({ taskModal: id, taskForm: Object.assign({ newResponsableName: '', newResponsableChecked: false, followupStatus: '', dueDate: '' }, task, { responsable: normalizeResponsableList(task.responsable) }) });
   }
 
   closeTaskModal = () => this.setState({ taskModal: null });
@@ -2035,32 +2045,36 @@ class Component extends DCLogic {
     return entry;
   }
 
-  deleteResponsableFromRoster = async () => {
-    const id = this.state.taskForm.responsable;
-    if (!id || id === NEW_MEMBER_VALUE) return;
-    const next = this.state.teamMembers.filter(m => m.id !== id);
-    const res = await sb.from(TEAM_MEMBERS_TABLE).upsert({ key: TEAM_MEMBERS_KEY, value: next, updated_at: new Date().toISOString() });
-    if (res.error) return;
-    this.setState({ teamMembers: next, taskForm: Object.assign({}, this.state.taskForm, { responsable: '' }) });
+  toggleTaskResponsable = (id) => {
+    const s = this.state;
+    const current = s.taskForm.responsable || [];
+    const next = current.indexOf(id) > -1 ? current.filter(x => x !== id) : current.concat([id]);
+    this.setState({ taskForm: Object.assign({}, s.taskForm, { responsable: next }) });
+  };
+
+  toggleNewResponsable = () => {
+    const s = this.state;
+    this.setState({ taskForm: Object.assign({}, s.taskForm, { newResponsableChecked: !s.taskForm.newResponsableChecked }) });
   };
 
   saveTask = async () => {
     const s = this.state;
-    let responsable = s.taskForm.responsable;
-    if (responsable === NEW_MEMBER_VALUE) {
+    let responsableIds = s.taskForm.responsable || [];
+    if (s.taskForm.newResponsableChecked) {
       const name = (s.taskForm.newResponsableName || '').trim();
       if (!name) return;
       const created = await this._createTeamMember(name);
       if (!created) return;
-      responsable = created.id;
+      responsableIds = responsableIds.concat([created.id]);
     }
     const clean = normalizeTaskStatus(Object.assign({}, s.taskForm, {
       title: s.taskForm.title.trim() || 'Tarea sin título',
-      responsable: responsable,
+      responsable: responsableIds,
       detail: s.taskForm.detail.trim() || 'Sin detalle registrado.',
       nextAction: s.taskForm.nextAction.trim() || 'Definir próxima acción.'
     }));
     delete clean.newResponsableName;
+    delete clean.newResponsableChecked;
     const id = s.taskModal === 'new' ? ('ucv-' + Date.now()) : s.taskModal;
     const finalTask = Object.assign({}, clean, { id: id, org: 'ucv' });
     const rawList = this._sharedTasksRaw || [];
@@ -2469,7 +2483,7 @@ class Component extends DCLogic {
     const count = r => all.filter(c => c.role === r).length;
     const kpiBase = { borderRadius: bubble.radius + 4, padding: (bubble.padding + 2) + 'px ' + (bubble.padding + 4) + 'px', display: 'flex', flexDirection: 'column', gap: 4, boxShadow: 'var(--shadow-sm)' };
     const kpi = (bg, fg) => Object.assign({}, kpiBase, { background: bg, color: fg });
-    const kpiTasksScoped = s.tasks.filter(t => !s.taskResponsableFilter || t.responsable === s.taskResponsableFilter);
+    const kpiTasksScoped = s.tasks.filter(t => !s.taskResponsableFilter || normalizeResponsableList(t.responsable).indexOf(s.taskResponsableFilter) > -1);
     const kpis = s.view === 'board' ? [
       { emoji: '🧩', value: kpiTasksScoped.length, label: 'Tareas', style: kpi('#fff', 'var(--color-text)') },
       { emoji: '○', value: kpiTasksScoped.filter(t => t.status === 'pendiente').length, label: 'Pendiente', style: kpi('#f1ede6', '#645c50') },
@@ -2701,15 +2715,18 @@ class Component extends DCLogic {
     const placeholderStyle = { height: 64, borderRadius: bubble.radius, border: '2px dashed var(--color-accent-500)', background: 'var(--color-accent-100)', flex: 'none' };
     const boardColumns = BOARD_STATUS.map(col => {
       const isOver = s.dragOverCol === col.id;
-      const rawTasks = s.tasks.filter(t => t.status === col.id && (!s.taskResponsableFilter || t.responsable === s.taskResponsableFilter));
+      const rawTasks = s.tasks.filter(t => t.status === col.id && (!s.taskResponsableFilter || normalizeResponsableList(t.responsable).indexOf(s.taskResponsableFilter) > -1));
       const tasks = rawTasks.map((t, i) => {
         const p = priorityMeta[t.priority] || priorityMeta.media;
         const pos = statusOrder.indexOf(t.status);
         const dragging = s.dragTaskId === t.id;
         const followup = t.followupStatus ? FOLLOWUP_STATUS.find(f => f.id === t.followupStatus) : null;
-        const responsableMember = t.responsable ? s.teamMembers.find(m => m.id === t.responsable) : null;
+        const responsableNames = normalizeResponsableList(t.responsable).map(id => {
+          const m = s.teamMembers.find(x => x.id === id);
+          return m ? m.name : '';
+        }).filter(Boolean).join(', ');
         return Object.assign({}, t, {
-          ownerLabel: responsableMember ? responsableMember.name : 'Sin asignar',
+          ownerLabel: responsableNames || 'Sin asignar',
           areaColor: AREA_COLORS[t.area] || '#82796a',
           followupLabel: followup ? followup.label : '', followupEmoji: followup ? followup.emoji : '',
           hasDueDate: !!t.dueDate, dueDateLabel: t.dueDate ? fmt(t.dueDate) : '',
@@ -2798,12 +2815,13 @@ class Component extends DCLogic {
     })();
 
     // Responsables de la tarea: el roster compartido de "Tareas de Equipo"
-    // en Networking Fundación Ingenia, más el valor actual si viene de
-    // antes de tener este roster (para no perder ese dato al editar).
-    const taskResponsableOptions = [{ id: '', label: 'Sin asignar' }]
-      .concat(s.teamMembers.map(m => ({ id: m.id, label: '👤 ' + m.name })))
-      .concat([{ id: NEW_MEMBER_VALUE, label: '➕ Otro (agregar miembro nuevo)' }]);
-    const taskResponsableIsNew = s.taskForm.responsable === NEW_MEMBER_VALUE;
+    // en Networking Fundación Ingenia — checklist de selección múltiple.
+    const taskResponsableChecklist = s.teamMembers.map(m => ({
+      id: m.id, label: '👤 ' + m.name,
+      checked: (s.taskForm.responsable || []).indexOf(m.id) > -1,
+      toggle: () => this.toggleTaskResponsable(m.id)
+    }));
+    const taskResponsableIsNew = !!s.taskForm.newResponsableChecked;
 
     const taskResponsableFilterOptions = s.teamMembers.map(m => ({ id: m.id, label: '👤 ' + m.name }));
 
@@ -3101,8 +3119,8 @@ class Component extends DCLogic {
       taskModalOpen: !!s.taskModal, taskModalTitle: s.taskModal === 'new' ? 'Nueva tarea' : 'Editar tarea', taskForm: s.taskForm,
       isEditingTask: !!s.taskModal && s.taskModal !== 'new', deleteCurrentTask: this.deleteTask,
       taskStatusOptions: taskStatusOptions, taskFollowupOptions: taskFollowupOptions, taskFollowupOpen: s.taskForm.status === 'en_proceso', taskPriorityOptions: taskPriorityOptions, extraUnitChips: extraUnitChips, contactOwnerOptions: contactOwnerOptions,
-      taskResponsableOptions: taskResponsableOptions, taskResponsableIsNew: taskResponsableIsNew,
-      deleteResponsableFromRoster: this.deleteResponsableFromRoster,
+      taskResponsableChecklist: taskResponsableChecklist, taskResponsableIsNew: taskResponsableIsNew,
+      onToggleNewResponsable: this.toggleNewResponsable,
       taskResponsableFilter: s.taskResponsableFilter, taskResponsableFilterOptions: taskResponsableFilterOptions,
       onTaskResponsableFilter: e => this.setState({ taskResponsableFilter: e.target.value }),
       clearTaskResponsableFilter: () => this.setState({ taskResponsableFilter: '' }),
@@ -3163,7 +3181,6 @@ class Component extends DCLogic {
       closeTaskModal: this.closeTaskModal,
       saveTask: this.saveTask,
       onTaskTitle: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { title: e.target.value }) }),
-      onTaskResponsable: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { responsable: e.target.value }) }),
       onNewResponsableName: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { newResponsableName: e.target.value }) }),
       onTaskStatus: e => this.setState({ taskForm: applyTaskStatus(s.taskForm, e.target.value) }),
       onTaskFollowup: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { followupStatus: e.target.value }) }),
