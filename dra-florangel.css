@@ -381,9 +381,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .kanban-move-btn { border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: var(--color-accent-700); cursor: pointer; }
 .kanban-move-btn:hover { background: var(--color-accent-100); }
 .responsable-tag { width: fit-content; padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; background: var(--color-neutral-200); color: var(--color-neutral-800); }
-.responsable-row { display: flex; gap: 8px; align-items: center; }
-.responsable-row select { flex: 1; }
-.responsable-row .icon-button { width: 40px; height: 40px; font-size: 15px; }
+.responsable-checklist { display: flex; flex-direction: column; gap: 4px; max-height: 190px; overflow-y: auto; border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; }
+.responsable-check-row { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; padding: 3px 0; }
+.responsable-check-row input { cursor: pointer; }
 .kanban-delete-btn { border: 0; background: transparent; color: var(--coalition-danger); font-size: 11px; font-weight: 700; cursor: pointer; margin-left: auto; }
 .kanban-empty { padding: 14px; text-align: center; color: var(--color-neutral-500); font-size: 12.5px; }
 

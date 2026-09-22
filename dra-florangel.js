@@ -65,7 +65,6 @@
       'task-dialog-close': closeTaskDialog,
       'task-dialog-cancel': closeTaskDialog,
       'task-delete': deleteEditingTask,
-      'responsable-delete': deleteResponsableFromRoster,
       'tasks-filter-clear': function () {
         state.taskResponsableFilter = '';
         dom.tasksResponsableFilter.value = '';
@@ -109,7 +108,7 @@
     dom.taskDialogTitle = document.getElementById('task-dialog-title');
     dom.taskError = document.getElementById('task-error');
     dom.taskDelete = document.getElementById('task-delete');
-    dom.taskResponsableSelect = document.getElementById('field-task-responsable');
+    dom.responsableChecklist = document.getElementById('responsable-checklist');
     dom.newResponsableField = document.getElementById('new-responsable-field');
     dom.taskDueDate = document.getElementById('field-task-due-date');
     dom.taskStageSelect = document.getElementById('field-task-stage');
@@ -130,7 +129,7 @@
     dom.eventForm.addEventListener('submit', onEventSubmit);
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
     dom.eventDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeEventDialog(); });
-    dom.taskResponsableSelect.addEventListener('change', onResponsableChange);
+    dom.responsableChecklist.addEventListener('change', onResponsableChecklistChange);
     dom.taskStageSelect.addEventListener('change', onTaskStageChange);
     dom.tasksResponsableFilter.addEventListener('change', function () {
       state.taskResponsableFilter = dom.tasksResponsableFilter.value;
@@ -212,7 +211,7 @@
       await writeKey(TASKS_KEY, []);
     }
 
-    state.tasks = tasks;
+    state.tasks = tasks.map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); });
     state.events = events;
     dom.loadingState.hidden = true;
     populateTasksResponsableFilter();
@@ -232,7 +231,7 @@
 
   function renderKpis() {
     const responsableFilter = state.taskResponsableFilter || null;
-    const scoped = state.tasks.filter(function (t) { return !responsableFilter || t.responsable === responsableFilter; });
+    const scoped = state.tasks.filter(function (t) { return !responsableFilter || t.responsable.indexOf(responsableFilter) > -1; });
     const cards = [
       { icon: '🧩', value: scoped.length, label: 'Tareas', cls: 'kpi-primary' }
     ].concat(STAGES.map(function (stage, idx) {
@@ -250,7 +249,7 @@
     renderKpis();
     const responsableFilter = state.taskResponsableFilter || null;
     renderMarkup(dom.kanbanBoard, STAGES.map(function (stage) {
-      const items = state.tasks.filter(function (t) { return t.stage === stage.key && (!responsableFilter || t.responsable === responsableFilter); });
+      const items = state.tasks.filter(function (t) { return t.stage === stage.key && (!responsableFilter || t.responsable.indexOf(responsableFilter) > -1); });
       return '<div class="kanban-column" data-stage="' + stage.key + '">' +
         '<div class="kanban-column-head"><h3>' + safe(stage.label) + '</h3><span class="kanban-count">' + items.length + '</span></div>' +
         (items.length ? items.map(renderTaskCard).join('') : '<div class="kanban-empty">Sin tareas</div>') +
@@ -289,7 +288,7 @@
     const moveButtons = [];
     if (stageIndex > 0) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task" data-id="' + safe(task.id) + '" data-stage="' + STAGES[stageIndex - 1].key + '" onclick="window.florangelAction(event)">← ' + safe(STAGES[stageIndex - 1].short) + '</button>');
     if (stageIndex < STAGES.length - 1) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task" data-id="' + safe(task.id) + '" data-stage="' + STAGES[stageIndex + 1].key + '" onclick="window.florangelAction(event)">' + safe(STAGES[stageIndex + 1].short) + ' →</button>');
-    const responsable = responsableName(task.responsable);
+    const responsable = responsableNamesLabel(task.responsable);
     const detailText = taskDetailText(task);
     const followupLabel = taskFollowupLabel(task);
     return '<article class="kanban-card" draggable="true" data-id="' + safe(task.id) + '">' +
@@ -315,19 +314,41 @@
     return member ? member.name : '';
   }
 
-  function populateResponsableSelect(currentId) {
-    const options = ['<option value="">Sin asignar</option>'].concat(state.teamMembers.map(function (m) {
-      return '<option value="' + safe(m.id) + '">👤 ' + safe(m.name) + '</option>';
-    }), ['<option value="' + NEW_MEMBER_VALUE + '">➕ Otro (agregar miembro nuevo)</option>']);
-    renderMarkup(dom.taskResponsableSelect, options.join(''));
-    dom.taskResponsableSelect.value = currentId || '';
+  function normalizeResponsableList(value) {
+    if (Array.isArray(value)) return value.filter(Boolean);
+    return value ? [value] : [];
+  }
+
+  function responsableNamesLabel(value) {
+    return normalizeResponsableList(value).map(responsableName).filter(Boolean).join(', ');
+  }
+
+  function populateResponsableChecklist(currentIds) {
+    const selected = normalizeResponsableList(currentIds);
+    const rows = state.teamMembers.map(function (m) {
+      const checked = selected.indexOf(m.id) > -1 ? ' checked' : '';
+      return '<label class="responsable-check-row"><input type="checkbox" value="' + safe(m.id) + '"' + checked + '> 👤 ' + safe(m.name) + '</label>';
+    });
+    rows.push('<label class="responsable-check-row"><input type="checkbox" id="responsable-check-new" value="' + NEW_MEMBER_VALUE + '"> ➕ Otro (agregar miembro nuevo)</label>');
+    renderMarkup(dom.responsableChecklist, rows.join(''));
     dom.newResponsableField.hidden = true;
   }
 
-  function onResponsableChange() {
-    const isNew = dom.taskResponsableSelect.value === NEW_MEMBER_VALUE;
-    dom.newResponsableField.hidden = !isNew;
-    if (isNew) dom.taskForm.elements.new_responsable_name.focus();
+  function onResponsableChecklistChange(e) {
+    if (!e.target || e.target.id !== 'responsable-check-new') return;
+    dom.newResponsableField.hidden = !e.target.checked;
+    if (e.target.checked) dom.taskForm.elements.new_responsable_name.focus();
+  }
+
+  function getSelectedResponsableIds() {
+    return Array.from(dom.responsableChecklist.querySelectorAll('input[type="checkbox"]:checked'))
+      .map(function (cb) { return cb.value; })
+      .filter(function (v) { return v && v !== NEW_MEMBER_VALUE; });
+  }
+
+  function isNewResponsableChecked() {
+    const cb = document.getElementById('responsable-check-new');
+    return !!(cb && cb.checked);
   }
 
   function onTaskStageChange() {
@@ -354,21 +375,6 @@
     return entry;
   }
 
-  async function deleteResponsableFromRoster() {
-    const selectedId = dom.taskResponsableSelect.value;
-    if (!selectedId || selectedId === NEW_MEMBER_VALUE) return;
-    const member = findTeamMember(selectedId);
-    if (!member) return;
-    const next = state.teamMembers.filter(function (m) { return m.id !== selectedId; });
-    const ok = await writeTeamMembers(next);
-    if (!ok) { toast('No se pudo eliminar al responsable — revisa tu conexión.', 'error'); return; }
-    state.teamMembers = next;
-    populateResponsableSelect('');
-    populateTasksResponsableFilter();
-    renderKanban();
-    toast('Responsable eliminado del equipo.', 'success');
-  }
-
   function moveTask(id, stage) {
     const task = findById(state.tasks, id);
     if (!task || task.stage === stage) return;
@@ -383,7 +389,7 @@
     dom.taskDelete.hidden = !task;
     hideError(dom.taskError);
     dom.taskForm.elements.title.value = task ? task.title : '';
-    populateResponsableSelect(task ? task.responsable : '');
+    populateResponsableChecklist(task ? task.responsable : []);
     dom.taskDueDate.value = task ? (task.dueDate || '') : '';
     dom.taskDetail.value = task ? taskDetailText(task) : '';
     dom.taskNextAction.value = task ? (task.nextAction || '') : '';
@@ -401,13 +407,13 @@
     e.preventDefault();
     const title = dom.taskForm.elements.title.value.trim();
     if (!title) { showError(dom.taskError, 'El título es obligatorio.'); return; }
-    let responsable = dom.taskForm.elements.responsable.value;
-    if (responsable === NEW_MEMBER_VALUE) {
+    let responsableIds = getSelectedResponsableIds();
+    if (isNewResponsableChecked()) {
       const newName = dom.taskForm.elements.new_responsable_name.value.trim();
       if (!newName) { showError(dom.taskError, 'Escribe el nombre del nuevo responsable.'); return; }
       const created = await createTeamMember(newName);
       if (!created) { showError(dom.taskError, 'No se pudo guardar el responsable — revisa tu conexión.'); return; }
-      responsable = created.id;
+      responsableIds = responsableIds.concat([created.id]);
       populateTasksResponsableFilter();
     }
     const stage = dom.taskStageSelect.value;
@@ -418,7 +424,7 @@
       stage: stage,
       followupStatus: stage === 'doing' ? dom.taskFollowupSelect.value : '',
       priority: dom.taskPrioritySelect.value,
-      responsable: responsable,
+      responsable: responsableIds,
       dueDate: dom.taskDueDate.value,
       nextAction: dom.taskNextAction.value.trim(),
       created_at: new Date().toISOString()
