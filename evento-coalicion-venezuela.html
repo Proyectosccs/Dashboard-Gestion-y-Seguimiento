@@ -6,11 +6,11 @@
   <meta name="description" content="Control operativo móvil para eventos de Coalición Venezuela y Fundación Ingenia.">
   <title>Resumen — Evento Coalición Venezuela</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./evento-coalicion-venezuela.css?v=3">
+  <link rel="stylesheet" href="./evento-coalicion-venezuela.css?v=4">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-  <script src="./evento-coalicion-venezuela.js?v=11" defer></script>
+  <script src="./evento-coalicion-venezuela.js?v=12" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -35,6 +35,7 @@
       <!-- Ocultos temporalmente para la reunión de hoy — quitar el `hidden` para reactivarlos -->
       <button class="tab-button" type="button" data-view="contacts" onclick="window.coalicionAction(event)" hidden>🤝 Responsables</button>
       <button class="tab-button" type="button" data-view="calendar" onclick="window.coalicionAction(event)">🗓️ Calendario</button>
+      <button class="tab-button" type="button" data-view="tasks" onclick="window.coalicionAction(event)">📋 Tareas de Equipo</button>
       <a class="tab-link" href="./" target="_blank" rel="noopener noreferrer" aria-label="Abrir Tablero UCV en otra pestaña" hidden>🎓 Tablero UCV ↗</a>
     </nav>
 
@@ -97,6 +98,23 @@
         <button id="calendar-today" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)">Hoy</button>
       </div>
       <div id="calendar-grid" class="calendar-grid panel"></div>
+    </section>
+
+    <section id="tasks-view" class="view" aria-labelledby="tasks-title" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">📋 Seguimiento</p>
+          <h2 id="tasks-title">Tareas de Equipo</h2>
+        </div>
+        <button class="btn btn-primary" type="button" data-action="new-task" onclick="window.coalicionAction(event)">➕ Agregar tarea</button>
+      </div>
+      <div id="tasks-kpi-grid" class="task-kpi-grid"></div>
+      <div class="list-toolbar panel">
+        <label class="sr-only" for="tasks-responsable-filter">Filtrar por responsable</label>
+        <select id="tasks-responsable-filter" class="toolbar-select"><option value="">Todos los responsables</option></select>
+        <button id="tasks-filter-clear" class="link-button" type="button" onclick="window.coalicionAction(event)">Limpiar</button>
+      </div>
+      <div id="tasks-board" class="kanban-board"></div>
     </section>
 
     <section id="contacts-view" class="view" aria-labelledby="contacts-title" hidden>
@@ -217,6 +235,83 @@
           <span class="button-label">Continuar</span>
           <span class="button-spinner" aria-hidden="true"></span>
         </button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="task-dialog" class="editor-dialog" aria-labelledby="task-dialog-title">
+    <form id="task-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">📋 Tareas de Equipo</p>
+          <h2 id="task-dialog-title">Agregar tarea</h2>
+        </div>
+        <button id="task-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.coalicionAction(event)">×</button>
+      </div>
+      <div id="task-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-fields">
+        <div class="field field-full">
+          <label for="field-task-title">Título</label>
+          <input id="field-task-title" class="input" name="title" type="text" required>
+        </div>
+        <div class="field">
+          <label for="field-task-responsable">Responsable</label>
+          <div class="responsable-row">
+            <select id="field-task-responsable" class="input" name="responsable"></select>
+            <button id="responsable-delete" class="icon-button" type="button" aria-label="Eliminar responsable seleccionado del equipo" title="Eliminar responsable seleccionado del equipo" onclick="window.coalicionAction(event)">🗑️</button>
+          </div>
+        </div>
+        <div class="field field-full" id="new-responsable-field" hidden>
+          <label for="field-new-responsable-name">Nombre del nuevo responsable</label>
+          <input id="field-new-responsable-name" class="input" name="new_responsable_name" type="text" placeholder="Ej. Andrea Pérez">
+        </div>
+        <div class="field">
+          <label for="field-task-due-date">Fecha límite</label>
+          <input id="field-task-due-date" class="input" name="due_date" type="date">
+        </div>
+        <div class="field">
+          <label for="field-task-status">Estado</label>
+          <select id="field-task-status" class="input" name="status">
+            <option value="pendiente">Pendiente</option>
+            <option value="en_proceso">En proceso</option>
+            <option value="listo">Listo</option>
+            <option value="bloqueada">Bloqueada</option>
+          </select>
+        </div>
+        <div class="field field-full" id="task-followup-field" hidden>
+          <label for="field-task-followup">¿Cómo va el seguimiento?</label>
+          <select id="field-task-followup" class="input" name="followup_status">
+            <option value="contacted">Contactado</option>
+            <option value="in_progress">En seguimiento</option>
+            <option value="waiting_response">Esperando respuesta</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="field-task-priority">Prioridad</label>
+          <select id="field-task-priority" class="input" name="priority">
+            <option value="critica">Crítica</option>
+            <option value="alta">Alta</option>
+            <option value="media" selected>Media</option>
+            <option value="baja">Baja</option>
+          </select>
+        </div>
+        <div class="field field-full">
+          <label for="field-task-detail">Detalle</label>
+          <textarea id="field-task-detail" class="input" name="detail"></textarea>
+        </div>
+        <div class="field field-full">
+          <label for="field-task-next-action">Próxima acción</label>
+          <textarea id="field-task-next-action" class="input" name="next_action"></textarea>
+        </div>
+        <div class="field field-full">
+          <label for="field-task-evidence">Evidencia</label>
+          <textarea id="field-task-evidence" class="input" name="evidence" placeholder="Prueba o resultado de la ejecución…"></textarea>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="task-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)">Cancelar</button>
+        <button id="task-delete" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)" hidden>🗑️ Eliminar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
       </div>
     </form>
   </dialog>

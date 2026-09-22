@@ -9,6 +9,27 @@
     contacts: 'coalicion_contacts',
     events: 'coalicion_events'
   };
+
+  // Tareas de Equipo: mismo listado compartido que usan Networking Fundación
+  // Ingenia, cada página de organización y Dra Florangel — vive en
+  // ingenia_board_state (mismo proyecto de Supabase, tabla distinta a las de
+  // Coalición), filtrado aquí por esta organización.
+  const SHARED_TABLE = 'ingenia_board_state';
+  const TEAM_TASKS_KEY = 'ingenia-team-tasks-v1';
+  const TEAM_MEMBERS_KEY = 'ingenia-team-members-v1';
+  const NEW_MEMBER_VALUE = '__new_member__';
+  const ORG_ID = 'coalicion';
+  const TASK_STATUSES = [
+    { key: 'pendiente', label: 'Pendiente', color: '#82796a' },
+    { key: 'en_proceso', label: 'En proceso', color: '#0f766e' },
+    { key: 'listo', label: 'Listo', color: '#0f7a3d' },
+    { key: 'bloqueada', label: 'Bloqueada', color: '#a02525' }
+  ];
+  const FOLLOWUP_STATUSES = [
+    { key: 'contacted', label: 'Contactado' },
+    { key: 'in_progress', label: 'En seguimiento' },
+    { key: 'waiting_response', label: 'Esperando respuesta' }
+  ];
   const SEMAFORO_META = {
     Verde: { key: 'verde', label: 'Verde · Habitable', color: 'var(--coalition-good)', soft: 'var(--coalition-good-soft)' },
     Amarillo: { key: 'amarillo', label: 'Amarillo · Riesgo moderado/restringido. Se puede reparar', color: 'var(--coalition-warning)', soft: 'var(--coalition-warning-soft)' },
@@ -367,7 +388,12 @@
     loadId: 0,
     results: { loading: false, error: null, loaded: false, entregas: [], envios: [], semaforoFilter: null, needsData: [], openNeedCategory: null, selectedJornada: null, jornadaAnchored: false },
     map: null,
-    mapMarkers: null
+    mapMarkers: null,
+    allTasks: [],
+    teamMembers: [],
+    taskResponsableFilter: '',
+    editingTask: null,
+    dragTaskId: null
   };
 
   const dom = {};
@@ -379,6 +405,8 @@
     const target = event.currentTarget;
     if (!target) return;
     if (target.dataset.view) return setView(target.dataset.view);
+    if (target.dataset.action === 'move-task-status') { moveTaskStatus(target.dataset.id, target.dataset.status); return; }
+    if (target.dataset.taskId) { openTaskDialog(findById(state.allTasks, target.dataset.taskId)); return; }
     if (target.dataset.action) return handleAction(target.dataset.action, target.tagName === 'SELECT' ? target.value : target.dataset.id);
     const actionsById = {
       'retry-load': loadAllData,
@@ -390,7 +418,17 @@
       'key-dialog-cancel': closeKeyDialog,
       'toggle-editor-key': toggleEditorKey,
       'dialog-close': requestCloseEditor,
-      'dialog-cancel': requestCloseEditor
+      'dialog-cancel': requestCloseEditor,
+      'task-dialog-close': closeTaskDialog,
+      'task-dialog-cancel': closeTaskDialog,
+      'task-delete': deleteEditingTask,
+      'responsable-delete': deleteResponsableFromRoster,
+      'tasks-filter-clear': function () {
+        state.taskResponsableFilter = '';
+        dom.tasksResponsableFilter.value = '';
+        renderTasksBoard();
+        renderTasksKpis();
+      }
     };
     const action = actionsById[target.id];
     if (action) action();
@@ -403,6 +441,7 @@
 
     state.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     loadAllData();
+    loadTeamTasks();
     subscribeRealtime();
     fetchResultados(false);
   }
@@ -459,6 +498,24 @@
     dom.dialogCancel = document.getElementById('dialog-cancel');
     dom.dialogClose = document.getElementById('dialog-close');
     dom.toastRegion = document.getElementById('toast-region');
+    dom.tasksKpiGrid = document.getElementById('tasks-kpi-grid');
+    dom.tasksResponsableFilter = document.getElementById('tasks-responsable-filter');
+    dom.tasksBoard = document.getElementById('tasks-board');
+    dom.taskDialog = document.getElementById('task-dialog');
+    dom.taskDialogTitle = document.getElementById('task-dialog-title');
+    dom.taskForm = document.getElementById('task-form');
+    dom.taskError = document.getElementById('task-error');
+    dom.taskDelete = document.getElementById('task-delete');
+    dom.taskResponsableSelect = document.getElementById('field-task-responsable');
+    dom.newResponsableField = document.getElementById('new-responsable-field');
+    dom.taskDueDate = document.getElementById('field-task-due-date');
+    dom.taskStatusSelect = document.getElementById('field-task-status');
+    dom.taskFollowupField = document.getElementById('task-followup-field');
+    dom.taskFollowupSelect = document.getElementById('field-task-followup');
+    dom.taskPrioritySelect = document.getElementById('field-task-priority');
+    dom.taskDetail = document.getElementById('field-task-detail');
+    dom.taskNextAction = document.getElementById('field-task-next-action');
+    dom.taskEvidence = document.getElementById('field-task-evidence');
   }
 
   function bindStaticEvents() {
@@ -486,7 +543,16 @@
       event.returnValue = '';
     });
     document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'visible') loadAllData(true);
+      if (document.visibilityState === 'visible') { loadAllData(true); loadTeamTasks(); }
+    });
+    dom.taskForm.addEventListener('submit', onTaskSubmit);
+    dom.taskDialog.addEventListener('cancel', function (event) { event.preventDefault(); closeTaskDialog(); });
+    dom.taskResponsableSelect.addEventListener('change', onResponsableChange);
+    dom.taskStatusSelect.addEventListener('change', onTaskStatusChange);
+    dom.tasksResponsableFilter.addEventListener('change', function () {
+      state.taskResponsableFilter = dom.tasksResponsableFilter.value;
+      renderTasksBoard();
+      renderTasksKpis();
     });
   }
 
@@ -637,6 +703,7 @@
     const titles = {
       summary: 'Resumen — Evento Coalición Venezuela',
       calendar: 'Calendario — Evento Coalición Venezuela',
+      tasks: 'Tareas de Equipo — Evento Coalición Venezuela',
       contacts: 'Responsables — Evento Coalición Venezuela',
       results: 'Resultados — Evento Coalición Venezuela'
     };
@@ -651,6 +718,7 @@
     if (viewName === 'calendar') renderCalendar();
     if (viewName === 'contacts') renderContacts();
     if (viewName === 'results') loadResultsIfNeeded();
+    if (viewName === 'tasks') { renderTasksBoard(); renderTasksKpis(); }
   }
 
   function handleAppAction(event) {
@@ -660,6 +728,7 @@
   }
 
   function handleAction(action, id) {
+    if (action === 'new-task') openTaskDialog();
     if (action === 'new-contact') openEditor('contact');
     if (action === 'edit-contact') requestSensitiveAccess('edit', id);
     if (action === 'reveal-contact') requestSensitiveAccess('reveal', id);
@@ -1693,6 +1762,263 @@
       return false;
     }
   }
+
+  // ---------- Tareas de Equipo (kanban compartido con el resto del sitio) ----------
+
+  async function readBoardKey(table, key, fallback) {
+    const res = await state.client.from(table).select('value').eq('key', key).maybeSingle();
+    if (res.error || !res.data) return fallback;
+    return res.data.value;
+  }
+
+  async function writeBoardKey(table, key, value) {
+    const res = await state.client.from(table).upsert({ key: key, value: value, updated_at: new Date().toISOString() });
+    return !res.error;
+  }
+
+  async function loadTeamTasks() {
+    if (!state.client) return;
+    const [tasksValue, membersValue] = await Promise.all([
+      readBoardKey(SHARED_TABLE, TEAM_TASKS_KEY, []),
+      readBoardKey(SHARED_TABLE, TEAM_MEMBERS_KEY, [])
+    ]);
+    state.allTasks = Array.isArray(tasksValue) ? tasksValue : [];
+    state.teamMembers = Array.isArray(membersValue) ? membersValue : [];
+    populateTasksResponsableFilter();
+    if (state.view === 'tasks') { renderTasksBoard(); renderTasksKpis(); }
+  }
+
+  function findTeamMember(id) {
+    return state.teamMembers.find(function (m) { return m.id === id; }) || null;
+  }
+
+  function responsableName(id) {
+    const member = id ? findTeamMember(id) : null;
+    return member ? member.name : '';
+  }
+
+  function scopedTasks() {
+    const responsableFilter = state.taskResponsableFilter || null;
+    return state.allTasks.filter(function (t) { return t.org === ORG_ID && (!responsableFilter || t.responsable === responsableFilter); });
+  }
+
+  function renderTasksKpis() {
+    const scoped = scopedTasks();
+    function count(statusKey) { return scoped.filter(function (t) { return (t.status || 'pendiente') === statusKey; }).length; }
+    const cards = [
+      { icon: '🧩', value: scoped.length, label: 'Tareas', cls: 'task-kpi-primary' },
+      { icon: '○', value: count('pendiente'), label: 'Pendiente', cls: 'task-kpi-neutral' },
+      { icon: '↻', value: count('en_proceso'), label: 'En proceso', cls: 'task-kpi-sky' },
+      { icon: '✓', value: count('listo'), label: 'Listo', cls: 'task-kpi-good' },
+      { icon: '⛔', value: count('bloqueada'), label: 'Bloqueada', cls: 'task-kpi-danger' }
+    ];
+    renderMarkup(dom.tasksKpiGrid, cards.map(function (c) {
+      return '<article class="task-kpi-card ' + c.cls + '"><span class="task-kpi-icon" aria-hidden="true">' + c.icon + '</span><strong>' + c.value + '</strong><span class="task-kpi-label">' + safe(c.label) + '</span></article>';
+    }).join(''));
+  }
+
+  function renderTasksBoard() {
+    const scoped = scopedTasks();
+    renderMarkup(dom.tasksBoard, TASK_STATUSES.map(function (status) {
+      const items = scoped.filter(function (t) { return (t.status || 'pendiente') === status.key; });
+      return '<div class="kanban-column" data-status="' + status.key + '">' +
+        '<div class="kanban-column-head"><h3>' + safe(status.label) + '</h3><span class="kanban-count">' + items.length + '</span></div>' +
+        (items.length ? items.map(renderTaskCard).join('') : '<div class="kanban-empty">Sin tareas</div>') +
+      '</div>';
+    }).join(''));
+
+    dom.tasksBoard.querySelectorAll('.kanban-card').forEach(function (card) {
+      card.addEventListener('dragstart', function () { state.dragTaskId = card.dataset.id; card.classList.add('dragging'); });
+      card.addEventListener('dragend', function () { card.classList.remove('dragging'); });
+    });
+    dom.tasksBoard.querySelectorAll('.kanban-column').forEach(function (column) {
+      column.addEventListener('dragover', function (e) { e.preventDefault(); column.classList.add('drag-over'); });
+      column.addEventListener('dragleave', function () { column.classList.remove('drag-over'); });
+      column.addEventListener('drop', function (e) {
+        e.preventDefault();
+        column.classList.remove('drag-over');
+        if (state.dragTaskId) moveTaskStatus(state.dragTaskId, column.dataset.status);
+        state.dragTaskId = null;
+      });
+    });
+  }
+
+  function taskDetailText(task) { return task.detail != null ? task.detail : (task.notes || ''); }
+
+  function taskFollowupLabel(task) {
+    if (task.status !== 'en_proceso' || !task.followupStatus) return '';
+    const f = FOLLOWUP_STATUSES.find(function (x) { return x.key === task.followupStatus; });
+    return f ? f.label : '';
+  }
+
+  function renderTaskCard(task) {
+    const statusIndex = TASK_STATUSES.findIndex(function (s) { return s.key === (task.status || 'pendiente'); });
+    const status = TASK_STATUSES[statusIndex] || TASK_STATUSES[0];
+    const moveButtons = [];
+    if (statusIndex > 0) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task-status" data-id="' + safe(task.id) + '" data-status="' + TASK_STATUSES[statusIndex - 1].key + '" onclick="window.coalicionAction(event)">← ' + safe(TASK_STATUSES[statusIndex - 1].label) + '</button>');
+    if (statusIndex < TASK_STATUSES.length - 1) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task-status" data-id="' + safe(task.id) + '" data-status="' + TASK_STATUSES[statusIndex + 1].key + '" onclick="window.coalicionAction(event)">' + safe(TASK_STATUSES[statusIndex + 1].label) + ' →</button>');
+    const responsable = responsableName(task.responsable);
+    const detailText = taskDetailText(task);
+    const followupLabel = taskFollowupLabel(task);
+    return '<article class="kanban-card" draggable="true" data-id="' + safe(task.id) + '" style="--status-color:' + safe(status.color) + '">' +
+      '<button type="button" style="all:unset;cursor:pointer" data-task-id="' + safe(task.id) + '" onclick="window.coalicionAction(event)">' +
+        '<p class="kanban-card-title">' + safe(task.title) + '</p>' +
+        (detailText ? '<p class="kanban-card-notes">' + safe(detailText) + '</p>' : '') +
+        (responsable ? '<span class="responsable-tag">👤 ' + safe(responsable) + '</span>' : '') +
+        (followupLabel ? '<span class="responsable-tag">↻ ' + safe(followupLabel) + '</span>' : '') +
+        (task.dueDate ? '<span class="responsable-tag">⏰ ' + safe(formatDate(task.dueDate)) + '</span>' : '') +
+      '</button>' +
+      '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' +
+    '</article>';
+  }
+
+  function populateResponsableSelect(currentId) {
+    const options = ['<option value="">Sin asignar</option>'].concat(state.teamMembers.map(function (m) {
+      return '<option value="' + safe(m.id) + '">👤 ' + safe(m.name) + '</option>';
+    }), ['<option value="' + NEW_MEMBER_VALUE + '">➕ Otro (agregar miembro nuevo)</option>']);
+    renderMarkup(dom.taskResponsableSelect, options.join(''));
+    dom.taskResponsableSelect.value = currentId || '';
+    dom.newResponsableField.hidden = true;
+  }
+
+  function onResponsableChange() {
+    const isNew = dom.taskResponsableSelect.value === NEW_MEMBER_VALUE;
+    dom.newResponsableField.hidden = !isNew;
+    if (isNew) dom.taskForm.elements.new_responsable_name.focus();
+  }
+
+  function onTaskStatusChange() {
+    dom.taskFollowupField.hidden = dom.taskStatusSelect.value !== 'en_proceso';
+  }
+
+  function populateTasksResponsableFilter() {
+    if (!dom.tasksResponsableFilter) return;
+    const current = dom.tasksResponsableFilter.value;
+    const options = state.teamMembers.map(function (m) {
+      return '<option value="' + safe(m.id) + '">👤 ' + safe(m.name) + '</option>';
+    });
+    renderMarkup(dom.tasksResponsableFilter, ['<option value="">Todos los responsables</option>'].concat(options).join(''));
+    const stillExists = state.teamMembers.some(function (m) { return m.id === current; });
+    dom.tasksResponsableFilter.value = stillExists ? current : '';
+    state.taskResponsableFilter = dom.tasksResponsableFilter.value;
+  }
+
+  async function createTeamMember(name) {
+    const entry = { id: uid(), name: name, created_at: new Date().toISOString() };
+    const next = state.teamMembers.concat(entry);
+    const ok = await writeBoardKey(SHARED_TABLE, TEAM_MEMBERS_KEY, next);
+    if (!ok) return null;
+    state.teamMembers = next;
+    return entry;
+  }
+
+  async function deleteResponsableFromRoster() {
+    const selectedId = dom.taskResponsableSelect.value;
+    if (!selectedId || selectedId === NEW_MEMBER_VALUE) return;
+    const member = findTeamMember(selectedId);
+    if (!member) return;
+    const next = state.teamMembers.filter(function (m) { return m.id !== selectedId; });
+    const ok = await writeBoardKey(SHARED_TABLE, TEAM_MEMBERS_KEY, next);
+    if (!ok) { toast('No se pudo eliminar al responsable — revisa tu conexión.', 'error'); return; }
+    state.teamMembers = next;
+    populateResponsableSelect('');
+    populateTasksResponsableFilter();
+    renderTasksBoard();
+    renderTasksKpis();
+    toast('Responsable eliminado del equipo.', 'success');
+  }
+
+  async function moveTaskStatus(id, status) {
+    const task = findById(state.allTasks, id);
+    if (!task || task.status === status) return;
+    const previous = task.status;
+    task.status = status;
+    renderTasksBoard();
+    renderTasksKpis();
+    const ok = await writeBoardKey(SHARED_TABLE, TEAM_TASKS_KEY, state.allTasks);
+    if (!ok) { task.status = previous; renderTasksBoard(); renderTasksKpis(); toast('No se pudo actualizar el estado — revisa tu conexión.', 'error'); }
+  }
+
+  function openTaskDialog(existing) {
+    hideError(dom.taskError);
+    dom.taskForm.reset();
+    state.editingTask = existing || null;
+    dom.taskDialogTitle.textContent = existing ? 'Editar tarea' : 'Agregar tarea';
+    dom.taskDelete.hidden = !existing;
+    dom.taskForm.elements.title.value = existing ? (existing.title || '') : '';
+    populateResponsableSelect(existing ? existing.responsable : '');
+    dom.taskDueDate.value = existing ? (existing.dueDate || '') : '';
+    dom.taskDetail.value = existing ? taskDetailText(existing) : '';
+    dom.taskNextAction.value = existing ? (existing.nextAction || '') : '';
+    dom.taskEvidence.value = existing ? (existing.evidence || '') : '';
+    dom.taskPrioritySelect.value = existing ? (existing.priority || 'media') : 'media';
+    dom.taskStatusSelect.value = existing ? (existing.status || 'pendiente') : 'pendiente';
+    dom.taskFollowupSelect.value = existing ? (existing.followupStatus || 'in_progress') : 'in_progress';
+    onTaskStatusChange();
+    dom.taskDialog.showModal();
+    dom.taskForm.elements.title.focus();
+  }
+
+  function closeTaskDialog() { dom.taskDialog.close(); state.editingTask = null; }
+
+  function showError(node, message) { node.textContent = message; node.hidden = false; }
+  function hideError(node) { node.hidden = true; node.textContent = ''; }
+
+  async function onTaskSubmit(e) {
+    e.preventDefault();
+    hideError(dom.taskError);
+    const title = dom.taskForm.elements.title.value.trim();
+    if (!title) { showError(dom.taskError, 'El título es obligatorio.'); return; }
+    let responsable = dom.taskForm.elements.responsable.value;
+    if (responsable === NEW_MEMBER_VALUE) {
+      const newName = dom.taskForm.elements.new_responsable_name.value.trim();
+      if (!newName) { showError(dom.taskError, 'Escribe el nombre del nuevo responsable.'); return; }
+      const created = await createTeamMember(newName);
+      if (!created) { showError(dom.taskError, 'No se pudo guardar el responsable — revisa tu conexión.'); return; }
+      responsable = created.id;
+      populateTasksResponsableFilter();
+    }
+    const existing = state.editingTask;
+    const status = dom.taskForm.elements.status.value;
+    const payload = {
+      id: existing ? existing.id : uid(),
+      org: ORG_ID,
+      title: title,
+      detail: dom.taskDetail.value.trim(),
+      status: status,
+      followupStatus: status === 'en_proceso' ? dom.taskFollowupSelect.value : '',
+      priority: dom.taskPrioritySelect.value,
+      responsable: responsable,
+      dueDate: dom.taskDueDate.value,
+      nextAction: dom.taskNextAction.value.trim(),
+      evidence: dom.taskEvidence.value.trim(),
+      created_at: existing ? existing.created_at : new Date().toISOString()
+    };
+    const next = existing
+      ? state.allTasks.map(function (t) { return t.id === existing.id ? payload : t; })
+      : state.allTasks.concat(payload);
+    const ok = await writeBoardKey(SHARED_TABLE, TEAM_TASKS_KEY, next);
+    if (!ok) { showError(dom.taskError, 'No se pudo guardar — revisa tu conexión.'); return; }
+    state.allTasks = next;
+    renderTasksBoard();
+    renderTasksKpis();
+    closeTaskDialog();
+    toast('Tarea guardada.', 'success');
+  }
+
+  async function deleteEditingTask() {
+    if (!state.editingTask) return;
+    const next = state.allTasks.filter(function (t) { return t.id !== state.editingTask.id; });
+    const ok = await writeBoardKey(SHARED_TABLE, TEAM_TASKS_KEY, next);
+    if (!ok) { toast('No se pudo eliminar — revisa tu conexión.', 'error'); return; }
+    state.allTasks = next;
+    renderTasksBoard();
+    renderTasksKpis();
+    closeTaskDialog();
+    toast('Tarea eliminada.', 'success');
+  }
+
+  function uid() { return 'id-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
 
   function textareaField(label, name, value, extraClass) {
     return '<div class="field ' + safe(extraClass || '') + '"><label for="field-' + safe(name) + '">' + safe(label) + '</label><textarea id="field-' + safe(name) + '" class="input" name="' + safe(name) + '">' + safe(value || '') + '</textarea></div>';
