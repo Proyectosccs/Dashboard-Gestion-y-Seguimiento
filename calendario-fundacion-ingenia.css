@@ -438,8 +438,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .org-tag { width: fit-content; padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; background: color-mix(in srgb, var(--source-color, var(--color-neutral-500)) 16%, white); color: color-mix(in srgb, var(--source-color, var(--color-neutral-500)) 82%, #1c1c1c); }
 .responsable-tag { width: fit-content; padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; background: var(--color-neutral-200); color: var(--color-neutral-800); }
 .responsable-row { display: flex; gap: 8px; align-items: center; }
-.responsable-row select { flex: 1; }
-.responsable-row .icon-button { width: 40px; height: 40px; font-size: 15px; }
+.responsable-checklist { display: flex; flex-direction: column; gap: 4px; max-height: 190px; overflow-y: auto; border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; }
+.responsable-check-row { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; padding: 3px 0; }
+.responsable-check-row input { cursor: pointer; }
 .responsables-manage-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
 .responsable-manage-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--color-neutral-300); border-radius: 14px; background: var(--color-neutral-100); }
 .responsable-manage-row span { flex: 1; font-size: 13.5px; font-weight: 600; }
