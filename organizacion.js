@@ -20,6 +20,42 @@
 
   const ORG_ID = new URLSearchParams(window.location.search).get('org') || '';
   const EVENTS_KEY = 'ingenia-custom-' + ORG_ID + '-events-v1';
+  const UI_KEY = 'ingenia-custom-' + ORG_ID + '-ui-v1';
+
+  // Modo edición: textos y orden personalizables, igual que en el tablero
+  // UCV — pero sin los controles de tamaño de burbuja/título, porque este
+  // sitio usa una hoja de estilos fija en vez de estilos calculados en JS.
+  const DEFAULT_UI = {
+    pageSubtitle: 'Calendario y tareas propias de esta organización.',
+    calendarTitle: 'Calendario',
+    tasksTitle: 'Tareas de Equipo',
+    tabOrder: ['calendar', 'tasks'],
+    boardOrder: ['kpis', 'board']
+  };
+  const NAV_ITEMS = {
+    calendar: { emoji: '🗓️', label: 'Calendario' },
+    tasks: { emoji: '📋', label: 'Tareas de Equipo' }
+  };
+  const BOARD_ITEMS = {
+    kpis: { emoji: '📊', label: 'Indicadores' },
+    board: { emoji: '🗂️', label: 'Tablero de tareas' }
+  };
+
+  function normalizeUI(value) {
+    const v = value || {};
+    const tabIds = Object.keys(NAV_ITEMS);
+    const sectionIds = Object.keys(BOARD_ITEMS);
+    const tabs = Array.isArray(v.tabOrder) ? v.tabOrder.filter(function (x) { return NAV_ITEMS[x]; }) : [];
+    tabIds.forEach(function (id) { if (tabs.indexOf(id) === -1) tabs.push(id); });
+    const sections = Array.isArray(v.boardOrder) ? v.boardOrder.filter(function (x) { return BOARD_ITEMS[x]; }) : [];
+    sectionIds.forEach(function (id) { if (sections.indexOf(id) === -1) sections.push(id); });
+    return Object.assign({}, DEFAULT_UI, v, { tabOrder: tabs, boardOrder: sections });
+  }
+
+  function cloneUI(value) {
+    const v = normalizeUI(value);
+    return Object.assign({}, v, { tabOrder: v.tabOrder.slice(), boardOrder: v.boardOrder.slice() });
+  }
 
   const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -47,7 +83,9 @@
     selectedDay: new Date().toISOString().slice(0, 10),
     editingEvent: null,
     editingTask: null,
-    dragTaskId: null
+    dragTaskId: null,
+    ui: cloneUI(DEFAULT_UI),
+    customizeForm: cloneUI(DEFAULT_UI)
   };
 
   const dom = {};
@@ -79,7 +117,11 @@
         dom.tasksResponsableFilter.value = '';
         renderTasksBoard();
         renderKpis();
-      }
+      },
+      'customize-open': openCustomize,
+      'customize-dialog-close': closeCustomize,
+      'customize-dialog-cancel': closeCustomize,
+      'customize-reset': resetCustomize
     };
     const action = actionsById[target.id];
     if (action) action();
@@ -107,6 +149,8 @@
     dom.eventDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeEventDialog(); });
     dom.taskForm.addEventListener('submit', onTaskSubmit);
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
+    dom.customizeForm.addEventListener('submit', onCustomizeSubmit);
+    dom.customizeDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeCustomize(); });
     dom.responsableChecklist.addEventListener('change', onResponsableChecklistChange);
     dom.taskStatusSelect.addEventListener('change', onTaskStatusChange);
     dom.tasksResponsableFilter.addEventListener('change', function () {
@@ -152,6 +196,17 @@
     dom.taskDetail = document.getElementById('field-task-detail');
     dom.taskNextAction = document.getElementById('field-task-next-action');
     dom.toastRegion = document.getElementById('toast-region');
+    dom.pageSubtitle = document.getElementById('page-subtitle');
+    dom.calendarViewTitle = document.getElementById('calendar-view-title');
+    dom.tasksViewTitle = document.getElementById('tasks-view-title');
+    dom.tasksBlocks = document.getElementById('tasks-blocks');
+    dom.customizeDialog = document.getElementById('customize-dialog');
+    dom.customizeForm = document.getElementById('customize-form');
+    dom.customSubtitle = document.getElementById('field-custom-subtitle');
+    dom.customCalendarTitle = document.getElementById('field-custom-calendar-title');
+    dom.customTasksTitle = document.getElementById('field-custom-tasks-title');
+    dom.customizeTabsList = document.getElementById('customize-tabs-list');
+    dom.customizeSectionsList = document.getElementById('customize-sections-list');
   }
 
   function toast(message, tone) {
@@ -193,11 +248,12 @@
     if (showSpinner !== false) dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
 
-    const [registryRes, tasksRes, eventsRes, membersRes] = await Promise.all([
+    const [registryRes, tasksRes, eventsRes, membersRes, uiRes] = await Promise.all([
       state.client.from(TABLE).select('value').eq('key', CUSTOM_CALENDARS_KEY).maybeSingle(),
       state.client.from(TABLE).select('value').eq('key', TEAM_TASKS_KEY).maybeSingle(),
       state.client.from(TABLE).select('value').eq('key', EVENTS_KEY).maybeSingle(),
-      state.client.from(TABLE).select('value').eq('key', TEAM_MEMBERS_KEY).maybeSingle()
+      state.client.from(TABLE).select('value').eq('key', TEAM_MEMBERS_KEY).maybeSingle(),
+      state.client.from(TABLE).select('value').eq('key', UI_KEY).maybeSingle()
     ]);
 
     if (registryRes.error && tasksRes.error && eventsRes.error) return showConnectionFailure();
@@ -212,8 +268,10 @@
     });
     state.events = (Array.isArray(eventsRes.data && eventsRes.data.value) ? eventsRes.data.value : []).filter(function (e) { return !!e.event_date; });
     state.teamMembers = Array.isArray(membersRes.data && membersRes.data.value) ? membersRes.data.value : [];
+    state.ui = cloneUI(uiRes.data && uiRes.data.value);
 
     applyOrgTheme();
+    applyUI();
     dom.loadingState.hidden = true;
     dom.tabNav.hidden = false;
     populateTasksResponsableFilter();
@@ -226,6 +284,99 @@
   async function writeBoardKey(key, value) {
     const res = await state.client.from(TABLE).upsert({ key: key, value: value, updated_at: new Date().toISOString() });
     return !res.error;
+  }
+
+  // ---------- Modo edición ----------
+
+  function applyUI() {
+    const ui = state.ui;
+    dom.pageSubtitle.textContent = ui.pageSubtitle;
+    dom.calendarViewTitle.textContent = ui.calendarTitle;
+    dom.tasksViewTitle.textContent = ui.tasksTitle;
+    reorderChildren(dom.tabNav, ui.tabOrder, function (id) { return dom.tabNav.querySelector('[data-view="' + id + '"]'); });
+    reorderChildren(dom.tasksBlocks, ui.boardOrder, function (id) { return document.getElementById('tasks-block-' + id); });
+  }
+
+  function reorderChildren(parent, order, findChild) {
+    order.forEach(function (id) {
+      const child = findChild(id);
+      if (child) parent.appendChild(child);
+    });
+  }
+
+  function openCustomize() {
+    state.customizeForm = cloneUI(state.ui);
+    dom.customSubtitle.value = state.customizeForm.pageSubtitle;
+    dom.customCalendarTitle.value = state.customizeForm.calendarTitle;
+    dom.customTasksTitle.value = state.customizeForm.tasksTitle;
+    renderCustomizeLists();
+    dom.customizeDialog.showModal();
+  }
+
+  function closeCustomize() { dom.customizeDialog.close(); }
+
+  function resetCustomize() {
+    state.customizeForm = cloneUI(DEFAULT_UI);
+    dom.customSubtitle.value = state.customizeForm.pageSubtitle;
+    dom.customCalendarTitle.value = state.customizeForm.calendarTitle;
+    dom.customTasksTitle.value = state.customizeForm.tasksTitle;
+    renderCustomizeLists();
+  }
+
+  function renderCustomizeLists() {
+    renderReorderList(dom.customizeTabsList, state.customizeForm.tabOrder, NAV_ITEMS, moveTabOrder);
+    renderReorderList(dom.customizeSectionsList, state.customizeForm.boardOrder, BOARD_ITEMS, moveSectionOrder);
+  }
+
+  function renderReorderList(node, order, items, mover) {
+    renderMarkup(node, order.map(function (id, index) {
+      const item = items[id];
+      return '<div class="reorder-row">' +
+        '<span>' + item.emoji + '</span><span class="reorder-row-label">' + safe(item.label) + '</span>' +
+        '<button type="button" class="icon-button icon-button-sm" data-reorder-id="' + id + '" data-reorder-dir="-1" aria-label="Mover hacia arriba"' + (index === 0 ? ' disabled' : '') + '>↑</button>' +
+        '<button type="button" class="icon-button icon-button-sm" data-reorder-id="' + id + '" data-reorder-dir="1" aria-label="Mover hacia abajo"' + (index === order.length - 1 ? ' disabled' : '') + '>↓</button>' +
+      '</div>';
+    }).join(''));
+    node.querySelectorAll('[data-reorder-id]').forEach(function (button) {
+      button.addEventListener('click', function () { mover(button.dataset.reorderId, Number(button.dataset.reorderDir)); });
+    });
+  }
+
+  function moveInArray(list, id, delta) {
+    const index = list.indexOf(id);
+    const target = index + delta;
+    if (index === -1 || target < 0 || target >= list.length) return list;
+    const next = list.slice();
+    next.splice(index, 1);
+    next.splice(target, 0, id);
+    return next;
+  }
+
+  function moveTabOrder(id, delta) {
+    state.customizeForm.tabOrder = moveInArray(state.customizeForm.tabOrder, id, delta);
+    renderCustomizeLists();
+  }
+
+  function moveSectionOrder(id, delta) {
+    state.customizeForm.boardOrder = moveInArray(state.customizeForm.boardOrder, id, delta);
+    renderCustomizeLists();
+  }
+
+  async function onCustomizeSubmit(e) {
+    e.preventDefault();
+    const next = {
+      pageSubtitle: dom.customSubtitle.value.trim() || DEFAULT_UI.pageSubtitle,
+      calendarTitle: dom.customCalendarTitle.value.trim() || DEFAULT_UI.calendarTitle,
+      tasksTitle: dom.customTasksTitle.value.trim() || DEFAULT_UI.tasksTitle,
+      tabOrder: state.customizeForm.tabOrder,
+      boardOrder: state.customizeForm.boardOrder
+    };
+    const ok = await writeBoardKey(UI_KEY, next);
+    if (!ok) { toast('No se pudo guardar el diseño — revisa tu conexión.', 'error'); return; }
+    state.ui = cloneUI(next);
+    applyUI();
+    closeCustomize();
+    toast('Diseño guardado.', 'success');
   }
 
   // ---------- Calendario ----------

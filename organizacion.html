@@ -6,9 +6,9 @@
   <meta name="description" content="Calendario y tareas propias de una organización de Networking Fundación Ingenia.">
   <title>Organización — Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./organizacion.css?v=6">
+  <link rel="stylesheet" href="./organizacion.css?v=7">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./organizacion.js?v=6" defer></script>
+  <script src="./organizacion.js?v=7" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -18,11 +18,12 @@
       <div class="header-copy">
         <p class="eyebrow">🏢 Organización · Fundación Ingenia</p>
         <h1 id="org-title">Organización</h1>
-        <p>Calendario y tareas propias de esta organización.</p>
+        <p id="page-subtitle">Calendario y tareas propias de esta organización.</p>
       </div>
       <div class="session-card">
         <span class="session-name">Acceso desde cualquier dispositivo</span>
         <span class="role-badge">✏️ Edición directa</span>
+        <button id="customize-open" class="customize-btn" type="button" onclick="window.orgAction(event)">✏️ Modo edición</button>
       </div>
     </header>
 
@@ -49,7 +50,7 @@
       <div class="view-heading">
         <div>
           <p class="eyebrow">📋 Agenda</p>
-          <h2>Calendario</h2>
+          <h2 id="calendar-view-title">Calendario</h2>
         </div>
         <button class="btn btn-primary" type="button" id="new-event-btn" onclick="window.orgAction(event)">➕ Agregar evento</button>
       </div>
@@ -76,17 +77,23 @@
       <div class="view-heading">
         <div>
           <p class="eyebrow">📋 Seguimiento</p>
-          <h2>Tareas de Equipo</h2>
+          <h2 id="tasks-view-title">Tareas de Equipo</h2>
         </div>
         <button class="btn btn-primary" type="button" id="new-task-btn" onclick="window.orgAction(event)">➕ Agregar tarea</button>
       </div>
-      <div id="tasks-kpi-grid" class="kpi-grid"></div>
-      <div class="list-toolbar panel">
-        <label class="sr-only" for="tasks-responsable-filter">Filtrar por responsable</label>
-        <select id="tasks-responsable-filter" class="toolbar-select"><option value="">Todos los responsables</option></select>
-        <button id="tasks-filter-clear" class="link-button" type="button" onclick="window.orgAction(event)">Limpiar</button>
+      <div id="tasks-blocks">
+        <div id="tasks-block-kpis" data-block="kpis">
+          <div id="tasks-kpi-grid" class="kpi-grid"></div>
+        </div>
+        <div id="tasks-block-board" data-block="board">
+          <div class="list-toolbar panel">
+            <label class="sr-only" for="tasks-responsable-filter">Filtrar por responsable</label>
+            <select id="tasks-responsable-filter" class="toolbar-select"><option value="">Todos los responsables</option></select>
+            <button id="tasks-filter-clear" class="link-button" type="button" onclick="window.orgAction(event)">Limpiar</button>
+          </div>
+          <div id="tasks-board" class="kanban-board"></div>
+        </div>
       </div>
-      <div id="tasks-board" class="kanban-board"></div>
     </section>
   </div>
 
@@ -196,6 +203,47 @@
         <button id="task-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.orgAction(event)">Cancelar</button>
         <button id="task-delete" class="btn btn-secondary" type="button" onclick="window.orgAction(event)" hidden>🗑️ Eliminar</button>
         <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="customize-dialog" class="editor-dialog" aria-labelledby="customize-dialog-title">
+    <form id="customize-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">✏️ Personalización</p>
+          <h2 id="customize-dialog-title">Modo edición</h2>
+        </div>
+        <button id="customize-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.orgAction(event)">×</button>
+      </div>
+      <div class="dialog-fields">
+        <div class="field field-full">
+          <label for="field-custom-subtitle">Subtítulo principal</label>
+          <textarea id="field-custom-subtitle" class="input" name="pageSubtitle"></textarea>
+        </div>
+        <div class="field">
+          <label for="field-custom-calendar-title">Título del calendario</label>
+          <input id="field-custom-calendar-title" class="input" name="calendarTitle" type="text">
+        </div>
+        <div class="field">
+          <label for="field-custom-tasks-title">Título de tareas</label>
+          <input id="field-custom-tasks-title" class="input" name="tasksTitle" type="text">
+        </div>
+      </div>
+      <div class="customize-grid">
+        <div>
+          <p class="eyebrow">Orden de las pestañas</p>
+          <div id="customize-tabs-list" class="reorder-list"></div>
+        </div>
+        <div>
+          <p class="eyebrow">Orden del tablero</p>
+          <div id="customize-sections-list" class="reorder-list"></div>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="customize-reset" class="btn btn-secondary" type="button" onclick="window.orgAction(event)">Restablecer</button>
+        <button id="customize-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.orgAction(event)">Cancelar</button>
+        <button class="btn btn-primary" type="submit">Guardar diseño</button>
       </div>
     </form>
   </dialog>
