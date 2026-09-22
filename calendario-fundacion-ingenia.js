@@ -42,6 +42,19 @@
     { key: 'listo', label: 'Listo', color: '#0f7a3d' },
     { key: 'bloqueada', label: 'Bloqueada', color: '#a02525' }
   ];
+  // Sub-estado de "en_proceso" — mismo detalle de seguimiento que antes se
+  // describía entre paréntesis, ahora como su propio selector.
+  const FOLLOWUP_STATUSES = [
+    { key: 'contacted', label: 'Contactado' },
+    { key: 'in_progress', label: 'En seguimiento' },
+    { key: 'waiting_response', label: 'Esperando respuesta' }
+  ];
+  const PRIORITIES = [
+    { key: 'critica', label: 'Crítica' },
+    { key: 'alta', label: 'Alta' },
+    { key: 'media', label: 'Media' },
+    { key: 'baja', label: 'Baja' }
+  ];
 
   // Roster de responsables compartido por TODOS los espacios de tareas del
   // sitio (este tablero, cada página de organización, y Dra Florangel) —
@@ -100,7 +113,11 @@
       'new-org-btn': openOrgDialog,
       'org-dialog-close': closeOrgDialog,
       'org-dialog-cancel': closeOrgDialog,
-      'responsable-delete': deleteResponsableFromRoster
+      'responsable-delete': deleteResponsableFromRoster,
+      'new-responsable-btn': openResponsablesDialog,
+      'responsables-dialog-close': closeResponsablesDialog,
+      'responsables-dialog-done': closeResponsablesDialog,
+      'responsable-add-only': addResponsableOnly
     };
     const action = actionsById[target.id];
     if (action) action();
@@ -120,6 +137,9 @@
     }
     if (target.dataset.action === 'move-task-status') {
       moveTaskStatus(target.dataset.id, target.dataset.status);
+    }
+    if (target.dataset.action === 'delete-responsable-only') {
+      deleteResponsableOnly(target.dataset.id);
     }
   };
 
@@ -169,6 +189,7 @@
       refreshTaskBoards();
     });
     dom.taskResponsableSelect.addEventListener('change', onResponsableChange);
+    dom.taskStatusSelect.addEventListener('change', onTaskStatusChange);
     dom.orgForm.addEventListener('submit', onOrgSubmit);
     dom.orgDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeOrgDialog(); });
     if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) return showConnectionFailure();
@@ -201,9 +222,21 @@
     dom.taskOrgSelect = document.getElementById('field-task-org');
     dom.taskResponsableSelect = document.getElementById('field-task-responsable');
     dom.newResponsableField = document.getElementById('new-responsable-field');
+    dom.taskDueDate = document.getElementById('field-task-due-date');
+    dom.taskStatusSelect = document.getElementById('field-task-status');
+    dom.taskFollowupField = document.getElementById('task-followup-field');
+    dom.taskFollowupSelect = document.getElementById('field-task-followup');
+    dom.taskPrioritySelect = document.getElementById('field-task-priority');
+    dom.taskDetail = document.getElementById('field-task-detail');
+    dom.taskNextAction = document.getElementById('field-task-next-action');
+    dom.taskEvidence = document.getElementById('field-task-evidence');
     dom.tasksOrgFilter = document.getElementById('tasks-org-filter');
     dom.tasksResponsableFilter = document.getElementById('tasks-responsable-filter');
     dom.tasksKpiGrid = document.getElementById('tasks-kpi-grid');
+    dom.responsablesDialog = document.getElementById('responsables-dialog');
+    dom.responsablesList = document.getElementById('responsables-list');
+    dom.responsablesError = document.getElementById('responsables-error');
+    dom.newResponsableOnlyName = document.getElementById('field-new-responsable-only-name');
     dom.organizationsGrid = document.getElementById('organizations-grid');
     dom.orgDialog = document.getElementById('org-dialog');
     dom.orgForm = document.getElementById('org-form');
@@ -448,6 +481,57 @@
     if (isNew) dom.taskForm.elements.new_responsable_name.focus();
   }
 
+  function onTaskStatusChange() {
+    dom.taskFollowupField.hidden = dom.taskStatusSelect.value !== 'en_proceso';
+  }
+
+  // ---------- Gestión de responsables (botón dedicado, sin pasar por una tarea) ----------
+
+  function openResponsablesDialog() {
+    hideError(dom.responsablesError);
+    dom.newResponsableOnlyName.value = '';
+    renderResponsablesList();
+    dom.responsablesDialog.showModal();
+  }
+
+  function closeResponsablesDialog() { dom.responsablesDialog.close(); }
+
+  function renderResponsablesList() {
+    if (!state.teamMembers.length) {
+      renderMarkup(dom.responsablesList, '<div class="responsables-empty">Todavía no hay responsables en el equipo.</div>');
+      return;
+    }
+    renderMarkup(dom.responsablesList, state.teamMembers.map(function (m) {
+      return '<div class="responsable-manage-row"><span>👤 ' + safe(m.name) + '</span>' +
+        '<button type="button" data-action="delete-responsable-only" data-id="' + safe(m.id) + '" onclick="window.ingeniaAction(event)" aria-label="Eliminar a ' + safe(m.name) + '" title="Eliminar">🗑️</button></div>';
+    }).join(''));
+  }
+
+  async function addResponsableOnly() {
+    hideError(dom.responsablesError);
+    const name = dom.newResponsableOnlyName.value.trim();
+    if (!name) { showError(dom.responsablesError, 'Escribe el nombre del nuevo responsable.'); return; }
+    const created = await createTeamMember(name);
+    if (!created) { showError(dom.responsablesError, 'No se pudo guardar — revisa tu conexión.'); return; }
+    dom.newResponsableOnlyName.value = '';
+    renderResponsablesList();
+    populateTasksResponsableFilter();
+    toast('Responsable agregado al equipo.', 'success');
+  }
+
+  async function deleteResponsableOnly(id) {
+    const member = findTeamMember(id);
+    if (!member) return;
+    const next = state.teamMembers.filter(function (m) { return m.id !== id; });
+    const ok = await writeBoardKey('ingenia_board_state', TEAM_MEMBERS_KEY, next);
+    if (!ok) { showError(dom.responsablesError, 'No se pudo eliminar — revisa tu conexión.'); return; }
+    state.teamMembers = next;
+    renderResponsablesList();
+    populateTasksResponsableFilter();
+    refreshTaskBoards();
+    toast('Responsable eliminado del equipo.', 'success');
+  }
+
   async function createTeamMember(name) {
     const entry = { id: uid(), name: name, created_at: new Date().toISOString() };
     const next = state.teamMembers.concat(entry);
@@ -647,7 +731,7 @@
     });
     function count(statusKey) { return scoped.filter(function (t) { return (t.status || 'pendiente') === statusKey; }).length; }
     const cards = [
-      { icon: '🧩', value: scoped.length, label: 'Tareas operativas', cls: 'kpi-primary' },
+      { icon: '🧩', value: scoped.length, label: 'Tareas', cls: 'kpi-primary' },
       { icon: '○', value: count('pendiente'), label: 'Pendiente', cls: 'kpi-neutral' },
       { icon: '↻', value: count('en_proceso'), label: 'En proceso', cls: 'kpi-sky' },
       { icon: '✓', value: count('listo'), label: 'Listo', cls: 'kpi-good' },
@@ -681,6 +765,14 @@
     state.taskResponsableFilter = dom.tasksResponsableFilter.value;
   }
 
+  function taskDetailText(task) { return task.detail != null ? task.detail : (task.notes || ''); }
+
+  function taskFollowupLabel(task) {
+    if (task.status !== 'en_proceso' || !task.followupStatus) return '';
+    const f = FOLLOWUP_STATUSES.find(function (x) { return x.key === task.followupStatus; });
+    return f ? f.label : '';
+  }
+
   function renderTaskCard(task) {
     const statusIndex = TASK_STATUSES.findIndex(function (s) { return s.key === (task.status || 'pendiente'); });
     const status = TASK_STATUSES[statusIndex] || TASK_STATUSES[0];
@@ -689,12 +781,16 @@
     if (statusIndex > 0) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task-status" data-id="' + safe(task.id) + '" data-status="' + TASK_STATUSES[statusIndex - 1].key + '" onclick="window.ingeniaAction(event)">← ' + safe(TASK_STATUSES[statusIndex - 1].label) + '</button>');
     if (statusIndex < TASK_STATUSES.length - 1) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-task-status" data-id="' + safe(task.id) + '" data-status="' + TASK_STATUSES[statusIndex + 1].key + '" onclick="window.ingeniaAction(event)">' + safe(TASK_STATUSES[statusIndex + 1].label) + ' →</button>');
     const responsable = responsableName(task.responsable);
+    const detailText = taskDetailText(task);
+    const followupLabel = taskFollowupLabel(task);
     return '<article class="kanban-card" draggable="true" data-id="' + safe(task.id) + '" style="--status-color:' + safe(status.color) + '">' +
       '<button type="button" style="all:unset;cursor:pointer" data-task-id="' + safe(task.id) + '" onclick="window.ingeniaAction(event)">' +
         '<span class="org-tag" style="--source-color:' + safe(info.color) + '">' + safe(info.label) + '</span>' +
         '<p class="kanban-card-title">' + safe(task.title) + '</p>' +
-        (task.notes ? '<p class="kanban-card-notes">' + safe(task.notes) + '</p>' : '') +
+        (detailText ? '<p class="kanban-card-notes">' + safe(detailText) + '</p>' : '') +
         (responsable ? '<span class="responsable-tag">👤 ' + safe(responsable) + '</span>' : '') +
+        (followupLabel ? '<span class="responsable-tag">↻ ' + safe(followupLabel) + '</span>' : '') +
+        (task.dueDate ? '<span class="responsable-tag">⏰ ' + safe(formatDate(task.dueDate)) + '</span>' : '') +
       '</button>' +
       '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' +
     '</article>';
@@ -719,12 +815,16 @@
     dom.taskOrgSelect.disabled = !existing && !!lockedOrg;
     dom.taskDialogTitle.textContent = existing ? 'Editar tarea' : 'Agregar tarea';
     dom.taskDelete.hidden = !existing;
+    dom.taskForm.elements.title.value = existing ? (existing.title || '') : '';
     populateResponsableSelect(existing ? existing.responsable : '');
-    if (existing) {
-      dom.taskForm.elements.title.value = existing.title || '';
-      dom.taskForm.elements.notes.value = existing.notes || '';
-      dom.taskForm.elements.status.value = existing.status || 'pendiente';
-    }
+    dom.taskDueDate.value = existing ? (existing.dueDate || '') : '';
+    dom.taskDetail.value = existing ? taskDetailText(existing) : '';
+    dom.taskNextAction.value = existing ? (existing.nextAction || '') : '';
+    dom.taskEvidence.value = existing ? (existing.evidence || '') : '';
+    dom.taskPrioritySelect.value = existing ? (existing.priority || 'media') : 'media';
+    dom.taskStatusSelect.value = existing ? (existing.status || 'pendiente') : 'pendiente';
+    dom.taskFollowupSelect.value = existing ? (existing.followupStatus || 'in_progress') : 'in_progress';
+    onTaskStatusChange();
     dom.taskDialog.showModal();
     dom.taskForm.elements.title.focus();
   }
@@ -746,13 +846,19 @@
       responsable = created.id;
       populateTasksResponsableFilter();
     }
+    const status = dom.taskForm.elements.status.value;
     const payload = {
       id: state.editingTask ? state.editingTask.id : uid(),
       org: org,
       title: title,
-      notes: dom.taskForm.elements.notes.value.trim(),
-      status: dom.taskForm.elements.status.value,
+      detail: dom.taskDetail.value.trim(),
+      status: status,
+      followupStatus: status === 'en_proceso' ? dom.taskFollowupSelect.value : '',
+      priority: dom.taskPrioritySelect.value,
       responsable: responsable,
+      dueDate: dom.taskDueDate.value,
+      nextAction: dom.taskNextAction.value.trim(),
+      evidence: dom.taskEvidence.value.trim(),
       created_at: state.editingTask ? state.editingTask.created_at : new Date().toISOString()
     };
     const next = state.editingTask
