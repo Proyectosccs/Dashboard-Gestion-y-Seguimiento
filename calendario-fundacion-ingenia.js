@@ -76,7 +76,8 @@
     editingTask: null,
     dragTaskId: null,
     taskOrgFilter: '',
-    taskResponsableFilter: ''
+    taskResponsableFilter: '',
+    editingResponsableId: null
   };
 
   const dom = {};
@@ -140,6 +141,15 @@
     }
     if (target.dataset.action === 'delete-responsable-only') {
       deleteResponsableOnly(target.dataset.id);
+    }
+    if (target.dataset.action === 'edit-responsable-only') {
+      startEditResponsable(target.dataset.id);
+    }
+    if (target.dataset.action === 'save-edit-responsable-only') {
+      saveEditResponsable(target.dataset.id);
+    }
+    if (target.dataset.action === 'cancel-edit-responsable-only') {
+      cancelEditResponsable();
     }
   };
 
@@ -490,11 +500,12 @@
   function openResponsablesDialog() {
     hideError(dom.responsablesError);
     dom.newResponsableOnlyName.value = '';
+    state.editingResponsableId = null;
     renderResponsablesList();
     dom.responsablesDialog.showModal();
   }
 
-  function closeResponsablesDialog() { dom.responsablesDialog.close(); }
+  function closeResponsablesDialog() { dom.responsablesDialog.close(); state.editingResponsableId = null; }
 
   function renderResponsablesList() {
     if (!state.teamMembers.length) {
@@ -502,9 +513,46 @@
       return;
     }
     renderMarkup(dom.responsablesList, state.teamMembers.map(function (m) {
+      if (m.id === state.editingResponsableId) {
+        return '<div class="responsable-manage-row responsable-manage-row-editing">' +
+          '<input type="text" class="input" id="responsable-edit-input" value="' + safe(m.name) + '" />' +
+          '<button type="button" data-action="save-edit-responsable-only" data-id="' + safe(m.id) + '" onclick="window.ingeniaAction(event)" aria-label="Guardar" title="Guardar">✅</button>' +
+          '<button type="button" data-action="cancel-edit-responsable-only" onclick="window.ingeniaAction(event)" aria-label="Cancelar" title="Cancelar">✕</button>' +
+        '</div>';
+      }
       return '<div class="responsable-manage-row"><span>👤 ' + safe(m.name) + '</span>' +
+        '<button type="button" data-action="edit-responsable-only" data-id="' + safe(m.id) + '" onclick="window.ingeniaAction(event)" aria-label="Editar a ' + safe(m.name) + '" title="Editar">✏️</button>' +
         '<button type="button" data-action="delete-responsable-only" data-id="' + safe(m.id) + '" onclick="window.ingeniaAction(event)" aria-label="Eliminar a ' + safe(m.name) + '" title="Eliminar">🗑️</button></div>';
     }).join(''));
+    if (state.editingResponsableId) {
+      const input = document.getElementById('responsable-edit-input');
+      if (input) { input.focus(); input.select(); }
+    }
+  }
+
+  function startEditResponsable(id) {
+    state.editingResponsableId = id;
+    renderResponsablesList();
+  }
+
+  function cancelEditResponsable() {
+    state.editingResponsableId = null;
+    renderResponsablesList();
+  }
+
+  async function saveEditResponsable(id) {
+    const input = document.getElementById('responsable-edit-input');
+    const name = input ? input.value.trim() : '';
+    if (!name) { showError(dom.responsablesError, 'El nombre no puede quedar vacío.'); return; }
+    const next = state.teamMembers.map(function (m) { return m.id === id ? Object.assign({}, m, { name: name }) : m; });
+    const ok = await writeBoardKey('ingenia_board_state', TEAM_MEMBERS_KEY, next);
+    if (!ok) { showError(dom.responsablesError, 'No se pudo guardar — revisa tu conexión.'); return; }
+    state.teamMembers = next;
+    state.editingResponsableId = null;
+    renderResponsablesList();
+    populateTasksResponsableFilter();
+    refreshTaskBoards();
+    toast('Responsable actualizado.', 'success');
   }
 
   async function addResponsableOnly() {
