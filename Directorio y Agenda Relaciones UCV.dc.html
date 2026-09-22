@@ -116,6 +116,9 @@
                     <div>👤 <strong>{{ task.owner }}</strong></div>
                     <div>🏢 {{ task.organization }}</div>
                     <div>🗓️ {{ task.horizon }}</div>
+                    <sc-if value="{{ task.followupLabel }}" hint-placeholder-val="{{ false }}">
+                      <div>{{ task.followupEmoji }} {{ task.followupLabel }}</div>
+                    </sc-if>
                     <sc-if value="{{ task.hasDueDate }}" hint-placeholder-val="{{ false }}">
                       <div>⏰ Fecha límite: {{ task.dueDateLabel }}</div>
                     </sc-if>
@@ -884,16 +887,18 @@
               </sc-for>
             </span>
           </label>
+          <sc-if value="{{ taskFollowupOpen }}" hint-placeholder-val="{{ false }}">
+            <label style="font-size: 12px; font-weight: 700; display: grid; gap: 6px">¿Cómo va el seguimiento?
+              <span style="display: flex; flex-wrap: wrap; gap: 7px">
+                <sc-for list="{{ taskFollowupChips }}" as="o" hint-placeholder-count="3">
+                  <button type="button" onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.emoji }} {{ o.label }}</button>
+                </sc-for>
+              </span>
+            </label>
+          </sc-if>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 6px">Prioridad
             <span style="display: flex; flex-wrap: wrap; gap: 7px">
               <sc-for list="{{ taskPriorityChips }}" as="o" hint-placeholder-count="3">
-                <button type="button" onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
-              </sc-for>
-            </span>
-          </label>
-          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 6px">Organización
-            <span style="display: flex; flex-wrap: wrap; gap: 7px">
-              <sc-for list="{{ taskOrgChips }}" as="o" hint-placeholder-count="4">
                 <button type="button" onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
               </sc-for>
             </span>
@@ -1461,16 +1466,35 @@ const SEED = [];
 
 const BOARD_STATUS = [
   { id: 'pending', label: 'Pendiente', emoji: '○', color: '#82796a' },
-  { id: 'contacted', label: 'Contactado', emoji: '📞', color: '#4a7fd4' },
-  { id: 'following', label: 'En seguimiento', emoji: '↻', color: '#2fa89b' },
-  { id: 'waiting_response', label: 'Esperando respuesta', emoji: '◷', color: '#c67139' },
-  { id: 'executed', label: 'Ejecutado', emoji: '✓', color: '#4f8f68' },
-  { id: 'blocked', label: 'Bloqueado', emoji: '⛔', color: '#a02525' }
+  { id: 'following', label: 'En proceso', emoji: '↻', color: '#2fa89b' },
+  { id: 'executed', label: 'Listo', emoji: '✓', color: '#4f8f68' },
+  { id: 'blocked', label: 'Bloqueada', emoji: '⛔', color: '#a02525' }
+];
+// Sub-estado de "En proceso" — mismo detalle que antes tenían los estados
+// Contactado / En seguimiento / Esperando respuesta, ahora anidado bajo un
+// único estado "En proceso" para alinear con Tareas de Equipo en Networking.
+const FOLLOWUP_STATUS = [
+  { id: 'contacted', label: 'Contactado', emoji: '📞' },
+  { id: 'in_progress', label: 'En seguimiento', emoji: '↻' },
+  { id: 'waiting_response', label: 'Esperando respuesta', emoji: '◷' }
 ];
 const STATUS_MIGRATION = { todo: 'pending', waiting: 'waiting_response', doing: 'following', done: 'executed' };
-function migrateTaskStatus(id) { return STATUS_MIGRATION[id] || id; }
-
-const ORGANIZATIONS = ['CONEKTADOS', 'UCV', 'Florangel', 'Externo'];
+// Estados antiguos que hoy viven como sub-estado de "En proceso".
+const LEGACY_STATUS_TO_FOLLOWUP = { contacted: 'contacted', following: 'in_progress', waiting_response: 'waiting_response' };
+function normalizeTaskStatus(t) {
+  let status = STATUS_MIGRATION[t.status] || t.status;
+  let followupStatus = t.followupStatus || '';
+  if (LEGACY_STATUS_TO_FOLLOWUP[status]) {
+    if (!followupStatus) followupStatus = LEGACY_STATUS_TO_FOLLOWUP[status];
+    status = 'following';
+  }
+  if (status === 'following' && !followupStatus) followupStatus = 'in_progress';
+  if (status !== 'following') followupStatus = '';
+  return Object.assign({}, t, { status: status, followupStatus: followupStatus });
+}
+function applyTaskStatus(task, status) {
+  return normalizeTaskStatus(Object.assign({}, task, { status: status }));
+}
 
 const AREA_COLORS = { Estructura: '#6b5bd6', Contactos: '#c67139', Cronograma: '#4a7fd4', Datos: '#2fa89b', Evento: '#e0a423', Jornada: '#e0a423', Florangel: '#7a8a5e' };
 
@@ -1487,7 +1511,7 @@ const TASKS_RAW = [
   { id: 't10', title: 'Definir ficha de auditoría por evento', area: 'Evento', status: 'todo', priority: 'high', owner: 'Equipo CONEKTADOS', horizon: 'Esta semana', detail: 'Cada evento debe completar cinco controles internos de información antes de confirmarse.', nextAction: 'Crear una ficha por fecha con comunicación, equipo, materiales, voluntariado y data.' },
   { id: 't11', title: 'Completar directorio con datos confirmados', area: 'Contactos', status: 'doing', priority: 'medium', owner: 'Equipo CONEKTADOS', horizon: 'Esta semana', detail: 'El borrador debe contener solo nombres y datos verificados, marcando lo desconocido como Por confirmar.', nextAction: 'Completar teléfonos, correos, cargos y unidades de los siete contactos identificados.' }
 ];
-const TASKS = TASKS_RAW.map(t => Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t, { status: migrateTaskStatus(t.status) }));
+const TASKS = TASKS_RAW.map(t => normalizeTaskStatus(Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t)));
 
 const JOURNEY_QUESTIONS = [
   { key: 'communication', emoji: '💬', label: 'Comunicación confirmada' },
@@ -1674,7 +1698,7 @@ class Component extends DCLogic {
     dragContactId: null, dragOverUnit: null,
     contacts: readStore('ucv-contacts-v1', CONTACTS),
     interactions: readStore('ucv-interactions-v2', SEED),
-    tasks: readStore('ucv-tasks-v2', TASKS).map(t => Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t, { status: migrateTaskStatus(t.status) })),
+    tasks: readStore('ucv-tasks-v2', TASKS).map(t => normalizeTaskStatus(Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t))),
     journeys: readStore('ucv-journeys-v3', JOURNEYS).map(normalizeJourney),
     volunteers: readStore('ucv-volunteers-v1', VOLUNTEERS),
     volunteerModal: null,
@@ -1777,13 +1801,13 @@ class Component extends DCLogic {
       const p = row.payload || {};
       const subtareas = Array.isArray(p.subtareas) ? p.subtareas : [];
       const pending = subtareas.find(st => !st.hecha);
-      added.push({
+      added.push(normalizeTaskStatus({
         id: ucvId, title: p.descripcion || 'Tarea sin título', area: 'Contactos',
         owner: p.equipo || 'Equipo CONEKTADOS', status: netStatus[p.estado] || 'pending',
         priority: 'medium', horizon: 'Por definir', dueDate: p.fechaLimite || '', organization: 'CONEKTADOS',
         detail: subtareas.length ? subtareas.map(st => st.texto).join('; ') : 'Sin detalle registrado.',
         nextAction: pending ? pending.texto : 'Definir próxima acción.'
-      });
+      }));
     });
     if (added.length) {
       const tasks = s.tasks.concat(added);
@@ -1825,7 +1849,7 @@ class Component extends DCLogic {
     if (!field) return;
     let v = value;
     if (field === 'journeys' && Array.isArray(v)) v = v.map(normalizeJourney);
-    if (field === 'tasks' && Array.isArray(v)) v = v.map(t => Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t, { status: migrateTaskStatus(t.status) }));
+    if (field === 'tasks' && Array.isArray(v)) v = v.map(t => normalizeTaskStatus(Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t)));
     if (field === 'ui') v = cloneUI(v);
     writeLocal(key, v);
     this.setState({ [field]: v });
@@ -1840,7 +1864,7 @@ class Component extends DCLogic {
       if (!field) return;
       let v = row.value;
       if (field === 'journeys' && Array.isArray(v)) v = v.map(normalizeJourney);
-      if (field === 'tasks' && Array.isArray(v)) v = v.map(t => Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t, { status: migrateTaskStatus(t.status) }));
+      if (field === 'tasks' && Array.isArray(v)) v = v.map(t => normalizeTaskStatus(Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t)));
       if (field === 'ui') v = cloneUI(v);
       writeLocal(row.key, v);
       patch[field] = v;
@@ -1992,13 +2016,13 @@ class Component extends DCLogic {
 
   newTask = () => this.setState({
     taskModal: 'new',
-    taskForm: { title: '', owner: 'Por confirmar', area: 'Contactos', status: 'pending', priority: 'medium', horizon: 'Por definir', detail: '', nextAction: '', organization: 'CONEKTADOS', dueDate: '', evidence: '' }
+    taskForm: { title: '', owner: 'Por confirmar', area: 'Contactos', status: 'pending', followupStatus: '', priority: 'medium', horizon: 'Por definir', detail: '', nextAction: '', organization: 'CONEKTADOS', dueDate: '', evidence: '' }
   });
 
   openTask(id) {
     const task = this.state.tasks.find(t => t.id === id);
     if (!task) return;
-    this.setState({ taskModal: id, taskForm: Object.assign({ organization: 'CONEKTADOS', dueDate: '', evidence: '' }, task) });
+    this.setState({ taskModal: id, taskForm: Object.assign({ organization: 'CONEKTADOS', followupStatus: '', dueDate: '', evidence: '' }, task) });
   }
 
   closeTaskModal = () => this.setState({ taskModal: null });
@@ -2032,12 +2056,12 @@ class Component extends DCLogic {
   saveTask = () => {
     const s = this.state;
     const prevTask = s.taskModal !== 'new' ? s.tasks.find(t => t.id === s.taskModal) : null;
-    const clean = Object.assign({}, s.taskForm, {
+    const clean = normalizeTaskStatus(Object.assign({}, s.taskForm, {
       title: s.taskForm.title.trim() || 'Tarea sin título',
       owner: s.taskForm.owner.trim() || 'Por confirmar',
       detail: s.taskForm.detail.trim() || 'Sin detalle registrado.',
       nextAction: s.taskForm.nextAction.trim() || 'Definir próxima acción.'
-    });
+    }));
     let list;
     if (s.taskModal === 'new') list = s.tasks.concat([Object.assign({}, clean, { id: 't' + Date.now() })]);
     else list = s.tasks.map(t => t.id === s.taskModal ? Object.assign({}, clean, { id: t.id }) : t);
@@ -2055,7 +2079,7 @@ class Component extends DCLogic {
       const next = Math.max(0, Math.min(order.length - 1, current + direction));
       const nextStatus = order[next];
       if (nextStatus === 'executed' && t.status !== 'executed') celebrated = t.title || 'La tarea';
-      return Object.assign({}, t, { status: nextStatus });
+      return applyTaskStatus(t, nextStatus);
     });
     writeStore('ucv-tasks-v2', list);
     this.setState({ tasks: list });
@@ -2067,7 +2091,7 @@ class Component extends DCLogic {
     const fromIdx = tasks.findIndex(t => t.id === id);
     if (fromIdx === -1) return;
     const original = tasks[fromIdx];
-    const moved = Object.assign({}, original, { status: targetStatus });
+    const moved = applyTaskStatus(original, targetStatus);
     tasks.splice(fromIdx, 1);
     const colTasks = tasks.filter(t => t.status === targetStatus);
     let insertAt;
@@ -2433,9 +2457,8 @@ class Component extends DCLogic {
     const kpi = (bg, fg) => Object.assign({}, kpiBase, { background: bg, color: fg });
     const kpis = s.view === 'board' ? [
       { emoji: '🧩', value: s.tasks.length, label: 'Tareas operativas', style: kpi('#fff', 'var(--color-text)') },
-      { emoji: '◷', value: s.tasks.filter(t => t.status === 'waiting_response').length, label: 'Esperando respuesta', style: kpi('#fff2eb', '#8c491a') },
-      { emoji: '↻', value: s.tasks.filter(t => t.status === 'following').length, label: 'En seguimiento', style: kpi('#eaf1fc', '#315a9d') },
-      { emoji: '✓', value: s.tasks.filter(t => t.status === 'executed').length, label: 'Ejecutadas', style: kpi('#e6f6f3', '#14584f') },
+      { emoji: '↻', value: s.tasks.filter(t => t.status === 'following').length, label: 'En proceso', style: kpi('#eaf1fc', '#315a9d') },
+      { emoji: '✓', value: s.tasks.filter(t => t.status === 'executed').length, label: 'Listas', style: kpi('#e6f6f3', '#14584f') },
       { emoji: '⛔', value: s.tasks.filter(t => t.status === 'blocked').length, label: 'Bloqueadas', style: kpi('#fdebeb', '#a02525') },
       { emoji: '⚑', value: s.tasks.filter(t => t.priority === 'high' && t.status !== 'executed').length, label: 'Prioridad alta', style: kpi('#fdf4de', '#855d09') }
     ] : s.view === 'calendar' ? [
@@ -2667,8 +2690,10 @@ class Component extends DCLogic {
         const p = priorityMeta[t.priority] || priorityMeta.medium;
         const pos = statusOrder.indexOf(t.status);
         const dragging = s.dragTaskId === t.id;
+        const followup = t.followupStatus ? FOLLOWUP_STATUS.find(f => f.id === t.followupStatus) : null;
         return Object.assign({}, t, {
           areaColor: AREA_COLORS[t.area] || '#82796a',
+          followupLabel: followup ? followup.label : '', followupEmoji: followup ? followup.emoji : '',
           hasDueDate: !!t.dueDate, dueDateLabel: t.dueDate ? fmt(t.dueDate) : '',
           priorityLabel: p.label,
           priorityStyle: { background: p.bg, color: p.fg, borderRadius: 999, padding: '4px 8px', fontSize: bubble.taskPriorityFont, fontWeight: 700, whiteSpace: 'nowrap' },
@@ -2738,15 +2763,15 @@ class Component extends DCLogic {
     }));
     const taskStatusChips = BOARD_STATUS.map(st => ({
       id: st.id, label: st.label, emoji: st.emoji, style: tagChipStyle(st.color, s.taskForm.status === st.id),
-      onClick: () => this.setState({ taskForm: Object.assign({}, s.taskForm, { status: st.id }) })
+      onClick: () => this.setState({ taskForm: applyTaskStatus(s.taskForm, st.id) })
+    }));
+    const taskFollowupChips = FOLLOWUP_STATUS.map(st => ({
+      id: st.id, label: st.label, emoji: st.emoji, style: tagChipStyle('#2fa89b', s.taskForm.followupStatus === st.id),
+      onClick: () => this.setState({ taskForm: Object.assign({}, s.taskForm, { followupStatus: st.id }) })
     }));
     const taskPriorityChips = Object.keys(priorityMeta).map(p => ({
       id: p, label: priorityMeta[p].label, style: tagChipStyle(priorityMeta[p].fg, s.taskForm.priority === p),
       onClick: () => this.setState({ taskForm: Object.assign({}, s.taskForm, { priority: p }) })
-    }));
-    const taskOrgChips = ORGANIZATIONS.map(o => ({
-      id: o, label: o, style: tagChipStyle('#6b5bd6', s.taskForm.organization === o),
-      onClick: () => this.setState({ taskForm: Object.assign({}, s.taskForm, { organization: o }) })
     }));
     const extraUnitChips = this.unitOptionsList().filter(o => o.id !== s.contactForm.unit).map(o => {
       const active = (s.contactForm.extraUnits || []).indexOf(o.id) > -1;
@@ -3071,7 +3096,7 @@ class Component extends DCLogic {
       primaryHover: { background: 'var(--color-accent-600)' },
       modalOpen: !!s.modal, modal: modal, form: { notes: s.notes, date: s.date, follow: s.follow },
       taskModalOpen: !!s.taskModal, taskModalTitle: s.taskModal === 'new' ? 'Nueva tarea' : 'Editar tarea', taskForm: s.taskForm,
-      taskAreaChips: taskAreaChips, taskStatusChips: taskStatusChips, taskPriorityChips: taskPriorityChips, taskOrgChips: taskOrgChips, extraUnitChips: extraUnitChips, contactOwnerOptions: contactOwnerOptions,
+      taskAreaChips: taskAreaChips, taskStatusChips: taskStatusChips, taskFollowupChips: taskFollowupChips, taskFollowupOpen: s.taskForm.status === 'following', taskPriorityChips: taskPriorityChips, extraUnitChips: extraUnitChips, contactOwnerOptions: contactOwnerOptions,
       taskOwnerOptions: taskOwnerOptions,
       contactModalOpen: !!s.contactModal, contactModalTitle: s.contactModal === 'new' ? 'Nuevo contacto' : 'Editar contacto',
       isEditingContact: !!s.contactModal && s.contactModal !== 'new',
