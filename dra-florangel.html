@@ -6,9 +6,9 @@
   <meta name="description" content="Tareas y calendario de jornadas — Dra Florangel.">
   <title>Dra Florangel — Tareas y jornadas</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./dra-florangel.css?v=8">
+  <link rel="stylesheet" href="./dra-florangel.css?v=9">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./dra-florangel.js?v=8" defer></script>
+  <script src="./dra-florangel.js?v=9" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -17,16 +17,17 @@
     <header class="app-header">
       <div class="header-copy">
         <p class="eyebrow">🩺 Coordinación · Dra Florangel</p>
-        <h1>Dra Florangel</h1>
-        <p>Tareas pendientes y calendario de jornadas.</p>
+        <h1 id="page-title">Dra Florangel</h1>
+        <p id="page-subtitle">Tareas pendientes y calendario de jornadas.</p>
       </div>
       <div class="session-card">
         <span id="session-name" class="session-name">Acceso desde cualquier dispositivo</span>
         <span class="role-badge">✏️ Edición directa</span>
+        <button id="customize-open" class="customize-btn" type="button" onclick="window.florangelAction(event)">✏️ Modo edición</button>
       </div>
     </header>
 
-    <nav class="tab-nav" aria-label="Secciones">
+    <nav id="tab-nav" class="tab-nav" aria-label="Secciones">
       <button class="tab-button" type="button" data-view="tasks" aria-current="page" onclick="window.florangelAction(event)">📋 Tareas de Equipo</button>
       <button class="tab-button" type="button" data-view="calendar" onclick="window.florangelAction(event)">🗓️ Calendario</button>
     </nav>
@@ -48,13 +49,19 @@
         </div>
         <button class="btn btn-primary" type="button" data-action="new-task" onclick="window.florangelAction(event)">➕ Agregar tarea</button>
       </div>
-      <div id="tasks-kpi-grid" class="kpi-grid"></div>
-      <div class="list-toolbar panel">
-        <label class="sr-only" for="tasks-responsable-filter">Filtrar por responsable</label>
-        <select id="tasks-responsable-filter" class="toolbar-select"><option value="">Todos los responsables</option></select>
-        <button id="tasks-filter-clear" class="link-button" type="button" onclick="window.florangelAction(event)">Limpiar</button>
+      <div id="tasks-blocks">
+        <div id="tasks-block-kpis" data-block="kpis">
+          <div id="tasks-kpi-grid" class="kpi-grid"></div>
+        </div>
+        <div id="tasks-block-board" data-block="board">
+          <div class="list-toolbar panel">
+            <label class="sr-only" for="tasks-responsable-filter">Filtrar por responsable</label>
+            <select id="tasks-responsable-filter" class="toolbar-select"><option value="">Todos los responsables</option></select>
+            <button id="tasks-filter-clear" class="link-button" type="button" onclick="window.florangelAction(event)">Limpiar</button>
+          </div>
+          <div id="kanban-board" class="kanban-board"></div>
+        </div>
       </div>
-      <div id="kanban-board" class="kanban-board"></div>
     </section>
 
     <section id="calendar-view" class="view" aria-labelledby="calendar-title" hidden>
@@ -181,6 +188,51 @@
         <button id="event-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.florangelAction(event)">Cancelar</button>
         <button id="event-delete" class="btn btn-secondary" type="button" onclick="window.florangelAction(event)" hidden>🗑️ Eliminar</button>
         <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="customize-dialog" class="editor-dialog" aria-labelledby="customize-dialog-title">
+    <form id="customize-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">✏️ Personalización</p>
+          <h2 id="customize-dialog-title">Modo edición</h2>
+        </div>
+        <button id="customize-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.florangelAction(event)">×</button>
+      </div>
+      <div class="dialog-fields">
+        <div class="field">
+          <label for="field-custom-page-title">Título principal</label>
+          <input id="field-custom-page-title" class="input" name="pageTitle" type="text">
+        </div>
+        <div class="field field-full">
+          <label for="field-custom-subtitle">Subtítulo principal</label>
+          <textarea id="field-custom-subtitle" class="input" name="pageSubtitle"></textarea>
+        </div>
+        <div class="field">
+          <label for="field-custom-tasks-title">Título de tareas</label>
+          <input id="field-custom-tasks-title" class="input" name="tasksTitle" type="text">
+        </div>
+        <div class="field">
+          <label for="field-custom-calendar-title">Título del calendario</label>
+          <input id="field-custom-calendar-title" class="input" name="calendarTitle" type="text">
+        </div>
+      </div>
+      <div class="customize-grid">
+        <div>
+          <p class="eyebrow">Orden de las pestañas</p>
+          <div id="customize-tabs-list" class="reorder-list"></div>
+        </div>
+        <div>
+          <p class="eyebrow">Orden del tablero</p>
+          <div id="customize-sections-list" class="reorder-list"></div>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="customize-reset" class="btn btn-secondary" type="button" onclick="window.florangelAction(event)">Restablecer</button>
+        <button id="customize-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.florangelAction(event)">Cancelar</button>
+        <button class="btn btn-primary" type="submit">Guardar diseño</button>
       </div>
     </form>
   </dialog>

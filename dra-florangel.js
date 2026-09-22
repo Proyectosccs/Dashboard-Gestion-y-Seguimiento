@@ -9,6 +9,43 @@
   const TABLE = 'florangel_board_state';
   const TASKS_KEY = 'florangel-tasks-v1';
   const EVENTS_KEY = 'florangel-events-v1';
+  const UI_KEY = 'florangel-ui-v1';
+
+  // Modo edición: textos y orden personalizables, igual que en el tablero
+  // UCV — pero sin los controles de tamaño de burbuja/título, porque este
+  // sitio usa una hoja de estilos fija en vez de estilos calculados en JS.
+  const DEFAULT_UI = {
+    pageTitle: 'Dra Florangel',
+    pageSubtitle: 'Tareas pendientes y calendario de jornadas.',
+    tasksTitle: 'Tareas de Equipo',
+    calendarTitle: '🗓️ Calendario de jornadas',
+    tabOrder: ['tasks', 'calendar'],
+    boardOrder: ['kpis', 'board']
+  };
+  const NAV_ITEMS = {
+    tasks: { emoji: '📋', label: 'Tareas de Equipo' },
+    calendar: { emoji: '🗓️', label: 'Calendario' }
+  };
+  const BOARD_ITEMS = {
+    kpis: { emoji: '📊', label: 'Indicadores' },
+    board: { emoji: '🗂️', label: 'Tablero de tareas' }
+  };
+
+  function normalizeUI(value) {
+    const v = value || {};
+    const tabIds = Object.keys(NAV_ITEMS);
+    const sectionIds = Object.keys(BOARD_ITEMS);
+    const tabs = Array.isArray(v.tabOrder) ? v.tabOrder.filter(function (x) { return NAV_ITEMS[x]; }) : [];
+    tabIds.forEach(function (id) { if (tabs.indexOf(id) === -1) tabs.push(id); });
+    const sections = Array.isArray(v.boardOrder) ? v.boardOrder.filter(function (x) { return BOARD_ITEMS[x]; }) : [];
+    sectionIds.forEach(function (id) { if (sections.indexOf(id) === -1) sections.push(id); });
+    return Object.assign({}, DEFAULT_UI, v, { tabOrder: tabs, boardOrder: sections });
+  }
+
+  function cloneUI(value) {
+    const v = normalizeUI(value);
+    return Object.assign({}, v, { tabOrder: v.tabOrder.slice(), boardOrder: v.boardOrder.slice() });
+  }
 
   // Roster de responsables compartido con TODOS los espacios de tareas del
   // sitio (este tablero, Networking Fundación Ingenia y cada página de
@@ -45,7 +82,9 @@
     calendarMonth: new Date().toISOString().slice(0, 7),
     taskEditor: null,
     eventEditor: null,
-    dragTaskId: null
+    dragTaskId: null,
+    ui: cloneUI(DEFAULT_UI),
+    customizeForm: cloneUI(DEFAULT_UI)
   };
 
   const dom = {};
@@ -72,7 +111,11 @@
       },
       'event-dialog-close': closeEventDialog,
       'event-dialog-cancel': closeEventDialog,
-      'event-delete': deleteEditingEvent
+      'event-delete': deleteEditingEvent,
+      'customize-open': openCustomize,
+      'customize-dialog-close': closeCustomize,
+      'customize-dialog-cancel': closeCustomize,
+      'customize-reset': resetCustomize
     };
     const action = actionsById[target.id];
     if (action) action();
@@ -122,6 +165,20 @@
     dom.eventDialogTitle = document.getElementById('event-dialog-title');
     dom.eventError = document.getElementById('event-error');
     dom.eventDelete = document.getElementById('event-delete');
+    dom.pageTitle = document.getElementById('page-title');
+    dom.pageSubtitle = document.getElementById('page-subtitle');
+    dom.tabNav = document.getElementById('tab-nav');
+    dom.tasksBlocks = document.getElementById('tasks-blocks');
+    dom.tasksTitle = document.getElementById('tasks-title');
+    dom.calendarTitle = document.getElementById('calendar-title');
+    dom.customizeDialog = document.getElementById('customize-dialog');
+    dom.customizeForm = document.getElementById('customize-form');
+    dom.customPageTitle = document.getElementById('field-custom-page-title');
+    dom.customSubtitle = document.getElementById('field-custom-subtitle');
+    dom.customTasksTitle = document.getElementById('field-custom-tasks-title');
+    dom.customCalendarTitle = document.getElementById('field-custom-calendar-title');
+    dom.customizeTabsList = document.getElementById('customize-tabs-list');
+    dom.customizeSectionsList = document.getElementById('customize-sections-list');
   }
 
   function bindStaticEvents() {
@@ -129,6 +186,8 @@
     dom.eventForm.addEventListener('submit', onEventSubmit);
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
     dom.eventDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeEventDialog(); });
+    dom.customizeForm.addEventListener('submit', onCustomizeSubmit);
+    dom.customizeDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeCustomize(); });
     dom.responsableChecklist.addEventListener('change', onResponsableChecklistChange);
     dom.taskStageSelect.addEventListener('change', onTaskStageChange);
     dom.tasksResponsableFilter.addEventListener('change', function () {
@@ -190,12 +249,15 @@
     if (!background) dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
 
-    const [tasksValue, eventsValue, teamMembers] = await Promise.all([
+    const [tasksValue, eventsValue, teamMembers, uiValue] = await Promise.all([
       readKey(TASKS_KEY, null),
       readKey(EVENTS_KEY, null),
-      loadTeamMembers()
+      loadTeamMembers(),
+      readKey(UI_KEY, null)
     ]);
     state.teamMembers = teamMembers;
+    state.ui = cloneUI(uiValue);
+    applyUI();
 
     let tasks = Array.isArray(tasksValue) ? tasksValue : [];
     let events = Array.isArray(eventsValue) ? eventsValue : [];
@@ -225,6 +287,104 @@
     state.client.channel('florangel-board')
       .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, function () { loadAllData(true); })
       .subscribe();
+  }
+
+  // ---------- Modo edición ----------
+
+  function applyUI() {
+    const ui = state.ui;
+    dom.pageTitle.textContent = ui.pageTitle;
+    dom.pageSubtitle.textContent = ui.pageSubtitle;
+    dom.tasksTitle.textContent = ui.tasksTitle;
+    dom.calendarTitle.textContent = ui.calendarTitle;
+    reorderChildren(dom.tabNav, ui.tabOrder, function (id) { return dom.tabNav.querySelector('[data-view="' + id + '"]'); });
+    reorderChildren(dom.tasksBlocks, ui.boardOrder, function (id) { return document.getElementById('tasks-block-' + id); });
+  }
+
+  function reorderChildren(parent, order, findChild) {
+    order.forEach(function (id) {
+      const child = findChild(id);
+      if (child) parent.appendChild(child);
+    });
+  }
+
+  function openCustomize() {
+    state.customizeForm = cloneUI(state.ui);
+    dom.customPageTitle.value = state.customizeForm.pageTitle;
+    dom.customSubtitle.value = state.customizeForm.pageSubtitle;
+    dom.customTasksTitle.value = state.customizeForm.tasksTitle;
+    dom.customCalendarTitle.value = state.customizeForm.calendarTitle;
+    renderCustomizeLists();
+    dom.customizeDialog.showModal();
+  }
+
+  function closeCustomize() { dom.customizeDialog.close(); }
+
+  function resetCustomize() {
+    state.customizeForm = cloneUI(DEFAULT_UI);
+    dom.customPageTitle.value = state.customizeForm.pageTitle;
+    dom.customSubtitle.value = state.customizeForm.pageSubtitle;
+    dom.customTasksTitle.value = state.customizeForm.tasksTitle;
+    dom.customCalendarTitle.value = state.customizeForm.calendarTitle;
+    renderCustomizeLists();
+  }
+
+  function renderCustomizeLists() {
+    renderReorderList(dom.customizeTabsList, state.customizeForm.tabOrder, NAV_ITEMS, moveTabOrder);
+    renderReorderList(dom.customizeSectionsList, state.customizeForm.boardOrder, BOARD_ITEMS, moveSectionOrder);
+  }
+
+  function renderReorderList(node, order, items, mover) {
+    renderMarkup(node, order.map(function (id, index) {
+      const item = items[id];
+      return '<div class="reorder-row">' +
+        '<span>' + item.emoji + '</span><span class="reorder-row-label">' + safe(item.label) + '</span>' +
+        '<button type="button" class="icon-button icon-button-sm" data-reorder-id="' + id + '" data-reorder-dir="-1" aria-label="Mover hacia arriba"' + (index === 0 ? ' disabled' : '') + '>↑</button>' +
+        '<button type="button" class="icon-button icon-button-sm" data-reorder-id="' + id + '" data-reorder-dir="1" aria-label="Mover hacia abajo"' + (index === order.length - 1 ? ' disabled' : '') + '>↓</button>' +
+      '</div>';
+    }).join(''));
+    node.querySelectorAll('[data-reorder-id]').forEach(function (button) {
+      button.addEventListener('click', function () { mover(button.dataset.reorderId, Number(button.dataset.reorderDir)); });
+    });
+  }
+
+  function moveInArray(list, id, delta) {
+    const index = list.indexOf(id);
+    const target = index + delta;
+    if (index === -1 || target < 0 || target >= list.length) return list;
+    const next = list.slice();
+    next.splice(index, 1);
+    next.splice(target, 0, id);
+    return next;
+  }
+
+  function moveTabOrder(id, delta) {
+    state.customizeForm.tabOrder = moveInArray(state.customizeForm.tabOrder, id, delta);
+    renderCustomizeLists();
+  }
+
+  function moveSectionOrder(id, delta) {
+    state.customizeForm.boardOrder = moveInArray(state.customizeForm.boardOrder, id, delta);
+    renderCustomizeLists();
+  }
+
+  async function onCustomizeSubmit(e) {
+    e.preventDefault();
+    const next = {
+      pageTitle: dom.customPageTitle.value.trim() || DEFAULT_UI.pageTitle,
+      pageSubtitle: dom.customSubtitle.value.trim() || DEFAULT_UI.pageSubtitle,
+      tasksTitle: dom.customTasksTitle.value.trim() || DEFAULT_UI.tasksTitle,
+      calendarTitle: dom.customCalendarTitle.value.trim() || DEFAULT_UI.calendarTitle,
+      tabOrder: state.customizeForm.tabOrder,
+      boardOrder: state.customizeForm.boardOrder
+    };
+    if (!state.client) { toast('No se pudo guardar el diseño — revisa tu conexión.', 'error'); return; }
+    const res = await state.client.from(TABLE).upsert({ key: UI_KEY, value: next, updated_at: new Date().toISOString() });
+    if (res.error) { toast('No se pudo guardar el diseño — revisa tu conexión.', 'error'); return; }
+    state.ui = cloneUI(next);
+    applyUI();
+    closeCustomize();
+    toast('Diseño guardado.', 'success');
   }
 
   // ---------- Tareas (kanban) ----------
