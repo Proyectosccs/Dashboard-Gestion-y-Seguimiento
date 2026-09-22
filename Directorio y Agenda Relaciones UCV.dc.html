@@ -122,8 +122,7 @@
                   </div>
                   <p style="{{ task.detailStyle }}">{{ task.detail }}</p>
                   <div style="{{ task.metaStyle }}">
-                    <div>👤 <strong>{{ task.owner }}</strong></div>
-                    <div>🏢 {{ task.organization }}</div>
+                    <div>👤 <strong>{{ task.ownerLabel }}</strong></div>
                     <div>🗓️ {{ task.horizon }}</div>
                     <sc-if value="{{ task.followupLabel }}" hint-placeholder-val="{{ false }}">
                       <div>{{ task.followupEmoji }} {{ task.followupLabel }}</div>
@@ -868,10 +867,18 @@
             <input type="text" value="{{ taskForm.title }}" onChange="{{ onTaskTitle }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Responsable
-            <select value="{{ taskForm.owner }}" onChange="{{ onTaskOwner }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
-              <sc-for list="{{ taskOwnerOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
-            </select>
+            <div style="display: flex; gap: 8px">
+              <select value="{{ taskForm.responsable }}" onChange="{{ onTaskResponsable }}" style="flex: 1; min-width: 0; border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+                <sc-for list="{{ taskResponsableOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+              </select>
+              <button type="button" onClick="{{ deleteResponsableFromRoster }}" aria-label="Eliminar responsable seleccionado del equipo" title="Eliminar responsable seleccionado del equipo" style="border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 14px; width: 44px; font-size: 15px; cursor: pointer">🗑️</button>
+            </div>
           </label>
+          <sc-if value="{{ taskResponsableIsNew }}" hint-placeholder-val="{{ false }}">
+            <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px; grid-column: 1 / -1">Nombre del nuevo responsable
+              <input type="text" value="{{ taskForm.newResponsableName }}" onChange="{{ onNewResponsableName }}" placeholder="Ej. Andrea Pérez" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+            </label>
+          </sc-if>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Fecha límite
             <input type="date" value="{{ taskForm.dueDate }}" onChange="{{ onTaskDueDate }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
@@ -1456,11 +1463,14 @@ const CONTACTS = [
 
 const SEED = [];
 
+// Mismo vocabulario que Tareas de Equipo en Networking Fundación Ingenia —
+// las tareas de UCV viven ahora en ese mismo listado compartido
+// (ingenia-team-tasks-v1), así que los ids deben coincidir exactamente.
 const BOARD_STATUS = [
-  { id: 'pending', label: 'Pendiente', emoji: '○', color: '#82796a' },
-  { id: 'following', label: 'En proceso', emoji: '↻', color: '#2fa89b' },
-  { id: 'executed', label: 'Listo', emoji: '✓', color: '#4f8f68' },
-  { id: 'blocked', label: 'Bloqueada', emoji: '⛔', color: '#a02525' }
+  { id: 'pendiente', label: 'Pendiente', emoji: '○', color: '#82796a' },
+  { id: 'en_proceso', label: 'En proceso', emoji: '↻', color: '#2fa89b' },
+  { id: 'listo', label: 'Listo', emoji: '✓', color: '#4f8f68' },
+  { id: 'bloqueada', label: 'Bloqueada', emoji: '⛔', color: '#a02525' }
 ];
 // Sub-estado de "En proceso" — mismo detalle que antes tenían los estados
 // Contactado / En seguimiento / Esperando respuesta, ahora anidado bajo un
@@ -1470,40 +1480,36 @@ const FOLLOWUP_STATUS = [
   { id: 'in_progress', label: 'En seguimiento', emoji: '↻' },
   { id: 'waiting_response', label: 'Esperando respuesta', emoji: '◷' }
 ];
-const STATUS_MIGRATION = { todo: 'pending', waiting: 'waiting_response', doing: 'following', done: 'executed' };
-// Estados antiguos que hoy viven como sub-estado de "En proceso".
-const LEGACY_STATUS_TO_FOLLOWUP = { contacted: 'contacted', following: 'in_progress', waiting_response: 'waiting_response' };
+// normalizeTaskStatus recibe una tarea con CUALQUIER vocabulario histórico —
+// el de 4 columnas original (todo/doing/done), el de 6 estados (contacted/
+// following/waiting_response como estado propio), el intermedio en inglés
+// (pending/following/executed/blocked) usado antes de esta unificación, o ya
+// el vocabulario final compartido — y siempre devuelve el vocabulario final:
+// pendiente/en_proceso/listo/bloqueada + followupStatus, más priority
+// normalizada a crítica/alta/media/baja.
 function normalizeTaskStatus(t) {
-  let status = STATUS_MIGRATION[t.status] || t.status;
+  let raw = t.status;
   let followupStatus = t.followupStatus || '';
-  if (LEGACY_STATUS_TO_FOLLOWUP[status]) {
-    if (!followupStatus) followupStatus = LEGACY_STATUS_TO_FOLLOWUP[status];
-    status = 'following';
+  const OLD_LEGACY = { todo: 'pending', waiting: 'waiting_response', doing: 'following', done: 'executed' };
+  if (OLD_LEGACY[raw]) raw = OLD_LEGACY[raw];
+  const TO_FOLLOWUP = { contacted: 'contacted', following: 'in_progress', waiting_response: 'waiting_response' };
+  if (TO_FOLLOWUP[raw]) {
+    if (!followupStatus) followupStatus = TO_FOLLOWUP[raw];
+    raw = 'following';
   }
-  if (status === 'following' && !followupStatus) followupStatus = 'in_progress';
-  if (status !== 'following') followupStatus = '';
-  return Object.assign({}, t, { status: status, followupStatus: followupStatus });
+  const FINAL_STATUS = { pending: 'pendiente', following: 'en_proceso', executed: 'listo', blocked: 'bloqueada', pendiente: 'pendiente', en_proceso: 'en_proceso', listo: 'listo', bloqueada: 'bloqueada' };
+  let status = FINAL_STATUS[raw] || 'pendiente';
+  if (status === 'en_proceso' && !followupStatus) followupStatus = 'in_progress';
+  if (status !== 'en_proceso') followupStatus = '';
+  const FINAL_PRIORITY = { critical: 'critica', high: 'alta', medium: 'media', low: 'baja', critica: 'critica', alta: 'alta', media: 'media', baja: 'baja' };
+  const priority = FINAL_PRIORITY[t.priority] || 'media';
+  return Object.assign({}, t, { status: status, followupStatus: followupStatus, priority: priority });
 }
 function applyTaskStatus(task, status) {
   return normalizeTaskStatus(Object.assign({}, task, { status: status }));
 }
 
 const AREA_COLORS = { Estructura: '#6b5bd6', Contactos: '#c67139', Cronograma: '#4a7fd4', Datos: '#2fa89b', Evento: '#e0a423', Jornada: '#e0a423', Florangel: '#7a8a5e' };
-
-const TASKS_RAW = [
-  { id: 't01', title: 'Solicitar el cronograma de actividades UCV', area: 'Cronograma', status: 'waiting', priority: 'high', owner: 'Dr. Pedro Franz', horizon: 'Hoy', detail: 'Obtener fechas, facultades, responsables y tipo de actividad para llevarlas a una vista semanal.', nextAction: 'Contactar a Pedro y pedir el cronograma consolidado.' },
-  { id: 't02', title: 'Aclarar Servicios Comunitarios ↔ Arquitectura', area: 'Estructura', status: 'todo', priority: 'high', owner: 'Pedro + José', horizon: 'Esta semana', detail: 'Resolver quién coordina Arquitectura, quién entrega su cronograma y cómo se conecta con Servicios Comunitarios.', nextAction: 'Acordar una llamada conjunta o identificar al responsable final.' },
-  { id: 't03', title: 'Incorporar Servicios Comunitarios bajo Vicerrectorado', area: 'Estructura', status: 'doing', priority: 'medium', owner: 'Equipo CONEKTADOS', horizon: 'Hoy', detail: 'Representar la capa operativa coordinada por el Dr. Pedro Franz dentro del mapa jerárquico.', nextAction: 'Validar que la ubicación y dependencia institucional sean correctas.' },
-  { id: 't04', title: 'Confirmar el rol de Majo', area: 'Contactos', status: 'waiting', priority: 'medium', owner: 'Majo / Carla', horizon: 'Mañana', detail: 'Majo ya respondió, pero falta ubicar su unidad, cargo y responsabilidad dentro de la operación.', nextAction: 'Pedir cargo, área, teléfono y responsabilidad concreta.' },
-  { id: 't05', title: 'Recibir audio de Andrea sobre triaje', area: 'Datos', status: 'waiting', priority: 'high', owner: 'Andrea', horizon: 'Mañana', detail: 'Andrea apoya Medicina Interna y quedó en enviar un audio para optimizar el flujo de triaje.', nextAction: 'Dar seguimiento al audio y convertirlo en requerimientos claros.' },
-  { id: 't06', title: 'Verificar data cargada por Odontología', area: 'Datos', status: 'todo', priority: 'high', owner: 'Responsable de Odontología', horizon: 'Esta semana', detail: 'La responsable dispone de información, pero no hay visibilidad sobre lo subido y lo pendiente.', nextAction: 'Solicitar estatus: recibido, cargado, pendiente y formato de la data.' },
-  { id: 't07', title: 'Recuperar información del doctor o fisioterapeuta', area: 'Contactos', status: 'waiting', priority: 'medium', owner: 'Por confirmar', horizon: 'Esta semana', detail: 'Durante el evento del lunes quedó pendiente el envío de información de este contacto.', nextAction: 'Identificar nombre y canal de contacto; solicitar nuevamente los datos.' },
-  { id: 't08', title: 'Construir la vista semanal de eventos', area: 'Cronograma', status: 'doing', priority: 'high', owner: 'Equipo CONEKTADOS', horizon: 'Esta semana', detail: 'Mostrar qué sucede hoy, mañana y la semana siguiente, con responsables y necesidades por día.', nextAction: 'Cargar el cronograma en cuanto Pedro lo comparta.' },
-  { id: 't09', title: 'Unificar UCV + Florangel en el mapa operativo', area: 'Florangel', status: 'todo', priority: 'medium', owner: 'Equipo CONEKTADOS', horizon: 'Próxima semana', detail: 'Vincular tareas y coordinación externa sin presentar a Florangel como parte de la estructura UCV.', nextAction: 'Crear una capa de coordinación externa y registrar sus pendientes.' },
-  { id: 't10', title: 'Definir ficha de auditoría por evento', area: 'Evento', status: 'todo', priority: 'high', owner: 'Equipo CONEKTADOS', horizon: 'Esta semana', detail: 'Cada evento debe completar cinco controles internos de información antes de confirmarse.', nextAction: 'Crear una ficha por fecha con comunicación, equipo, materiales, voluntariado y data.' },
-  { id: 't11', title: 'Completar directorio con datos confirmados', area: 'Contactos', status: 'doing', priority: 'medium', owner: 'Equipo CONEKTADOS', horizon: 'Esta semana', detail: 'El borrador debe contener solo nombres y datos verificados, marcando lo desconocido como Por confirmar.', nextAction: 'Completar teléfonos, correos, cargos y unidades de los siete contactos identificados.' }
-];
-const TASKS = TASKS_RAW.map(t => normalizeTaskStatus(Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t)));
 
 const JOURNEY_QUESTIONS = [
   { key: 'communication', emoji: '💬', label: 'Comunicación confirmada' },
@@ -1590,12 +1596,16 @@ const SUPABASE_KEY = 'sb_publishable_E-cV9DiNK9rctFCxzondvA_7OppBD7Y';
 const SUPABASE_TABLE = 'ucv_board_state';
 const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-// Roster de responsables de "Tareas de Equipo" en Networking Fundación
-// Ingenia — mismo proyecto de Supabase que este tablero, pero tabla
-// distinta (ingenia_board_state). Solo lectura: este tablero nunca
-// crea ni borra miembros del equipo, solo los muestra para asignarlos.
+// Tareas y roster de responsables compartidos con Tareas de Equipo en
+// Networking Fundación Ingenia, cada Organización, Dra Florangel y
+// Coalición Venezuela — mismo proyecto de Supabase que este tablero, pero
+// tabla distinta (ingenia_board_state). Las tareas de UCV ya NO viven en
+// ucv_board_state: este tablero lee y escribe directamente ese listado
+// compartido (filtrado por org: 'ucv'), igual que los demás dashboards.
 const TEAM_MEMBERS_TABLE = 'ingenia_board_state';
 const TEAM_MEMBERS_KEY = 'ingenia-team-members-v1';
+const SHARED_TASKS_KEY = 'ingenia-team-tasks-v1';
+const NEW_MEMBER_VALUE = '__new_member__';
 
 /* Alimentación desde el Panel de Networking (Fundación INGENIA): proyecto
    Supabase distinto y de solo lectura para este tablero. Solo se leen los
@@ -1620,7 +1630,6 @@ const NET_CONTACT_IDS = Object.keys(NET_CONTACT_MAP);
 const STORE_KEY_TO_FIELD = {
   'ucv-contacts-v1': 'contacts',
   'ucv-interactions-v2': 'interactions',
-  'ucv-tasks-v2': 'tasks',
   'ucv-journeys-v3': 'journeys',
   'ucv-volunteers-v1': 'volunteers',
   'ucv-app-status-v1': 'appStatuses',
@@ -1690,7 +1699,7 @@ class Component extends DCLogic {
     dragContactId: null, dragOverUnit: null,
     contacts: readStore('ucv-contacts-v1', CONTACTS),
     interactions: readStore('ucv-interactions-v2', SEED),
-    tasks: readStore('ucv-tasks-v2', TASKS).map(t => normalizeTaskStatus(Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t))),
+    tasks: [],
     journeys: readStore('ucv-journeys-v3', JOURNEYS).map(normalizeJourney),
     volunteers: readStore('ucv-volunteers-v1', VOLUNTEERS),
     volunteerModal: null,
@@ -1716,20 +1725,30 @@ class Component extends DCLogic {
     journeyForm: { title: '', eventType: 'health', dates: [TODAY], time: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, specialtyUnit: '', doctors: '', students: '' },
     modal: null, type: 'meeting', notes: '', date: TODAY, follow: '',
     taskModal: null,
-    taskForm: { title: '', owner: 'Por confirmar', area: 'Contactos', status: 'pending', priority: 'medium', horizon: 'Por definir', detail: '', nextAction: '', organization: 'CONEKTADOS', dueDate: '', evidence: '' },
+    taskForm: { title: '', responsable: '', newResponsableName: '', status: 'pendiente', followupStatus: '', priority: 'media', detail: '', nextAction: '', dueDate: '', evidence: '' },
     contactModal: null,
     contactForm: { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar', function: '', extraUnits: [] }
   };
 
   componentDidMount() {
     if (!sb) return;
-    this._loadFromSupabase().then(ok => { if (ok) this._syncFromNetworkingPanel(); });
-    this._loadTeamMembers();
+    this._loadFromSupabase();
+    Promise.all([this._loadTeamMembers(), this._loadTasks()]).then(() => this._syncFromNetworkingPanel());
     this._subscribeRealtime();
-    this._onVisible = () => { if (document.visibilityState === 'visible') { this._loadFromSupabase().then(ok => { if (ok) this._syncFromNetworkingPanel(); }); this._loadTeamMembers(); this._subscribeRealtime(); } };
+    this._onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      this._loadFromSupabase();
+      Promise.all([this._loadTeamMembers(), this._loadTasks()]).then(() => this._syncFromNetworkingPanel());
+      this._subscribeRealtime();
+    };
     document.addEventListener('visibilitychange', this._onVisible);
     window.addEventListener('focus', this._onVisible);
-    this._pollTimer = setInterval(() => { if (document.visibilityState === 'visible') { this._loadFromSupabase().then(ok => { if (ok) this._syncFromNetworkingPanel(); }); this._loadTeamMembers(); } }, 45000);
+    this._pollTimer = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      this._loadFromSupabase();
+      this._loadTeamMembers();
+      this._loadTasks();
+    }, 45000);
   }
 
   async _loadTeamMembers() {
@@ -1738,6 +1757,15 @@ class Component extends DCLogic {
     if (res.error || !res.data || !Array.isArray(res.data.value)) return;
     writeLocal(TEAM_MEMBERS_KEY, res.data.value);
     this.setState({ teamMembers: res.data.value });
+  }
+
+  async _loadTasks() {
+    if (!sb) return;
+    const res = await sb.from(TEAM_MEMBERS_TABLE).select('value').eq('key', SHARED_TASKS_KEY).maybeSingle();
+    if (res.error || !res.data || !Array.isArray(res.data.value)) return;
+    const normalized = res.data.value.map(normalizeTaskStatus);
+    this._sharedTasksRaw = normalized;
+    this.setState({ tasks: normalized.filter(t => t.org === 'ucv') });
   }
 
   async _syncFromNetworkingPanel() {
@@ -1781,30 +1809,42 @@ class Component extends DCLogic {
     if (changedUnits) { writeStore('ucv-unit-info-v1', unitInfo); this.setState({ unitInfo: unitInfo }); }
   }
 
-  _mergeNetworkingTasks(rows) {
-    const s = this.state;
+  async _resolveResponsableId(name) {
+    const trimmed = (name || '').trim();
+    if (!trimmed || trimmed === 'Por confirmar') return '';
+    const existing = this.state.teamMembers.find(m => m.name.toLowerCase() === trimmed.toLowerCase());
+    if (existing) return existing.id;
+    const created = await this._createTeamMember(trimmed);
+    return created ? created.id : '';
+  }
+
+  async _mergeNetworkingTasks(rows) {
+    const rawList = this._sharedTasksRaw || [];
     const existingIds = {};
-    s.tasks.forEach(t => { existingIds[t.id] = true; });
-    const netStatus = { POR_HACER: 'pending', EN_PROCESO: 'following', COMPLETADA: 'executed' };
+    rawList.forEach(t => { existingIds[t.id] = true; });
+    const netStatus = { POR_HACER: 'pendiente', EN_PROCESO: 'en_proceso', COMPLETADA: 'listo' };
     const added = [];
-    rows.forEach(row => {
-      const ucvId = 'net-' + row.id;
-      if (existingIds[ucvId]) return;
+    for (const row of rows) {
+      const ucvId = 'ucv-net-' + row.id;
+      if (existingIds[ucvId]) continue;
       const p = row.payload || {};
       const subtareas = Array.isArray(p.subtareas) ? p.subtareas : [];
       const pending = subtareas.find(st => !st.hecha);
+      const responsable = await this._resolveResponsableId(p.equipo || 'Equipo CONEKTADOS');
       added.push(normalizeTaskStatus({
-        id: ucvId, title: p.descripcion || 'Tarea sin título', area: 'Contactos',
-        owner: p.equipo || 'Equipo CONEKTADOS', status: netStatus[p.estado] || 'pending',
-        priority: 'medium', horizon: 'Por definir', dueDate: p.fechaLimite || '', organization: 'CONEKTADOS',
+        id: ucvId, org: 'ucv', title: p.descripcion || 'Tarea sin título',
+        responsable: responsable, status: netStatus[p.estado] || 'pendiente',
+        priority: 'media', dueDate: p.fechaLimite || '',
         detail: subtareas.length ? subtareas.map(st => st.texto).join('; ') : 'Sin detalle registrado.',
         nextAction: pending ? pending.texto : 'Definir próxima acción.'
       }));
-    });
+    }
     if (added.length) {
-      const tasks = s.tasks.concat(added);
-      writeStore('ucv-tasks-v2', tasks);
-      this.setState({ tasks: tasks });
+      const nextRaw = rawList.concat(added);
+      const ok = await this._writeSharedTasks(nextRaw);
+      if (!ok) return;
+      this._sharedTasksRaw = nextRaw;
+      this.setState({ tasks: nextRaw.filter(t => t.org === 'ucv') });
     }
   }
 
@@ -1841,7 +1881,6 @@ class Component extends DCLogic {
     if (!field) return;
     let v = value;
     if (field === 'journeys' && Array.isArray(v)) v = v.map(normalizeJourney);
-    if (field === 'tasks' && Array.isArray(v)) v = v.map(t => normalizeTaskStatus(Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t)));
     if (field === 'ui') v = cloneUI(v);
     writeLocal(key, v);
     this.setState({ [field]: v });
@@ -1856,7 +1895,6 @@ class Component extends DCLogic {
       if (!field) return;
       let v = row.value;
       if (field === 'journeys' && Array.isArray(v)) v = v.map(normalizeJourney);
-      if (field === 'tasks' && Array.isArray(v)) v = v.map(t => normalizeTaskStatus(Object.assign({ organization: 'CONEKTADOS', dueDate: '' }, t)));
       if (field === 'ui') v = cloneUI(v);
       writeLocal(row.key, v);
       patch[field] = v;
@@ -2008,13 +2046,13 @@ class Component extends DCLogic {
 
   newTask = () => this.setState({
     taskModal: 'new',
-    taskForm: { title: '', owner: 'Por confirmar', area: 'Contactos', status: 'pending', followupStatus: '', priority: 'medium', horizon: 'Por definir', detail: '', nextAction: '', organization: 'CONEKTADOS', dueDate: '', evidence: '' }
+    taskForm: { title: '', responsable: '', newResponsableName: '', status: 'pendiente', followupStatus: '', priority: 'media', detail: '', nextAction: '', dueDate: '', evidence: '' }
   });
 
   openTask(id) {
     const task = this.state.tasks.find(t => t.id === id);
     if (!task) return;
-    this.setState({ taskModal: id, taskForm: Object.assign({ organization: 'CONEKTADOS', followupStatus: '', dueDate: '', evidence: '' }, task) });
+    this.setState({ taskModal: id, taskForm: Object.assign({ newResponsableName: '', followupStatus: '', dueDate: '', evidence: '' }, task) });
   }
 
   closeTaskModal = () => this.setState({ taskModal: null });
@@ -2024,13 +2062,16 @@ class Component extends DCLogic {
     this.setState({ doneCapture: { taskId: taskId, title: title, text: '', submitted: false } });
   }
 
-  submitDoneCapture = () => {
+  submitDoneCapture = async () => {
     const s = this.state;
     if (!s.doneCapture) return;
     const text = s.doneCapture.text.trim();
-    const list = s.tasks.map(t => t.id === s.doneCapture.taskId ? Object.assign({}, t, { evidence: text }) : t);
-    writeStore('ucv-tasks-v2', list);
-    this.setState({ tasks: list, doneCapture: Object.assign({}, s.doneCapture, { text: text, submitted: true }) });
+    const rawList = this._sharedTasksRaw || [];
+    const nextRaw = rawList.map(t => t.id === s.doneCapture.taskId ? Object.assign({}, t, { evidence: text }) : t);
+    const ok = await this._writeSharedTasks(nextRaw);
+    if (!ok) return;
+    this._sharedTasksRaw = nextRaw;
+    this.setState({ tasks: nextRaw.filter(t => t.org === 'ucv'), doneCapture: Object.assign({}, s.doneCapture, { text: text, submitted: true }) });
     if (this._doneCaptureTimer) clearTimeout(this._doneCaptureTimer);
     this._doneCaptureTimer = setTimeout(() => this.setState({ doneCapture: null }), 3600);
   };
@@ -2045,64 +2086,108 @@ class Component extends DCLogic {
     this.setState({ doneCapture: null });
   };
 
-  saveTask = () => {
+  async _writeSharedTasks(list) {
+    if (!sb) return false;
+    const res = await sb.from(TEAM_MEMBERS_TABLE).upsert({ key: SHARED_TASKS_KEY, value: list, updated_at: new Date().toISOString() });
+    return !res.error;
+  }
+
+  async _createTeamMember(name) {
+    const entry = { id: 'id-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36), name: name, created_at: new Date().toISOString() };
+    const next = this.state.teamMembers.concat(entry);
+    const res = await sb.from(TEAM_MEMBERS_TABLE).upsert({ key: TEAM_MEMBERS_KEY, value: next, updated_at: new Date().toISOString() });
+    if (res.error) return null;
+    this.setState({ teamMembers: next });
+    return entry;
+  }
+
+  deleteResponsableFromRoster = async () => {
+    const id = this.state.taskForm.responsable;
+    if (!id || id === NEW_MEMBER_VALUE) return;
+    const next = this.state.teamMembers.filter(m => m.id !== id);
+    const res = await sb.from(TEAM_MEMBERS_TABLE).upsert({ key: TEAM_MEMBERS_KEY, value: next, updated_at: new Date().toISOString() });
+    if (res.error) return;
+    this.setState({ teamMembers: next, taskForm: Object.assign({}, this.state.taskForm, { responsable: '' }) });
+  };
+
+  saveTask = async () => {
     const s = this.state;
     const prevTask = s.taskModal !== 'new' ? s.tasks.find(t => t.id === s.taskModal) : null;
+    let responsable = s.taskForm.responsable;
+    if (responsable === NEW_MEMBER_VALUE) {
+      const name = (s.taskForm.newResponsableName || '').trim();
+      if (!name) return;
+      const created = await this._createTeamMember(name);
+      if (!created) return;
+      responsable = created.id;
+    }
     const clean = normalizeTaskStatus(Object.assign({}, s.taskForm, {
       title: s.taskForm.title.trim() || 'Tarea sin título',
-      owner: s.taskForm.owner.trim() || 'Por confirmar',
+      responsable: responsable,
       detail: s.taskForm.detail.trim() || 'Sin detalle registrado.',
       nextAction: s.taskForm.nextAction.trim() || 'Definir próxima acción.'
     }));
-    let list;
-    if (s.taskModal === 'new') list = s.tasks.concat([Object.assign({}, clean, { id: 't' + Date.now() })]);
-    else list = s.tasks.map(t => t.id === s.taskModal ? Object.assign({}, clean, { id: t.id }) : t);
-    writeStore('ucv-tasks-v2', list);
-    this.setState({ tasks: list, taskModal: null });
-    if (clean.status === 'executed' && (!prevTask || prevTask.status !== 'executed')) this.promptDoneCapture(s.taskModal === 'new' ? list[list.length - 1].id : s.taskModal, clean.title);
+    delete clean.newResponsableName;
+    const id = s.taskModal === 'new' ? ('ucv-' + Date.now()) : s.taskModal;
+    const finalTask = Object.assign({}, clean, { id: id, org: 'ucv' });
+    const rawList = this._sharedTasksRaw || [];
+    const nextRaw = s.taskModal === 'new' ? rawList.concat([finalTask]) : rawList.map(t => t.id === id ? finalTask : t);
+    const ok = await this._writeSharedTasks(nextRaw);
+    if (!ok) return;
+    this._sharedTasksRaw = nextRaw;
+    this.setState({ tasks: nextRaw.filter(t => t.org === 'ucv'), taskModal: null });
+    if (clean.status === 'listo' && (!prevTask || prevTask.status !== 'listo')) this.promptDoneCapture(id, clean.title);
   };
 
-  deleteTask = () => {
+  deleteTask = async () => {
     const s = this.state;
     if (!s.taskModal || s.taskModal === 'new') return;
-    const list = s.tasks.filter(t => t.id !== s.taskModal);
-    writeStore('ucv-tasks-v2', list);
-    this.setState({ tasks: list, taskModal: null });
+    const rawList = this._sharedTasksRaw || [];
+    const nextRaw = rawList.filter(t => t.id !== s.taskModal);
+    const ok = await this._writeSharedTasks(nextRaw);
+    if (!ok) return;
+    this._sharedTasksRaw = nextRaw;
+    this.setState({ tasks: nextRaw.filter(t => t.org === 'ucv'), taskModal: null });
   };
 
-  moveTask(id, direction) {
+  moveTask = async (id, direction) => {
     const order = BOARD_STATUS.map(x => x.id);
-    let celebrated = null;
-    const list = this.state.tasks.map(t => {
-      if (t.id !== id) return t;
-      const current = order.indexOf(t.status);
-      const next = Math.max(0, Math.min(order.length - 1, current + direction));
-      const nextStatus = order[next];
-      if (nextStatus === 'executed' && t.status !== 'executed') celebrated = t.title || 'La tarea';
-      return applyTaskStatus(t, nextStatus);
-    });
-    writeStore('ucv-tasks-v2', list);
-    this.setState({ tasks: list });
-    if (celebrated) this.promptDoneCapture(id, celebrated);
-  }
+    const rawList = this._sharedTasksRaw || [];
+    const idx = rawList.findIndex(t => t.id === id);
+    if (idx === -1) return;
+    const original = rawList[idx];
+    const current = order.indexOf(original.status);
+    const next = Math.max(0, Math.min(order.length - 1, current + direction));
+    const nextStatus = order[next];
+    const celebrated = nextStatus === 'listo' && original.status !== 'listo';
+    const updated = applyTaskStatus(original, nextStatus);
+    const nextRaw = rawList.map(t => t.id === id ? updated : t);
+    this._sharedTasksRaw = nextRaw;
+    this.setState({ tasks: nextRaw.filter(t => t.org === 'ucv') });
+    const ok = await this._writeSharedTasks(nextRaw);
+    if (!ok) { this._sharedTasksRaw = rawList; this.setState({ tasks: rawList.filter(t => t.org === 'ucv') }); return; }
+    if (celebrated) this.promptDoneCapture(id, original.title || 'La tarea');
+  };
 
-  reorderTask(id, targetStatus, targetIndex) {
-    const tasks = this.state.tasks.slice();
-    const fromIdx = tasks.findIndex(t => t.id === id);
+  reorderTask = async (id, targetStatus, targetIndex) => {
+    const rawList = (this._sharedTasksRaw || []).slice();
+    const fromIdx = rawList.findIndex(t => t.id === id);
     if (fromIdx === -1) return;
-    const original = tasks[fromIdx];
+    const original = rawList[fromIdx];
     const moved = applyTaskStatus(original, targetStatus);
-    tasks.splice(fromIdx, 1);
-    const colTasks = tasks.filter(t => t.status === targetStatus);
+    rawList.splice(fromIdx, 1);
+    const ucvTasks = rawList.filter(t => t.org === 'ucv');
+    const colTasks = ucvTasks.filter(t => t.status === targetStatus);
     let insertAt;
-    if (targetIndex < colTasks.length) insertAt = tasks.indexOf(colTasks[targetIndex]);
-    else if (colTasks.length) insertAt = tasks.indexOf(colTasks[colTasks.length - 1]) + 1;
-    else insertAt = tasks.length;
-    tasks.splice(insertAt, 0, moved);
-    writeStore('ucv-tasks-v2', tasks);
-    this.setState({ tasks: tasks, dragTaskId: null, dragOverCol: null, dragOverIndex: null });
-    if (targetStatus === 'executed' && original.status !== 'executed') this.promptDoneCapture(id, original.title || 'La tarea');
-  }
+    if (targetIndex < colTasks.length) insertAt = rawList.indexOf(colTasks[targetIndex]);
+    else if (colTasks.length) insertAt = rawList.indexOf(colTasks[colTasks.length - 1]) + 1;
+    else insertAt = rawList.length;
+    rawList.splice(insertAt, 0, moved);
+    this._sharedTasksRaw = rawList;
+    this.setState({ tasks: rawList.filter(t => t.org === 'ucv'), dragTaskId: null, dragOverCol: null, dragOverIndex: null });
+    const ok = await this._writeSharedTasks(rawList);
+    if (ok && targetStatus === 'listo' && original.status !== 'listo') this.promptDoneCapture(id, original.title || 'La tarea');
+  };
 
   blankJourney(date) {
     return { title: '', eventType: 'health', dates: date ? [date] : [], time: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, assignedVolunteers: [], specialtyUnit: '', doctors: '', students: '' };
@@ -2455,13 +2540,13 @@ class Component extends DCLogic {
     const count = r => all.filter(c => c.role === r).length;
     const kpiBase = { borderRadius: bubble.radius + 4, padding: (bubble.padding + 2) + 'px ' + (bubble.padding + 4) + 'px', display: 'flex', flexDirection: 'column', gap: 4, boxShadow: 'var(--shadow-sm)' };
     const kpi = (bg, fg) => Object.assign({}, kpiBase, { background: bg, color: fg });
-    const kpiTasksScoped = s.tasks.filter(t => !s.taskResponsableFilter || t.owner === s.taskResponsableFilter);
+    const kpiTasksScoped = s.tasks.filter(t => !s.taskResponsableFilter || t.responsable === s.taskResponsableFilter);
     const kpis = s.view === 'board' ? [
       { emoji: '🧩', value: kpiTasksScoped.length, label: 'Tareas', style: kpi('#fff', 'var(--color-text)') },
-      { emoji: '○', value: kpiTasksScoped.filter(t => t.status === 'pending').length, label: 'Pendiente', style: kpi('#f1ede6', '#645c50') },
-      { emoji: '↻', value: kpiTasksScoped.filter(t => t.status === 'following').length, label: 'En proceso', style: kpi('#eaf1fc', '#315a9d') },
-      { emoji: '✓', value: kpiTasksScoped.filter(t => t.status === 'executed').length, label: 'Listo', style: kpi('#e6f6f3', '#14584f') },
-      { emoji: '⛔', value: kpiTasksScoped.filter(t => t.status === 'blocked').length, label: 'Bloqueada', style: kpi('#fdebeb', '#a02525') }
+      { emoji: '○', value: kpiTasksScoped.filter(t => t.status === 'pendiente').length, label: 'Pendiente', style: kpi('#f1ede6', '#645c50') },
+      { emoji: '↻', value: kpiTasksScoped.filter(t => t.status === 'en_proceso').length, label: 'En proceso', style: kpi('#eaf1fc', '#315a9d') },
+      { emoji: '✓', value: kpiTasksScoped.filter(t => t.status === 'listo').length, label: 'Listo', style: kpi('#e6f6f3', '#14584f') },
+      { emoji: '⛔', value: kpiTasksScoped.filter(t => t.status === 'bloqueada').length, label: 'Bloqueada', style: kpi('#fdebeb', '#a02525') }
     ] : s.view === 'calendar' ? [
       { emoji: '🗓️', value: s.journeys.length, label: 'Eventos registrados', style: kpi('#fff', 'var(--color-text)') },
       { emoji: '📍', value: s.journeys.filter(j => (j.dates || []).some(d => d.slice(0, 7) === s.calendarMonth)).length, label: 'En este mes', style: kpi('#fff0e6', '#8c491a') },
@@ -2678,22 +2763,24 @@ class Component extends DCLogic {
       : [];
 
     const priorityMeta = {
-      critical: { label: 'Crítica', bg: '#f4d6d6', fg: '#7a1315' },
-      high: { label: 'Alta', bg: '#fdebeb', fg: '#a02525' },
-      medium: { label: 'Media', bg: '#fdf4de', fg: '#855d09' },
-      low: { label: 'Baja', bg: '#e6f6f3', fg: '#14584f' }
+      critica: { label: 'Crítica', bg: '#f4d6d6', fg: '#7a1315' },
+      alta: { label: 'Alta', bg: '#fdebeb', fg: '#a02525' },
+      media: { label: 'Media', bg: '#fdf4de', fg: '#855d09' },
+      baja: { label: 'Baja', bg: '#e6f6f3', fg: '#14584f' }
     };
     const statusOrder = BOARD_STATUS.map(x => x.id);
     const placeholderStyle = { height: 64, borderRadius: bubble.radius, border: '2px dashed var(--color-accent-500)', background: 'var(--color-accent-100)', flex: 'none' };
     const boardColumns = BOARD_STATUS.map(col => {
       const isOver = s.dragOverCol === col.id;
-      const rawTasks = s.tasks.filter(t => t.status === col.id && (!s.taskResponsableFilter || t.owner === s.taskResponsableFilter));
+      const rawTasks = s.tasks.filter(t => t.status === col.id && (!s.taskResponsableFilter || t.responsable === s.taskResponsableFilter));
       const tasks = rawTasks.map((t, i) => {
-        const p = priorityMeta[t.priority] || priorityMeta.medium;
+        const p = priorityMeta[t.priority] || priorityMeta.media;
         const pos = statusOrder.indexOf(t.status);
         const dragging = s.dragTaskId === t.id;
         const followup = t.followupStatus ? FOLLOWUP_STATUS.find(f => f.id === t.followupStatus) : null;
+        const responsableMember = t.responsable ? s.teamMembers.find(m => m.id === t.responsable) : null;
         return Object.assign({}, t, {
+          ownerLabel: responsableMember ? responsableMember.name : 'Sin asignar',
           areaColor: AREA_COLORS[t.area] || '#82796a',
           followupLabel: followup ? followup.label : '', followupEmoji: followup ? followup.emoji : '',
           hasDueDate: !!t.dueDate, dueDateLabel: t.dueDate ? fmt(t.dueDate) : '',
@@ -2784,15 +2871,12 @@ class Component extends DCLogic {
     // Responsables de la tarea: el roster compartido de "Tareas de Equipo"
     // en Networking Fundación Ingenia, más el valor actual si viene de
     // antes de tener este roster (para no perder ese dato al editar).
-    const taskOwnerOptions = (() => {
-      const list = ['Por confirmar'].concat(s.teamMembers.map(m => m.name));
-      const current = s.taskForm.owner;
-      if (current && list.indexOf(current) === -1) list.push(current);
-      const seen = {};
-      return list.filter(n => { if (seen[n]) return false; seen[n] = true; return true; }).map(n => ({ id: n, label: n === 'Por confirmar' ? n : '👤 ' + n }));
-    })();
+    const taskResponsableOptions = [{ id: '', label: 'Sin asignar' }]
+      .concat(s.teamMembers.map(m => ({ id: m.id, label: '👤 ' + m.name })))
+      .concat([{ id: NEW_MEMBER_VALUE, label: '➕ Otro (agregar miembro nuevo)' }]);
+    const taskResponsableIsNew = s.taskForm.responsable === NEW_MEMBER_VALUE;
 
-    const taskResponsableFilterOptions = s.teamMembers.map(m => ({ id: m.name, label: '👤 ' + m.name }));
+    const taskResponsableFilterOptions = s.teamMembers.map(m => ({ id: m.id, label: '👤 ' + m.name }));
 
     const unitBox = { background: '#fff', borderRadius: 14, padding: '9px 10px', display: 'flex', flexDirection: 'column', gap: 6, borderWidth: 1.5, borderStyle: 'solid' };
     const hasMedicalPerson = unitId => {
@@ -3087,8 +3171,9 @@ class Component extends DCLogic {
       modalOpen: !!s.modal, modal: modal, form: { notes: s.notes, date: s.date, follow: s.follow },
       taskModalOpen: !!s.taskModal, taskModalTitle: s.taskModal === 'new' ? 'Nueva tarea' : 'Editar tarea', taskForm: s.taskForm,
       isEditingTask: !!s.taskModal && s.taskModal !== 'new', deleteCurrentTask: this.deleteTask,
-      taskStatusOptions: taskStatusOptions, taskFollowupOptions: taskFollowupOptions, taskFollowupOpen: s.taskForm.status === 'following', taskPriorityOptions: taskPriorityOptions, extraUnitChips: extraUnitChips, contactOwnerOptions: contactOwnerOptions,
-      taskOwnerOptions: taskOwnerOptions,
+      taskStatusOptions: taskStatusOptions, taskFollowupOptions: taskFollowupOptions, taskFollowupOpen: s.taskForm.status === 'en_proceso', taskPriorityOptions: taskPriorityOptions, extraUnitChips: extraUnitChips, contactOwnerOptions: contactOwnerOptions,
+      taskResponsableOptions: taskResponsableOptions, taskResponsableIsNew: taskResponsableIsNew,
+      deleteResponsableFromRoster: this.deleteResponsableFromRoster,
       taskResponsableFilter: s.taskResponsableFilter, taskResponsableFilterOptions: taskResponsableFilterOptions,
       onTaskResponsableFilter: e => this.setState({ taskResponsableFilter: e.target.value }),
       clearTaskResponsableFilter: () => this.setState({ taskResponsableFilter: '' }),
@@ -3158,7 +3243,8 @@ class Component extends DCLogic {
       skipDoneCapture: this.skipDoneCapture,
       closeDoneCapture: this.closeDoneCapture,
       onTaskTitle: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { title: e.target.value }) }),
-      onTaskOwner: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { owner: e.target.value }) }),
+      onTaskResponsable: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { responsable: e.target.value }) }),
+      onNewResponsableName: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { newResponsableName: e.target.value }) }),
       onTaskStatus: e => this.setState({ taskForm: applyTaskStatus(s.taskForm, e.target.value) }),
       onTaskFollowup: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { followupStatus: e.target.value }) }),
       onTaskPriority: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { priority: e.target.value }) }),
