@@ -841,12 +841,12 @@
 
   <sc-if value="{{ taskModalOpen }}" hint-placeholder-val="{{ false }}">
     <div style="position: fixed; inset: 0; background: rgba(32,30,29,.58); display: flex; align-items: flex-start; justify-content: center; padding: 34px 16px; overflow: auto; z-index: 110">
-      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Editar tarea operativa" style="background: var(--color-bg); border-radius: 28px; width: 100%; max-width: 620px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 15px">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Editar tarea" style="background: var(--color-bg); border-radius: 28px; width: 100%; max-width: 620px; padding: 22px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 15px">
         <div style="display: flex; gap: 12px; align-items: center">
           <div style="width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: var(--color-accent-100); font-size: 21px">🧩</div>
           <div style="min-width: 0; flex: 1">
             <div style="font-family: var(--font-heading); font-size: 23px">{{ taskModalTitle }}</div>
-            <div style="font-size: 12.5px; color: var(--color-neutral-700)">Actualiza la responsabilidad, el horizonte y el siguiente paso.</div>
+            <div style="font-size: 12.5px; color: var(--color-neutral-700)">Actualiza la responsabilidad y el siguiente paso.</div>
           </div>
           <button aria-label="Cerrar editor de tarea" onClick="{{ closeTaskModal }}" style="border: none; background: var(--color-neutral-200); border-radius: 999px; width: 36px; height: 36px; font-size: 16px; cursor: pointer">✕</button>
         </div>
@@ -856,11 +856,8 @@
             <input type="text" value="{{ taskForm.title }}" onChange="{{ onTaskTitle }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Responsable
-            <input type="text" value="{{ taskForm.owner }}" onChange="{{ onTaskOwner }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
-          </label>
-          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Horizonte
-            <select value="{{ taskForm.horizon }}" onChange="{{ onTaskHorizon }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
-              <option value="Hoy">Hoy</option><option value="Mañana">Mañana</option><option value="Esta semana">Esta semana</option><option value="Próxima semana">Próxima semana</option><option value="Por definir">Por definir</option>
+            <select value="{{ taskForm.owner }}" onChange="{{ onTaskOwner }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <sc-for list="{{ taskOwnerOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
             </select>
           </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Fecha límite
@@ -1577,6 +1574,13 @@ const SUPABASE_KEY = 'sb_publishable_E-cV9DiNK9rctFCxzondvA_7OppBD7Y';
 const SUPABASE_TABLE = 'ucv_board_state';
 const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
+// Roster de responsables de "Tareas de Equipo" en Networking Fundación
+// Ingenia — mismo proyecto de Supabase que este tablero, pero tabla
+// distinta (ingenia_board_state). Solo lectura: este tablero nunca
+// crea ni borra miembros del equipo, solo los muestra para asignarlos.
+const TEAM_MEMBERS_TABLE = 'ingenia_board_state';
+const TEAM_MEMBERS_KEY = 'ingenia-team-members-v1';
+
 /* Alimentación desde el Panel de Networking (Fundación INGENIA): proyecto
    Supabase distinto y de solo lectura para este tablero. Solo se leen los
    contactos/tareas de INABIO UCV ya identificados como relevantes para las
@@ -1682,6 +1686,7 @@ class Component extends DCLogic {
     assignJourneyId: null,
     appStatuses: readStore('ucv-app-status-v1', {}),
     unitInfo: readStore('ucv-unit-info-v1', {}),
+    teamMembers: readStore(TEAM_MEMBERS_KEY, []),
     unitModal: null,
     unitForm: {
       responsibleName: '', responsiblePhone: '', responsibleEmail: '', responsibleRole: 'Responsable', responsibleFunction: '', responsibleAccount: '', responsibleAffiliation: '',
@@ -1703,11 +1708,20 @@ class Component extends DCLogic {
   componentDidMount() {
     if (!sb) return;
     this._loadFromSupabase().then(ok => { if (ok) this._syncFromNetworkingPanel(); });
+    this._loadTeamMembers();
     this._subscribeRealtime();
-    this._onVisible = () => { if (document.visibilityState === 'visible') { this._loadFromSupabase().then(ok => { if (ok) this._syncFromNetworkingPanel(); }); this._subscribeRealtime(); } };
+    this._onVisible = () => { if (document.visibilityState === 'visible') { this._loadFromSupabase().then(ok => { if (ok) this._syncFromNetworkingPanel(); }); this._loadTeamMembers(); this._subscribeRealtime(); } };
     document.addEventListener('visibilitychange', this._onVisible);
     window.addEventListener('focus', this._onVisible);
-    this._pollTimer = setInterval(() => { if (document.visibilityState === 'visible') { this._loadFromSupabase().then(ok => { if (ok) this._syncFromNetworkingPanel(); }); } }, 45000);
+    this._pollTimer = setInterval(() => { if (document.visibilityState === 'visible') { this._loadFromSupabase().then(ok => { if (ok) this._syncFromNetworkingPanel(); }); this._loadTeamMembers(); } }, 45000);
+  }
+
+  async _loadTeamMembers() {
+    if (!sb) return;
+    const res = await sb.from(TEAM_MEMBERS_TABLE).select('value').eq('key', TEAM_MEMBERS_KEY).maybeSingle();
+    if (res.error || !res.data || !Array.isArray(res.data.value)) return;
+    writeLocal(TEAM_MEMBERS_KEY, res.data.value);
+    this.setState({ teamMembers: res.data.value });
   }
 
   async _syncFromNetworkingPanel() {
@@ -2754,6 +2768,17 @@ class Component extends DCLogic {
       return list.filter(n => { if (seen[n]) return false; seen[n] = true; return true; }).map(n => ({ id: n, label: n }));
     })();
 
+    // Responsables de la tarea: el roster compartido de "Tareas de Equipo"
+    // en Networking Fundación Ingenia, más el valor actual si viene de
+    // antes de tener este roster (para no perder ese dato al editar).
+    const taskOwnerOptions = (() => {
+      const list = ['Por confirmar'].concat(s.teamMembers.map(m => m.name));
+      const current = s.taskForm.owner;
+      if (current && list.indexOf(current) === -1) list.push(current);
+      const seen = {};
+      return list.filter(n => { if (seen[n]) return false; seen[n] = true; return true; }).map(n => ({ id: n, label: n === 'Por confirmar' ? n : '👤 ' + n }));
+    })();
+
     const unitBox = { background: '#fff', borderRadius: 14, padding: '9px 10px', display: 'flex', flexDirection: 'column', gap: 6, borderWidth: 1.5, borderStyle: 'solid' };
     const hasMedicalPerson = unitId => {
       const info = s.unitInfo[unitId];
@@ -3045,8 +3070,9 @@ class Component extends DCLogic {
       chipHover: { background: '#fff', borderColor: 'var(--color-neutral-400)' },
       primaryHover: { background: 'var(--color-accent-600)' },
       modalOpen: !!s.modal, modal: modal, form: { notes: s.notes, date: s.date, follow: s.follow },
-      taskModalOpen: !!s.taskModal, taskModalTitle: s.taskModal === 'new' ? 'Nueva tarea operativa' : 'Editar tarea operativa', taskForm: s.taskForm,
+      taskModalOpen: !!s.taskModal, taskModalTitle: s.taskModal === 'new' ? 'Nueva tarea' : 'Editar tarea', taskForm: s.taskForm,
       taskAreaChips: taskAreaChips, taskStatusChips: taskStatusChips, taskPriorityChips: taskPriorityChips, taskOrgChips: taskOrgChips, extraUnitChips: extraUnitChips, contactOwnerOptions: contactOwnerOptions,
+      taskOwnerOptions: taskOwnerOptions,
       contactModalOpen: !!s.contactModal, contactModalTitle: s.contactModal === 'new' ? 'Nuevo contacto' : 'Editar contacto',
       isEditingContact: !!s.contactModal && s.contactModal !== 'new',
       contactForm: s.contactForm, roleOptions: Object.keys(ROLE).map(k => ({ id: k, label: ROLE[k].emoji + ' ' + ROLE[k].short })),
@@ -3117,7 +3143,6 @@ class Component extends DCLogic {
       onTaskArea: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { area: e.target.value }) }),
       onTaskStatus: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { status: e.target.value }) }),
       onTaskPriority: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { priority: e.target.value }) }),
-      onTaskHorizon: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { horizon: e.target.value }) }),
       onTaskDetail: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { detail: e.target.value }) }),
       onTaskNextAction: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { nextAction: e.target.value }) }),
       onTaskDueDate: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { dueDate: e.target.value }) }),
