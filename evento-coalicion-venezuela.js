@@ -19,6 +19,49 @@
   const TEAM_MEMBERS_KEY = 'ingenia-team-members-v1';
   const NEW_MEMBER_VALUE = '__new_member__';
   const ORG_ID = 'coalicion';
+  const UI_KEY = 'ingenia-coalicion-ui-v1';
+
+  // Modo edición: textos y orden personalizables, igual que en el tablero
+  // UCV — pero sin los controles de tamaño de burbuja/título, porque este
+  // sitio usa una hoja de estilos fija en vez de estilos calculados en JS.
+  // La pestaña "Responsables" queda fuera a propósito: está oculta
+  // temporalmente (ver el nav) y no tendría efecto visible si se reordena.
+  const DEFAULT_UI = {
+    pageTitle: 'Evento Coalición Venezuela',
+    pageSubtitle: 'Control compartido de responsables, calendario y resultados de la jornada.',
+    summaryTitle: '💙 Entrega de ayuda en Mareabajo',
+    resultsTitle: '📊 Resultados de la jornada',
+    calendarTitle: '🗓️ Calendario del evento',
+    tasksTitle: 'Tareas de Equipo',
+    tabOrder: ['summary', 'results', 'calendar', 'tasks'],
+    boardOrder: ['kpis', 'board']
+  };
+  const NAV_ITEMS = {
+    summary: { emoji: '🏠', label: 'Resumen' },
+    results: { emoji: '📊', label: 'Resultados' },
+    calendar: { emoji: '🗓️', label: 'Calendario' },
+    tasks: { emoji: '📋', label: 'Tareas de Equipo' }
+  };
+  const BOARD_ITEMS = {
+    kpis: { emoji: '📊', label: 'Indicadores' },
+    board: { emoji: '🗂️', label: 'Tablero de tareas' }
+  };
+
+  function normalizeUI(value) {
+    const v = value || {};
+    const tabIds = Object.keys(NAV_ITEMS);
+    const sectionIds = Object.keys(BOARD_ITEMS);
+    const tabs = Array.isArray(v.tabOrder) ? v.tabOrder.filter(function (x) { return NAV_ITEMS[x]; }) : [];
+    tabIds.forEach(function (id) { if (tabs.indexOf(id) === -1) tabs.push(id); });
+    const sections = Array.isArray(v.boardOrder) ? v.boardOrder.filter(function (x) { return BOARD_ITEMS[x]; }) : [];
+    sectionIds.forEach(function (id) { if (sections.indexOf(id) === -1) sections.push(id); });
+    return Object.assign({}, DEFAULT_UI, v, { tabOrder: tabs, boardOrder: sections });
+  }
+
+  function cloneUI(value) {
+    const v = normalizeUI(value);
+    return Object.assign({}, v, { tabOrder: v.tabOrder.slice(), boardOrder: v.boardOrder.slice() });
+  }
   const TASK_STATUSES = [
     { key: 'pendiente', label: 'Pendiente', color: '#82796a' },
     { key: 'en_proceso', label: 'En proceso', color: '#0f766e' },
@@ -393,7 +436,9 @@
     teamMembers: [],
     taskResponsableFilter: '',
     editingTask: null,
-    dragTaskId: null
+    dragTaskId: null,
+    ui: cloneUI(DEFAULT_UI),
+    customizeForm: cloneUI(DEFAULT_UI)
   };
 
   const dom = {};
@@ -427,7 +472,11 @@
         dom.tasksResponsableFilter.value = '';
         renderTasksBoard();
         renderTasksKpis();
-      }
+      },
+      'customize-open': openCustomize,
+      'customize-dialog-close': closeCustomize,
+      'customize-dialog-cancel': closeCustomize,
+      'customize-reset': resetCustomize
     };
     const action = actionsById[target.id];
     if (action) action();
@@ -514,6 +563,24 @@
     dom.taskPrioritySelect = document.getElementById('field-task-priority');
     dom.taskDetail = document.getElementById('field-task-detail');
     dom.taskNextAction = document.getElementById('field-task-next-action');
+    dom.pageTitle = document.getElementById('page-title');
+    dom.pageSubtitle = document.getElementById('page-subtitle');
+    dom.tabNav = document.getElementById('tab-nav');
+    dom.tasksBlocks = document.getElementById('tasks-blocks');
+    dom.summaryTitle = document.getElementById('summary-title');
+    dom.resultsTitle = document.getElementById('results-title');
+    dom.calendarTitle = document.getElementById('calendar-title');
+    dom.tasksTitle = document.getElementById('tasks-title');
+    dom.customizeDialog = document.getElementById('customize-dialog');
+    dom.customizeForm = document.getElementById('customize-form');
+    dom.customPageTitle = document.getElementById('field-custom-page-title');
+    dom.customSubtitle = document.getElementById('field-custom-subtitle');
+    dom.customSummaryTitle = document.getElementById('field-custom-summary-title');
+    dom.customResultsTitle = document.getElementById('field-custom-results-title');
+    dom.customCalendarTitle = document.getElementById('field-custom-calendar-title');
+    dom.customTasksTitle = document.getElementById('field-custom-tasks-title');
+    dom.customizeTabsList = document.getElementById('customize-tabs-list');
+    dom.customizeSectionsList = document.getElementById('customize-sections-list');
   }
 
   function bindStaticEvents() {
@@ -552,6 +619,8 @@
       renderTasksBoard();
       renderTasksKpis();
     });
+    dom.customizeForm.addEventListener('submit', onCustomizeSubmit);
+    dom.customizeDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeCustomize(); });
   }
 
   function showConnectionFailure() {
@@ -1776,14 +1845,122 @@
 
   async function loadTeamTasks() {
     if (!state.client) return;
-    const [tasksValue, membersValue] = await Promise.all([
+    const [tasksValue, membersValue, uiValue] = await Promise.all([
       readBoardKey(SHARED_TABLE, TEAM_TASKS_KEY, []),
-      readBoardKey(SHARED_TABLE, TEAM_MEMBERS_KEY, [])
+      readBoardKey(SHARED_TABLE, TEAM_MEMBERS_KEY, []),
+      readBoardKey(SHARED_TABLE, UI_KEY, null)
     ]);
     state.allTasks = (Array.isArray(tasksValue) ? tasksValue : []).map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); });
     state.teamMembers = Array.isArray(membersValue) ? membersValue : [];
+    state.ui = cloneUI(uiValue);
+    applyUI();
     populateTasksResponsableFilter();
     if (state.view === 'tasks') { renderTasksBoard(); renderTasksKpis(); }
+  }
+
+  // ---------- Modo edición ----------
+
+  function applyUI() {
+    const ui = state.ui;
+    dom.pageTitle.textContent = ui.pageTitle;
+    dom.pageSubtitle.textContent = ui.pageSubtitle;
+    dom.summaryTitle.textContent = ui.summaryTitle;
+    dom.resultsTitle.textContent = ui.resultsTitle;
+    dom.calendarTitle.textContent = ui.calendarTitle;
+    dom.tasksTitle.textContent = ui.tasksTitle;
+    reorderChildren(dom.tabNav, ui.tabOrder, function (id) { return dom.tabNav.querySelector('[data-view="' + id + '"]'); });
+    reorderChildren(dom.tasksBlocks, ui.boardOrder, function (id) { return document.getElementById('tasks-block-' + id); });
+  }
+
+  function reorderChildren(parent, order, findChild) {
+    order.forEach(function (id) {
+      const child = findChild(id);
+      if (child) parent.appendChild(child);
+    });
+  }
+
+  function openCustomize() {
+    state.customizeForm = cloneUI(state.ui);
+    dom.customPageTitle.value = state.customizeForm.pageTitle;
+    dom.customSubtitle.value = state.customizeForm.pageSubtitle;
+    dom.customSummaryTitle.value = state.customizeForm.summaryTitle;
+    dom.customResultsTitle.value = state.customizeForm.resultsTitle;
+    dom.customCalendarTitle.value = state.customizeForm.calendarTitle;
+    dom.customTasksTitle.value = state.customizeForm.tasksTitle;
+    renderCustomizeLists();
+    dom.customizeDialog.showModal();
+  }
+
+  function closeCustomize() { dom.customizeDialog.close(); }
+
+  function resetCustomize() {
+    state.customizeForm = cloneUI(DEFAULT_UI);
+    dom.customPageTitle.value = state.customizeForm.pageTitle;
+    dom.customSubtitle.value = state.customizeForm.pageSubtitle;
+    dom.customSummaryTitle.value = state.customizeForm.summaryTitle;
+    dom.customResultsTitle.value = state.customizeForm.resultsTitle;
+    dom.customCalendarTitle.value = state.customizeForm.calendarTitle;
+    dom.customTasksTitle.value = state.customizeForm.tasksTitle;
+    renderCustomizeLists();
+  }
+
+  function renderCustomizeLists() {
+    renderReorderList(dom.customizeTabsList, state.customizeForm.tabOrder, NAV_ITEMS, moveTabOrder);
+    renderReorderList(dom.customizeSectionsList, state.customizeForm.boardOrder, BOARD_ITEMS, moveSectionOrder);
+  }
+
+  function renderReorderList(node, order, items, mover) {
+    renderMarkup(node, order.map(function (id, index) {
+      const item = items[id];
+      return '<div class="reorder-row">' +
+        '<span>' + item.emoji + '</span><span class="reorder-row-label">' + safe(item.label) + '</span>' +
+        '<button type="button" class="icon-button icon-button-sm" data-reorder-id="' + id + '" data-reorder-dir="-1" aria-label="Mover hacia arriba"' + (index === 0 ? ' disabled' : '') + '>↑</button>' +
+        '<button type="button" class="icon-button icon-button-sm" data-reorder-id="' + id + '" data-reorder-dir="1" aria-label="Mover hacia abajo"' + (index === order.length - 1 ? ' disabled' : '') + '>↓</button>' +
+      '</div>';
+    }).join(''));
+    node.querySelectorAll('[data-reorder-id]').forEach(function (button) {
+      button.addEventListener('click', function () { mover(button.dataset.reorderId, Number(button.dataset.reorderDir)); });
+    });
+  }
+
+  function moveInArray(list, id, delta) {
+    const index = list.indexOf(id);
+    const target = index + delta;
+    if (index === -1 || target < 0 || target >= list.length) return list;
+    const next = list.slice();
+    next.splice(index, 1);
+    next.splice(target, 0, id);
+    return next;
+  }
+
+  function moveTabOrder(id, delta) {
+    state.customizeForm.tabOrder = moveInArray(state.customizeForm.tabOrder, id, delta);
+    renderCustomizeLists();
+  }
+
+  function moveSectionOrder(id, delta) {
+    state.customizeForm.boardOrder = moveInArray(state.customizeForm.boardOrder, id, delta);
+    renderCustomizeLists();
+  }
+
+  async function onCustomizeSubmit(e) {
+    e.preventDefault();
+    const next = {
+      pageTitle: dom.customPageTitle.value.trim() || DEFAULT_UI.pageTitle,
+      pageSubtitle: dom.customSubtitle.value.trim() || DEFAULT_UI.pageSubtitle,
+      summaryTitle: dom.customSummaryTitle.value.trim() || DEFAULT_UI.summaryTitle,
+      resultsTitle: dom.customResultsTitle.value.trim() || DEFAULT_UI.resultsTitle,
+      calendarTitle: dom.customCalendarTitle.value.trim() || DEFAULT_UI.calendarTitle,
+      tasksTitle: dom.customTasksTitle.value.trim() || DEFAULT_UI.tasksTitle,
+      tabOrder: state.customizeForm.tabOrder,
+      boardOrder: state.customizeForm.boardOrder
+    };
+    const ok = await writeBoardKey(SHARED_TABLE, UI_KEY, next);
+    if (!ok) { toast('No se pudo guardar el diseño — revisa tu conexión.', 'error'); return; }
+    state.ui = cloneUI(next);
+    applyUI();
+    closeCustomize();
+    toast('Diseño guardado.', 'success');
   }
 
   function findTeamMember(id) {

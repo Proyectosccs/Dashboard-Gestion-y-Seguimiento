@@ -6,11 +6,11 @@
   <meta name="description" content="Control operativo móvil para eventos de Coalición Venezuela y Fundación Ingenia.">
   <title>Resumen — Evento Coalición Venezuela</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./evento-coalicion-venezuela.css?v=5">
+  <link rel="stylesheet" href="./evento-coalicion-venezuela.css?v=6">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-  <script src="./evento-coalicion-venezuela.js?v=14" defer></script>
+  <script src="./evento-coalicion-venezuela.js?v=15" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -19,17 +19,18 @@
     <header class="app-header">
       <div class="header-copy">
         <p class="eyebrow">🚚 Operación móvil · Fundación Ingenia</p>
-        <h1>Evento Coalición Venezuela</h1>
+        <h1 id="page-title">Evento Coalición Venezuela</h1>
         <p id="header-event-datetime" class="header-event-datetime"></p>
-        <p>Control compartido de responsables, calendario y resultados de la jornada.</p>
+        <p id="page-subtitle">Control compartido de responsables, calendario y resultados de la jornada.</p>
       </div>
       <div class="session-card">
         <span id="session-name" class="session-name">Acceso desde cualquier dispositivo</span>
         <span id="session-role" class="role-badge">✏️ Edición directa</span>
+        <button id="customize-open" class="customize-btn" type="button" onclick="window.coalicionAction(event)">✏️ Modo edición</button>
       </div>
     </header>
 
-    <nav class="tab-nav" aria-label="Secciones del evento">
+    <nav id="tab-nav" class="tab-nav" aria-label="Secciones del evento">
       <button class="tab-button" type="button" data-view="summary" aria-current="page" onclick="window.coalicionAction(event)">🏠 Resumen</button>
       <button class="tab-button" type="button" data-view="results" onclick="window.coalicionAction(event)">📊 Resultados</button>
       <!-- Ocultos temporalmente para la reunión de hoy — quitar el `hidden` para reactivarlos -->
@@ -108,13 +109,19 @@
         </div>
         <button class="btn btn-primary" type="button" data-action="new-task" onclick="window.coalicionAction(event)">➕ Agregar tarea</button>
       </div>
-      <div id="tasks-kpi-grid" class="task-kpi-grid"></div>
-      <div class="list-toolbar panel">
-        <label class="sr-only" for="tasks-responsable-filter">Filtrar por responsable</label>
-        <select id="tasks-responsable-filter" class="toolbar-select"><option value="">Todos los responsables</option></select>
-        <button id="tasks-filter-clear" class="link-button" type="button" onclick="window.coalicionAction(event)">Limpiar</button>
+      <div id="tasks-blocks">
+        <div id="tasks-block-kpis" data-block="kpis">
+          <div id="tasks-kpi-grid" class="task-kpi-grid"></div>
+        </div>
+        <div id="tasks-block-board" data-block="board">
+          <div class="list-toolbar panel">
+            <label class="sr-only" for="tasks-responsable-filter">Filtrar por responsable</label>
+            <select id="tasks-responsable-filter" class="toolbar-select"><option value="">Todos los responsables</option></select>
+            <button id="tasks-filter-clear" class="link-button" type="button" onclick="window.coalicionAction(event)">Limpiar</button>
+          </div>
+          <div id="tasks-board" class="kanban-board"></div>
+        </div>
       </div>
-      <div id="tasks-board" class="kanban-board"></div>
     </section>
 
     <section id="contacts-view" class="view" aria-labelledby="contacts-title" hidden>
@@ -326,6 +333,59 @@
           <span class="button-label">Guardar cambios</span>
           <span class="button-spinner" aria-hidden="true"></span>
         </button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="customize-dialog" class="editor-dialog" aria-labelledby="customize-dialog-title">
+    <form id="customize-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">✏️ Personalización</p>
+          <h2 id="customize-dialog-title">Modo edición</h2>
+        </div>
+        <button id="customize-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.coalicionAction(event)">×</button>
+      </div>
+      <div class="dialog-fields">
+        <div class="field">
+          <label for="field-custom-page-title">Título principal</label>
+          <input id="field-custom-page-title" class="input" name="pageTitle" type="text">
+        </div>
+        <div class="field field-full">
+          <label for="field-custom-subtitle">Subtítulo principal</label>
+          <textarea id="field-custom-subtitle" class="input" name="pageSubtitle"></textarea>
+        </div>
+        <div class="field">
+          <label for="field-custom-summary-title">Título de resumen</label>
+          <input id="field-custom-summary-title" class="input" name="summaryTitle" type="text">
+        </div>
+        <div class="field">
+          <label for="field-custom-results-title">Título de resultados</label>
+          <input id="field-custom-results-title" class="input" name="resultsTitle" type="text">
+        </div>
+        <div class="field">
+          <label for="field-custom-calendar-title">Título del calendario</label>
+          <input id="field-custom-calendar-title" class="input" name="calendarTitle" type="text">
+        </div>
+        <div class="field">
+          <label for="field-custom-tasks-title">Título de tareas</label>
+          <input id="field-custom-tasks-title" class="input" name="tasksTitle" type="text">
+        </div>
+      </div>
+      <div class="customize-grid">
+        <div>
+          <p class="eyebrow">Orden de las pestañas</p>
+          <div id="customize-tabs-list" class="reorder-list"></div>
+        </div>
+        <div>
+          <p class="eyebrow">Orden del tablero</p>
+          <div id="customize-sections-list" class="reorder-list"></div>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="customize-reset" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)">Restablecer</button>
+        <button id="customize-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)">Cancelar</button>
+        <button class="btn btn-primary" type="submit">Guardar diseño</button>
       </div>
     </form>
   </dialog>
