@@ -142,23 +142,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .field .input { min-height: 46px; background: var(--color-neutral-100); }
 .field-help { display: block; margin-top: 5px; color: var(--color-neutral-600); font-size: 11px; }
 .field-error { min-height: 17px; display: block; padding: 3px 8px 0; color: var(--coalition-danger); font-size: 11.5px; }
-.password-field { position: relative; }
-.password-field .input { padding-right: 84px; }
-.password-toggle {
-  position: absolute;
-  top: 5px;
-  right: 6px;
-  min-height: 36px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--color-accent-700);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.password-toggle:hover { background: var(--color-accent-100); }
 .auth-submit { min-height: 48px; }
 
 .notice {
@@ -201,8 +184,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   gap: 22px;
 }
 .header-copy h1 { margin: 0; font-size: clamp(36px, 5vw, 56px); }
-.header-event-datetime { margin: 8px 0 0; color: var(--coalition-blue); font-weight: 700; font-size: 14px; }
-.header-event-datetime:empty { display: none; }
 .header-copy > p:last-child { margin: 8px 0 0; color: var(--color-neutral-700); }
 .session-card {
   display: flex;
@@ -321,6 +302,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .collaborator-card.affiliation-coalicion img { max-height: 110px; }
 }
 
+.jornadas-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.jornada-card { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border: 1px solid var(--color-neutral-200); border-radius: 18px; background: #fff; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.jornada-card:hover { border-color: var(--coalition-blue); background: var(--coalition-blue-soft); }
+.jornada-card-title { font-weight: 700; font-size: 14px; }
+.jornada-card-meta { font-size: 12px; color: var(--color-neutral-600); }
+
 .summary-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr); gap: 12px; }
 .event-hero-content { display: flex; flex-direction: column; }
 .event-hero h3 { max-width: 18ch; margin: 0; font-size: clamp(29px, 4vw, 44px); color: var(--color-text); }
@@ -395,17 +382,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .contact-card h3 { margin: 0; font-size: 20px; }
 .contact-role { color: var(--color-neutral-600); font-size: 12px; }
 .contact-chips { display: flex; flex-wrap: wrap; gap: 7px; }
-.private-chip, .affiliation-chip { width: fit-content; padding: 4px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; }
-.private-chip { background: var(--coalition-blue-soft); color: var(--coalition-blue); }
-.affiliation-chip { background: color-mix(in srgb, var(--affiliation-color) 14%, white); color: color-mix(in srgb, var(--affiliation-color) 84%, #0f172a); border: 1px solid color-mix(in srgb, var(--affiliation-color) 28%, transparent); }
+.affiliation-chip { width: fit-content; padding: 4px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; background: color-mix(in srgb, var(--affiliation-color) 14%, white); color: color-mix(in srgb, var(--affiliation-color) 84%, #0f172a); border: 1px solid color-mix(in srgb, var(--affiliation-color) 28%, transparent); }
 .contact-details { display: grid; gap: 8px; font-size: 13px; }
 .contact-details a { overflow-wrap: anywhere; }
 .sensitive-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .sensitive-label { color: var(--color-neutral-600); }
 .sensitive-value { min-width: 0; overflow-wrap: anywhere; text-align: right; }
-.masked-value { color: var(--color-neutral-500); letter-spacing: .11em; }
 .contact-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: auto; }
-.privacy-eye { min-width: 124px; }
 
 .status-pill { width: fit-content; padding: 5px 9px; border-radius: 999px; background: var(--coalition-indigo-soft); color: var(--coalition-indigo); font-size: 10.5px; font-weight: 700; }
 .status-pill.status-completed { background: var(--coalition-teal-soft); color: var(--coalition-teal); }
@@ -516,10 +499,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 20px 20px 8px; }
 .dialog-header h2 { margin: 0; font-size: 28px; }
 .dialog-form > .notice { margin: 4px 20px; }
-.key-dialog { width: min(520px, calc(100vw - 28px)); }
-.key-dialog-copy { padding: 0 20px; color: var(--color-neutral-700); font-size: 13px; }
-.key-dialog-copy p { margin: 0; }
-.key-fields { grid-template-columns: 1fr; overflow: visible; }
 .dialog-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; padding: 12px 20px 20px; overflow-y: auto; scrollbar-gutter: stable; }
 .dialog-fields .field-full { grid-column: 1 / -1; }
 .dialog-fields textarea.input { min-height: 100px; border-radius: 18px; resize: none; }

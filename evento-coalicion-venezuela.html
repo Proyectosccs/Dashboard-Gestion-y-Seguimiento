@@ -6,11 +6,11 @@
   <meta name="description" content="Control operativo móvil para eventos de Coalición Venezuela y Fundación Ingenia.">
   <title>Resumen — Evento Coalición Venezuela</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./evento-coalicion-venezuela.css?v=6">
+  <link rel="stylesheet" href="./evento-coalicion-venezuela.css?v=7">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-  <script src="./evento-coalicion-venezuela.js?v=16" defer></script>
+  <script src="./evento-coalicion-venezuela.js?v=17" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -20,8 +20,7 @@
       <div class="header-copy">
         <p class="eyebrow">🚚 Operación móvil · Fundación Ingenia</p>
         <h1 id="page-title">Evento Coalición Venezuela</h1>
-        <p id="header-event-datetime" class="header-event-datetime"></p>
-        <p id="page-subtitle">Control compartido de responsables, calendario y resultados de la jornada.</p>
+        <p id="page-subtitle">Control compartido de responsables, calendario, tareas y resultados con Coalición Venezuela.</p>
       </div>
       <div class="session-card">
         <button id="customize-open" class="customize-btn" type="button" onclick="window.coalicionAction(event)">✏️ Modo edición</button>
@@ -31,8 +30,7 @@
     <nav id="tab-nav" class="tab-nav" aria-label="Secciones del evento">
       <button class="tab-button" type="button" data-view="summary" aria-current="page" onclick="window.coalicionAction(event)">🏠 Resumen</button>
       <button class="tab-button" type="button" data-view="results" onclick="window.coalicionAction(event)">📊 Resultados</button>
-      <!-- Ocultos temporalmente para la reunión de hoy — quitar el `hidden` para reactivarlos -->
-      <button class="tab-button" type="button" data-view="contacts" onclick="window.coalicionAction(event)" hidden>🤝 Responsables</button>
+      <button class="tab-button" type="button" data-view="contacts" onclick="window.coalicionAction(event)">🤝 Contactos</button>
       <button class="tab-button" type="button" data-view="calendar" onclick="window.coalicionAction(event)">🗓️ Calendario</button>
       <button class="tab-button" type="button" data-view="tasks" onclick="window.coalicionAction(event)">📋 Tareas de Equipo</button>
       <a class="tab-link" href="./" target="_blank" rel="noopener noreferrer" aria-label="Abrir Tablero UCV en otra pestaña" hidden>🎓 Tablero UCV ↗</a>
@@ -50,12 +48,33 @@
     <section id="summary-view" class="view" aria-labelledby="summary-title" hidden>
       <div class="view-heading">
         <div>
-          <p class="eyebrow">📍 Vista del día</p>
-          <h2 id="summary-title">💙 Entrega de ayuda en Mareabajo</h2>
+          <p class="eyebrow">📍 Resumen general</p>
+          <h2 id="summary-title">Resumen de Coalición Venezuela</h2>
         </div>
         <button class="btn btn-primary" type="button" data-action="new-event" onclick="window.coalicionAction(event)">➕ Agregar evento</button>
       </div>
-      <section id="summary-results" class="panel summary-results-panel" aria-labelledby="summary-results-title" hidden>
+
+      <section class="panel" aria-labelledby="summary-team-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">🤝 Quiénes hacen esto posible</p>
+            <h3 id="summary-team-title">Equipo y colaboradores</h3>
+          </div>
+        </div>
+        <div id="summary-team-list" class="collaborators-list"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="summary-jornadas-title" style="margin-top: 14px">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">📅 Jornadas</p>
+            <h3 id="summary-jornadas-title">Jornadas y eventos</h3>
+          </div>
+        </div>
+        <div id="summary-jornadas-list" class="jornadas-strip"></div>
+      </section>
+
+      <section id="summary-results" class="panel summary-results-panel" aria-labelledby="summary-results-title" hidden style="margin-top: 14px">
         <div class="panel-heading">
           <div>
             <p class="eyebrow">📦 Love Box · conektados Lite</p>
@@ -68,18 +87,6 @@
           <img class="results-hero-art" src="./assets/donacion-dibujo.png" alt="" aria-hidden="true">
         </div>
       </section>
-
-      <section class="panel" aria-labelledby="summary-team-title">
-        <div class="panel-heading">
-          <div>
-            <p class="eyebrow">🤝 Quiénes hacen esto posible</p>
-            <h3 id="summary-team-title">Equipo y colaboradores</h3>
-          </div>
-          <button class="btn btn-secondary" type="button" data-view="contacts" onclick="window.coalicionAction(event)">Ver todos →</button>
-        </div>
-        <div id="summary-team-list" class="collaborators-list"></div>
-      </section>
-
     </section>
 
     <section id="calendar-view" class="view" aria-labelledby="calendar-title" hidden>
@@ -125,9 +132,9 @@
     <section id="contacts-view" class="view" aria-labelledby="contacts-title" hidden>
       <div class="view-heading">
         <div>
-          <p class="eyebrow">🤝 Responsables</p>
-          <h2 id="contacts-title">🤝 Equipo del evento</h2>
-          <p class="view-description">Los datos sensibles permanecen ocultos y requieren la clave para visualizarse o editarse.</p>
+          <p class="eyebrow">🤝 Contactos</p>
+          <h2 id="contacts-title">🤝 Equipo y colaboradores</h2>
+          <p class="view-description">Directorio de contactos y responsables que trabajan con Coalición Venezuela.</p>
         </div>
         <button class="btn btn-primary" type="button" data-action="new-contact" onclick="window.coalicionAction(event)">➕ Agregar responsable</button>
       </div>
@@ -211,38 +218,6 @@
       </div>
     </section>
   </div>
-
-  <dialog id="key-dialog" class="editor-dialog key-dialog" aria-labelledby="key-dialog-title">
-    <form id="key-form" class="dialog-form" novalidate>
-      <div class="dialog-header">
-        <div>
-          <p class="eyebrow">🔐 Información sensible</p>
-          <h2 id="key-dialog-title">Ver datos del responsable</h2>
-        </div>
-        <button id="key-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.coalicionAction(event)">×</button>
-      </div>
-      <div class="key-dialog-copy">
-        <p id="key-dialog-copy">Ingresa la clave operativa para continuar.</p>
-      </div>
-      <div id="key-error" class="notice notice-error" role="alert" hidden></div>
-      <div class="dialog-fields key-fields">
-        <div class="field field-full">
-          <label for="editor-key">Clave</label>
-          <div class="password-field">
-            <input id="editor-key" class="input" name="editor_key" type="password" autocomplete="current-password" required aria-describedby="key-error">
-            <button id="toggle-editor-key" class="password-toggle" type="button" aria-label="Mostrar clave" aria-pressed="false" onclick="window.coalicionAction(event)">Mostrar</button>
-          </div>
-        </div>
-      </div>
-      <div class="dialog-actions">
-        <button id="key-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)">Cancelar</button>
-        <button id="key-submit" class="btn btn-primary" type="submit">
-          <span class="button-label">Continuar</span>
-          <span class="button-spinner" aria-hidden="true"></span>
-        </button>
-      </div>
-    </form>
-  </dialog>
 
   <dialog id="task-dialog" class="editor-dialog" aria-labelledby="task-dialog-title">
     <form id="task-form" class="dialog-form" novalidate>

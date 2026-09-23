@@ -67,29 +67,6 @@ Deno.serve(async (request: Request) => {
   try {
     const body = await request.json();
     const action = typeof body?.action === 'string' ? body.action : '';
-    const key = typeof body?.key === 'string' ? body.key : '';
-
-    if (action === 'verify') {
-      if (key.length < 12) return jsonResponse(origin, 401, { error: 'invalid editor key' });
-      const valid = await callRpc('coalicion_verify_editor_key', { p_key: key });
-      return valid === true
-        ? jsonResponse(origin, 200, { data: true })
-        : jsonResponse(origin, 401, { error: 'invalid editor key' });
-    }
-
-    if (action === 'responsible') {
-      if (key.length < 12) return jsonResponse(origin, 401, { error: 'invalid editor key' });
-      if (typeof body?.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(body.id)) {
-        return jsonResponse(origin, 400, { error: 'invalid responsible id' });
-      }
-      const responsibles = await callRpc('coalicion_get_contacts', { p_key: key });
-      const responsible = Array.isArray(responsibles)
-        ? responsibles.find((item) => item?.id === body.id)
-        : null;
-      return responsible
-        ? jsonResponse(origin, 200, { data: responsible })
-        : jsonResponse(origin, 404, { error: 'responsible not found' });
-    }
 
     if (action === 'save') {
       if (!['contact', 'event', 'inventory', 'batch'].includes(body?.entity)) {
@@ -100,8 +77,7 @@ Deno.serve(async (request: Request) => {
       }
       const saved = body.entity === 'contact'
         ? body.id
-          ? await callRpc('coalicion_save_contact', {
-            p_key: key,
+          ? await callRpc('coalicion_update_contact_public', {
             p_payload: body.payload,
             p_id: body.id
           })
@@ -117,10 +93,7 @@ Deno.serve(async (request: Request) => {
     }
 
     return jsonResponse(origin, 400, { error: 'unsupported action' });
-  } catch (error) {
-    if (error instanceof Error && error.name === 'InvalidKey') {
-      return jsonResponse(origin, 401, { error: 'invalid editor key' });
-    }
+  } catch (_error) {
     return jsonResponse(origin, 500, { error: 'operation unavailable' });
   }
 });

@@ -24,21 +24,20 @@
   // Modo edición: textos y orden personalizables, igual que en el tablero
   // UCV — pero sin los controles de tamaño de burbuja/título, porque este
   // sitio usa una hoja de estilos fija en vez de estilos calculados en JS.
-  // La pestaña "Responsables" queda fuera a propósito: está oculta
-  // temporalmente (ver el nav) y no tendría efecto visible si se reordena.
   const DEFAULT_UI = {
     pageTitle: 'Evento Coalición Venezuela',
-    pageSubtitle: 'Control compartido de responsables, calendario y resultados de la jornada.',
-    summaryTitle: '💙 Entrega de ayuda en Mareabajo',
+    pageSubtitle: 'Control compartido de responsables, calendario, tareas y resultados con Coalición Venezuela.',
+    summaryTitle: 'Resumen de Coalición Venezuela',
     resultsTitle: '📊 Resultados de la jornada',
     calendarTitle: '🗓️ Calendario del evento',
     tasksTitle: 'Tareas de Equipo',
-    tabOrder: ['summary', 'results', 'calendar', 'tasks'],
+    tabOrder: ['summary', 'results', 'contacts', 'calendar', 'tasks'],
     boardOrder: ['kpis', 'board']
   };
   const NAV_ITEMS = {
     summary: { emoji: '🏠', label: 'Resumen' },
     results: { emoji: '📊', label: 'Resultados' },
+    contacts: { emoji: '🤝', label: 'Contactos' },
     calendar: { emoji: '🗓️', label: 'Calendario' },
     tasks: { emoji: '📋', label: 'Tareas de Equipo' }
   };
@@ -417,13 +416,8 @@
     view: 'summary',
     calendarMonth: new Date().toISOString().slice(0, 7),
     contacts: [],
-    revealedContacts: {},
     events: [],
     query: '',
-    keyRequest: null,
-    keyRequestCounter: 0,
-    keyTrigger: null,
-    sensitiveEditorKey: '',
     editor: null,
     editorDirty: false,
     discardArmed: false,
@@ -459,9 +453,6 @@
       'calendar-next': function () { changeMonth(1); },
       'calendar-today': function () { state.calendarMonth = new Date().toISOString().slice(0, 7); renderCalendar(); },
       'contact-search-clear': clearContactSearch,
-      'key-dialog-close': closeKeyDialog,
-      'key-dialog-cancel': closeKeyDialog,
-      'toggle-editor-key': toggleEditorKey,
       'dialog-close': requestCloseEditor,
       'dialog-cancel': requestCloseEditor,
       'task-dialog-close': closeTaskDialog,
@@ -502,8 +493,8 @@
     dom.summaryResults = document.getElementById('summary-results');
     dom.summaryResultsGrid = document.getElementById('summary-results-grid');
     dom.summaryTeamList = document.getElementById('summary-team-list');
+    dom.summaryJornadasList = document.getElementById('summary-jornadas-list');
     dom.nextEventCard = document.getElementById('next-event-card');
-    dom.headerEventDatetime = document.getElementById('header-event-datetime');
     dom.calendarMonthLabel = document.getElementById('calendar-month-label');
     dom.calendarGrid = document.getElementById('calendar-grid');
     dom.contactSearch = document.getElementById('contact-search');
@@ -526,14 +517,6 @@
     dom.resultsNucleos = document.getElementById('results-nucleos');
     dom.resultsInsights = document.getElementById('results-insights');
     dom.resultsRecommendations = document.getElementById('results-recommendations');
-    dom.keyDialog = document.getElementById('key-dialog');
-    dom.keyForm = document.getElementById('key-form');
-    dom.keyDialogTitle = document.getElementById('key-dialog-title');
-    dom.keyDialogCopy = document.getElementById('key-dialog-copy');
-    dom.editorKey = document.getElementById('editor-key');
-    dom.keyError = document.getElementById('key-error');
-    dom.keySubmit = document.getElementById('key-submit');
-    dom.toggleEditorKey = document.getElementById('toggle-editor-key');
     dom.editorDialog = document.getElementById('editor-dialog');
     dom.editorForm = document.getElementById('editor-form');
     dom.dialogTitle = document.getElementById('dialog-title');
@@ -584,11 +567,6 @@
   function bindStaticEvents() {
     dom.appShell.addEventListener('click', handleAppAction);
     dom.contactSearch.addEventListener('input', handleContactSearch);
-    dom.keyForm.addEventListener('submit', authorizeSensitiveAccess);
-    dom.keyDialog.addEventListener('cancel', function (event) {
-      event.preventDefault();
-      closeKeyDialog();
-    });
     dom.editorForm.addEventListener('submit', saveEditor);
     dom.editorForm.addEventListener('input', function () {
       state.editorDirty = true;
@@ -627,95 +605,6 @@
     dom.connectivityBanner.hidden = false;
   }
 
-  function requestSensitiveAccess(purpose, contactId) {
-    const contact = contactId ? findById(state.contacts, contactId) : null;
-    const name = contact ? contact.name : 'este responsable';
-    state.keyRequest = { purpose: purpose, contactId: contactId || null, token: ++state.keyRequestCounter };
-    state.keyTrigger = document.activeElement;
-    dom.keyDialogTitle.textContent = purpose === 'reveal'
-      ? 'Ver datos de ' + name
-      : 'Editar a ' + name;
-    dom.keyDialogCopy.textContent = purpose === 'reveal'
-      ? 'Ingresa la clave para mostrar la cédula, el teléfono, el correo y las notas.'
-      : 'Ingresa la clave para editar la información sensible de este responsable.';
-    dom.keyError.hidden = true;
-    dom.keyError.textContent = '';
-    dom.editorKey.value = '';
-    dom.editorKey.type = 'password';
-    dom.toggleEditorKey.textContent = 'Mostrar';
-    dom.toggleEditorKey.setAttribute('aria-label', 'Mostrar clave');
-    dom.toggleEditorKey.setAttribute('aria-pressed', 'false');
-    dom.keyDialog.showModal();
-    dom.editorKey.focus();
-  }
-
-  async function authorizeSensitiveAccess(event) {
-    event.preventDefault();
-    const request = state.keyRequest;
-    const key = dom.editorKey.value;
-    dom.keyError.hidden = true;
-    dom.editorKey.removeAttribute('aria-invalid');
-    if (!request) return;
-    if (key.length < 12) {
-      dom.keyError.textContent = 'La clave debe tener al menos 12 caracteres.';
-      dom.keyError.hidden = false;
-      dom.editorKey.setAttribute('aria-invalid', 'true');
-      dom.editorKey.focus();
-      return;
-    }
-
-    setBusy(dom.keySubmit, true);
-    const result = await callEditorApi('responsible', { key: key, id: request.contactId });
-    setBusy(dom.keySubmit, false);
-    if (!state.keyRequest || state.keyRequest.token !== request.token) return;
-
-    if (result.error) {
-      dom.keyError.textContent = 'La clave no es válida. Verifícala e inténtalo nuevamente.';
-      dom.keyError.hidden = false;
-      dom.editorKey.setAttribute('aria-invalid', 'true');
-      dom.editorKey.select();
-      return;
-    }
-
-    if (request.purpose === 'reveal') {
-      state.revealedContacts[request.contactId] = result.data;
-      closeKeyDialog(false);
-      renderContacts();
-      const hideButton = dom.contactsList.querySelector('[data-action="hide-contact"][data-id="' + request.contactId + '"]');
-      if (hideButton) hideButton.focus();
-      toast('Datos sensibles visibles para este responsable.', 'success');
-      return;
-    }
-
-    state.sensitiveEditorKey = key;
-    const record = request.purpose === 'edit' ? result.data : null;
-    closeKeyDialog(false);
-    openEditor('contact', record);
-  }
-
-  function closeKeyDialog(restoreFocus) {
-    dom.editorKey.value = '';
-    dom.editorKey.type = 'password';
-    dom.toggleEditorKey.textContent = 'Mostrar';
-    dom.toggleEditorKey.setAttribute('aria-label', 'Mostrar clave');
-    dom.toggleEditorKey.setAttribute('aria-pressed', 'false');
-    dom.keyError.hidden = true;
-    if (dom.keyDialog.open) dom.keyDialog.close();
-    const trigger = state.keyTrigger;
-    state.keyRequest = null;
-    state.keyTrigger = null;
-    if (restoreFocus !== false && trigger && typeof trigger.focus === 'function') trigger.focus();
-  }
-
-  function toggleEditorKey() {
-    const revealing = dom.editorKey.type === 'password';
-    dom.editorKey.type = revealing ? 'text' : 'password';
-    dom.toggleEditorKey.textContent = revealing ? 'Ocultar' : 'Mostrar';
-    dom.toggleEditorKey.setAttribute('aria-label', revealing ? 'Ocultar clave' : 'Mostrar clave');
-    dom.toggleEditorKey.setAttribute('aria-pressed', String(revealing));
-    dom.editorKey.focus();
-  }
-
   async function loadAllData(background) {
     if (!state.client) return;
     const loadId = ++state.loadId;
@@ -723,25 +612,29 @@
     dom.connectivityBanner.hidden = true;
 
     const contactsRequest = state.client.from(TABLES.contacts)
-      .select('id,name,role,belongs_to,created_at,updated_at')
+      .select('id,name,role,belongs_to,national_id,phone,email,notes,created_at,updated_at')
       .is('archived_at', null)
       .order('name');
-    const results = await Promise.all([
-      contactsRequest,
-      state.client.from(TABLES.events).select('*').is('archived_at', null).order('event_date')
-    ]);
+    const eventsRequest = state.client.from(TABLES.events).select('*').is('archived_at', null).order('event_date');
+    const [contactsResult, eventsResult] = await Promise.all([contactsRequest, eventsRequest]);
 
     if (loadId !== state.loadId) return;
-    const failed = results.find(function (result) { return result.error; });
-    if (failed) {
+    if (eventsResult.error) {
       dom.loadingState.hidden = true;
       dom.connectivityBanner.hidden = false;
       return;
     }
-
-    state.contacts = results[0].data || [];
-    state.revealedContacts = {};
-    state.events = results[1].data || [];
+    // La consulta de contactos puede fallar sola mientras no se hayan
+    // aplicado los permisos de lectura de campos sensibles (ver migración
+    // coalicion_contacts_public_access) — no bloqueamos el resto del
+    // dashboard por eso, solo dejamos el directorio vacío.
+    if (contactsResult.error) {
+      dom.connectivityBanner.hidden = false;
+      state.contacts = [];
+    } else {
+      state.contacts = contactsResult.data || [];
+    }
+    state.events = eventsResult.data || [];
     dom.loadingState.hidden = true;
     renderAll();
     if (!background) setView(state.view);
@@ -769,7 +662,7 @@
       summary: 'Resumen — Evento Coalición Venezuela',
       calendar: 'Calendario — Evento Coalición Venezuela',
       tasks: 'Tareas de Equipo — Evento Coalición Venezuela',
-      contacts: 'Responsables — Evento Coalición Venezuela',
+      contacts: 'Contactos — Evento Coalición Venezuela',
       results: 'Resultados — Evento Coalición Venezuela'
     };
     document.querySelectorAll('.tab-button').forEach(function (button) {
@@ -795,22 +688,13 @@
   function handleAction(action, id) {
     if (action === 'new-task') openTaskDialog();
     if (action === 'new-contact') openEditor('contact');
-    if (action === 'edit-contact') requestSensitiveAccess('edit', id);
-    if (action === 'reveal-contact') requestSensitiveAccess('reveal', id);
-    if (action === 'hide-contact') hideContact(id);
+    if (action === 'edit-contact') openEditor('contact', findById(state.contacts, id));
     if (action === 'new-event') openEditor('event');
     if (action === 'edit-event') openEditor('event', findById(state.events, id));
     if (action === 'refresh-results') fetchResultados(true);
     if (action === 'filter-semaforo') toggleSemaforoFilter(id);
     if (action === 'toggle-need') toggleNeedCategory(id);
     if (action === 'select-jornada') selectJornada(id);
-  }
-
-  function hideContact(id) {
-    delete state.revealedContacts[id];
-    renderContacts();
-    const revealButton = dom.contactsList.querySelector('[data-action="reveal-contact"][data-id="' + id + '"]');
-    if (revealButton) revealButton.focus();
   }
 
   function renderAll() {
@@ -821,15 +705,9 @@
     renderSummaryTeam();
   }
 
-  function renderHeaderDatetime() {
-    if (!dom.headerEventDatetime) return;
-    const next = nextEvent();
-    dom.headerEventDatetime.textContent = next ? '📅 ' + formatDate(next.event_date) + ' · ◷ ' + formatTime(next.start_time) : '';
-  }
-
   function renderSummary() {
     renderSummaryTeam();
-    renderHeaderDatetime();
+    renderSummaryJornadas();
   }
 
   function renderSummaryResults() {
@@ -883,6 +761,25 @@
     }).join(''));
   }
 
+  // Vista rápida de las jornadas/eventos compartidos en el Resumen — usa por
+  // ahora los mismos datos del calendario (título, fecha, lugar). Más
+  // adelante el equipo definirá qué otra información propia de cada jornada
+  // debe mostrarse aquí.
+  function renderSummaryJornadas() {
+    if (!dom.summaryJornadasList) return;
+    if (!state.events.length) {
+      renderMarkup(dom.summaryJornadasList, emptyState('📅 Sin jornadas todavía', 'Agrega un evento para que aparezca aquí.', ''));
+      return;
+    }
+    const sorted = state.events.slice().sort(function (a, b) { return (a.event_date || '').localeCompare(b.event_date || ''); });
+    renderMarkup(dom.summaryJornadasList, sorted.map(function (e) {
+      return '<button type="button" class="jornada-card" data-action="edit-event" data-id="' + safe(e.id) + '">' +
+        '<span class="jornada-card-title">' + safe(e.title) + '</span>' +
+        '<span class="jornada-card-meta">📅 ' + safe(formatDate(e.event_date)) + (e.location ? ' · 📍 ' + safe(e.location) : '') + '</span>' +
+      '</button>';
+    }).join(''));
+  }
+
   function renderCalendar() {
     const parts = state.calendarMonth.split('-').map(Number);
     const year = parts[0];
@@ -914,34 +811,24 @@
     dom.contactResultCount.textContent = contacts.length + ' de ' + state.contacts.length + ' responsables';
     dom.contactSearchClear.hidden = !state.query;
     if (!contacts.length) {
-      renderMarkup(dom.contactsList, emptyState(state.contacts.length ? '🔎 Sin coincidencias' : '🤝 Directorio vacío', state.contacts.length ? 'Prueba otra búsqueda o limpia el filtro.' : 'Agrega los responsables autorizados del evento.', state.contacts.length ? '<button class="btn btn-secondary" type="button" id="empty-clear-search">Limpiar búsqueda</button>' : ''));
+      renderMarkup(dom.contactsList, emptyState(state.contacts.length ? '🔎 Sin coincidencias' : '🤝 Directorio vacío', state.contacts.length ? 'Prueba otra búsqueda o limpia el filtro.' : 'Agrega los contactos y responsables del equipo.', state.contacts.length ? '<button class="btn btn-secondary" type="button" id="empty-clear-search">Limpiar búsqueda</button>' : ''));
       const clear = document.getElementById('empty-clear-search');
       if (clear) clear.addEventListener('click', clearContactSearch);
       return;
     }
     renderMarkup(dom.contactsList, contacts.map(function (contact) {
-      const fullContact = state.revealedContacts[contact.id];
       return '<article class="contact-card ' + safe(affiliationClass(contact.belongs_to)) + '">' +
         '<div class="contact-card-header"><div class="contact-avatar" aria-hidden="true">' + safe(initials(contact.name)) + '</div><div><h3>' + safe(contact.name) + '</h3><div class="contact-role">' + safe(contact.role || 'Responsable') + '</div></div></div>' +
-        '<div class="contact-chips"><span class="affiliation-chip">🏷️ ' + safe(contact.belongs_to || 'Pertenencia por confirmar') + '</span><span class="private-chip">🔐 Datos sensibles protegidos</span></div>' +
-        renderSensitiveDetails(fullContact) +
+        '<div class="contact-chips"><span class="affiliation-chip">🏷️ ' + safe(contact.belongs_to || 'Pertenencia por confirmar') + '</span></div>' +
+        renderContactDetails(contact) +
         '<div class="contact-card-actions">' +
-          '<button class="btn btn-ghost privacy-eye" type="button" data-action="' + (fullContact ? 'hide-contact' : 'reveal-contact') + '" data-id="' + safe(contact.id) + '" aria-label="' + (fullContact ? 'Ocultar' : 'Ver') + ' datos sensibles de ' + safe(contact.name) + '">' + (fullContact ? '🙈 Ocultar datos' : '👁️ Ver datos') + '</button>' +
           '<button class="btn btn-secondary" type="button" data-action="edit-contact" data-id="' + safe(contact.id) + '">Editar responsable</button>' +
         '</div>' +
       '</article>';
     }).join(''));
   }
 
-  function renderSensitiveDetails(contact) {
-    if (!contact) {
-      return '<div class="contact-details" aria-label="Datos sensibles ocultos">' +
-        sensitiveRow('▣ Cédula', '<span class="masked-value" aria-label="Oculto">••••••••</span>') +
-        sensitiveRow('◉ Teléfono', '<span class="masked-value" aria-label="Oculto">•••• ••••</span>') +
-        sensitiveRow('✉ Correo', '<span class="masked-value" aria-label="Oculto">••••••@••••.•••</span>') +
-        sensitiveRow('↳ Notas', '<span class="masked-value" aria-label="Oculto">••••••••••</span>') +
-      '</div>';
-    }
+  function renderContactDetails(contact) {
     const phone = contact.phone
       ? '<a href="tel:' + safe(contact.phone) + '">' + safe(contact.phone) + '</a>'
       : 'Por confirmar';
@@ -1664,18 +1551,12 @@
     const payload = normalizePayload(state.editor.type, data);
     setBusy(dom.dialogSave, true);
     const result = await callEditorApi('save', {
-      key: state.editor.type === 'contact' && state.editor.record ? state.sensitiveEditorKey : undefined,
       entity: state.editor.type,
       payload: payload,
       id: state.editor.record ? state.editor.record.id : null
     });
     setBusy(dom.dialogSave, false);
     if (result.error) {
-      if (state.editor.type === 'contact' && result.error.code === '28000') {
-        state.sensitiveEditorKey = '';
-        showDialogError('La clave dejó de ser válida. Cierra el formulario e inténtalo nuevamente.');
-        return;
-      }
       showDialogError('No pudimos guardar los cambios. Revisa tu conexión y vuelve a intentarlo.');
       return;
     }
@@ -1729,7 +1610,6 @@
   function closeEditor() {
     if (dom.editorDialog.open) dom.editorDialog.close();
     state.editor = null;
-    state.sensitiveEditorKey = '';
     state.editorDirty = false;
     state.discardArmed = false;
     dom.dialogCancel.textContent = 'Cancelar';
