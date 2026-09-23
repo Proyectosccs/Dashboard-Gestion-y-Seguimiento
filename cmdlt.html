@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es-VE">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Calendario, contactos y tareas de equipo — Centro Médico Docente de La Trinidad.">
+  <title>CMDLT — Centro Médico Docente de La Trinidad</title>
+  <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
+  <link rel="stylesheet" href="./cmdlt.css?v=1">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
+  <script src="./cmdlt.js?v=1" defer></script>
+</head>
+<body>
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+  <div id="app-shell" class="app-shell">
+    <header class="app-header">
+      <div class="header-copy">
+        <p class="eyebrow">🏥 Centro Médico Docente de La Trinidad</p>
+        <h1 id="page-title">CMDLT</h1>
+        <p id="page-subtitle">Calendario, contactos y tareas de equipo.</p>
+      </div>
+      <div class="session-card">
+        <button id="customize-open" class="customize-btn" type="button" onclick="window.cmdltAction(event)">✏️ Modo edición</button>
+      </div>
+    </header>
+
+    <nav id="tab-nav" class="tab-nav" aria-label="Secciones">
+      <button class="tab-button" type="button" data-view="calendar" aria-current="page" onclick="window.cmdltAction(event)">🗓️ Calendario</button>
+      <button class="tab-button" type="button" data-view="contacts" onclick="window.cmdltAction(event)">🤝 Contactos</button>
+      <button class="tab-button" type="button" data-view="tasks" onclick="window.cmdltAction(event)">📋 Tareas de Equipo</button>
+    </nav>
+
+    <div id="connectivity-banner" class="notice notice-warning page-notice" role="status" hidden>
+      No pudimos actualizar los datos. Conservamos la última información visible. <button id="retry-load" type="button" onclick="window.cmdltAction(event)">Reintentar</button>
+    </div>
+
+    <section id="loading-state" class="loading-state" aria-live="polite">
+      <span class="loader" aria-hidden="true"></span>
+      <p>Cargando calendario, contactos y tareas…</p>
+    </section>
+
+    <section id="calendar-view" class="view" aria-labelledby="calendar-title" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">⏰ Agenda</p>
+          <h2 id="calendar-title">🗓️ Calendario</h2>
+        </div>
+        <button class="btn btn-primary" type="button" data-action="new-event" onclick="window.cmdltAction(event)">➕ Agregar evento</button>
+      </div>
+      <div class="calendar-toolbar panel">
+        <button id="calendar-prev" class="icon-button" type="button" aria-label="Mes anterior" onclick="window.cmdltAction(event)">‹</button>
+        <h3 id="calendar-month-label"></h3>
+        <button id="calendar-next" class="icon-button" type="button" aria-label="Mes siguiente" onclick="window.cmdltAction(event)">›</button>
+        <button id="calendar-today" class="btn btn-secondary" type="button" onclick="window.cmdltAction(event)">Hoy</button>
+      </div>
+      <div id="calendar-grid" class="calendar-grid panel"></div>
+
+      <section class="panel" style="margin-top: 14px">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">📋 Agenda del día</p>
+            <h3 id="agenda-title">Selecciona un día</h3>
+          </div>
+        </div>
+        <div id="agenda-list" class="agenda-list"></div>
+      </section>
+    </section>
+
+    <section id="contacts-view" class="view" aria-labelledby="contacts-title" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">🤝 Equipo</p>
+          <h2 id="contacts-title">🤝 Contactos</h2>
+          <p class="view-description">Directorio de contactos del Centro Médico Docente de La Trinidad.</p>
+        </div>
+        <button class="btn btn-primary" type="button" data-action="new-contact" onclick="window.cmdltAction(event)">➕ Agregar contacto</button>
+      </div>
+      <div class="list-toolbar panel">
+        <div class="search-field">
+          <label class="sr-only" for="contact-search">Buscar contactos</label>
+          <span aria-hidden="true">⌕</span>
+          <input id="contact-search" type="text" placeholder="Buscar por nombre o rol…" autocomplete="off">
+          <button id="contact-search-clear" class="search-clear" type="button" aria-label="Limpiar búsqueda" onclick="window.cmdltAction(event)" hidden>×</button>
+        </div>
+        <p id="contact-result-count" class="result-count" aria-live="polite"></p>
+      </div>
+      <div id="contacts-list" class="contact-grid"></div>
+    </section>
+
+    <section id="tasks-view" class="view" aria-labelledby="tasks-title" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">📋 Seguimiento</p>
+          <h2 id="tasks-title">Tareas de Equipo</h2>
+        </div>
+        <button class="btn btn-primary" type="button" data-action="new-task" onclick="window.cmdltAction(event)">➕ Agregar tarea</button>
+      </div>
+      <div id="tasks-blocks">
+        <div id="tasks-block-kpis" data-block="kpis">
+          <div id="tasks-kpi-grid" class="kpi-grid"></div>
+        </div>
+        <div id="tasks-block-board" data-block="board">
+          <div class="list-toolbar panel">
+            <label class="sr-only" for="tasks-responsable-filter">Filtrar por responsable</label>
+            <select id="tasks-responsable-filter" class="toolbar-select"><option value="">Todos los responsables</option></select>
+            <button id="tasks-filter-clear" class="link-button" type="button" onclick="window.cmdltAction(event)">Limpiar</button>
+          </div>
+          <div id="tasks-board" class="kanban-board"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <dialog id="event-dialog" class="editor-dialog" aria-labelledby="event-dialog-title">
+    <form id="event-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">➕ Nuevo evento</p>
+          <h2 id="event-dialog-title">Agregar evento</h2>
+        </div>
+        <button id="event-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.cmdltAction(event)">×</button>
+      </div>
+      <div id="event-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-fields">
+        <div class="field field-full">
+          <label for="field-event-title">Título</label>
+          <input id="field-event-title" class="input" name="title" type="text" required>
+        </div>
+        <div class="field">
+          <label for="field-event-date">Fecha</label>
+          <input id="field-event-date" class="input" name="event_date" type="date" required>
+        </div>
+        <div class="field">
+          <label for="field-event-time">Hora</label>
+          <input id="field-event-time" class="input" name="start_time" type="time">
+        </div>
+        <div class="field field-full">
+          <label for="field-event-location">Ubicación</label>
+          <input id="field-event-location" class="input" name="location" type="text">
+        </div>
+        <div class="field field-full">
+          <label for="field-event-notes">Notas</label>
+          <textarea id="field-event-notes" class="input" name="notes"></textarea>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="event-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.cmdltAction(event)">Cancelar</button>
+        <button id="event-delete" class="btn btn-secondary" type="button" onclick="window.cmdltAction(event)" hidden>🗑️ Eliminar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="contact-dialog" class="editor-dialog" aria-labelledby="contact-dialog-title">
+    <form id="contact-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">🤝 Equipo</p>
+          <h2 id="contact-dialog-title">Agregar contacto</h2>
+        </div>
+        <button id="contact-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.cmdltAction(event)">×</button>
+      </div>
+      <div id="contact-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-fields">
+        <div class="field field-full">
+          <label for="field-contact-name">Nombre completo</label>
+          <input id="field-contact-name" class="input" name="name" type="text" required>
+        </div>
+        <div class="field">
+          <label for="field-contact-role">Rol o cargo</label>
+          <input id="field-contact-role" class="input" name="role" type="text" placeholder="Ej. Médico internista">
+        </div>
+        <div class="field">
+          <label for="field-contact-phone">Teléfono</label>
+          <input id="field-contact-phone" class="input" name="phone" type="tel">
+        </div>
+        <div class="field field-full">
+          <label for="field-contact-email">Correo electrónico</label>
+          <input id="field-contact-email" class="input" name="email" type="email">
+        </div>
+        <div class="field field-full">
+          <label for="field-contact-notes">Notas</label>
+          <textarea id="field-contact-notes" class="input" name="notes"></textarea>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="contact-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.cmdltAction(event)">Cancelar</button>
+        <button id="contact-delete" class="btn btn-secondary" type="button" onclick="window.cmdltAction(event)" hidden>🗑️ Eliminar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="task-dialog" class="editor-dialog" aria-labelledby="task-dialog-title">
+    <form id="task-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">📋 Tareas de Equipo</p>
+          <h2 id="task-dialog-title">Agregar tarea</h2>
+        </div>
+        <button id="task-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.cmdltAction(event)">×</button>
+      </div>
+      <div id="task-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-fields">
+        <div class="field field-full">
+          <label for="field-task-title">Título</label>
+          <input id="field-task-title" class="input" name="title" type="text" required>
+        </div>
+        <div class="field field-full">
+          <label>Responsables</label>
+          <div id="responsable-checklist" class="responsable-checklist"></div>
+        </div>
+        <div class="field field-full" id="new-responsable-field" hidden>
+          <label for="field-new-responsable-name">Nombre del nuevo responsable</label>
+          <input id="field-new-responsable-name" class="input" name="new_responsable_name" type="text" placeholder="Ej. Andrea Pérez">
+        </div>
+        <div class="field">
+          <label for="field-task-due-date">Fecha límite</label>
+          <input id="field-task-due-date" class="input" name="due_date" type="date">
+        </div>
+        <div class="field">
+          <label for="field-task-status">Estado</label>
+          <select id="field-task-status" class="input" name="status">
+            <option value="pendiente">Pendiente</option>
+            <option value="en_proceso">En proceso</option>
+            <option value="listo">Listo</option>
+            <option value="bloqueada">Bloqueada</option>
+          </select>
+        </div>
+        <div class="field field-full" id="task-followup-field" hidden>
+          <label for="field-task-followup">¿Cómo va el seguimiento?</label>
+          <select id="field-task-followup" class="input" name="followup_status">
+            <option value="contacted">Contactado</option>
+            <option value="in_progress">En seguimiento</option>
+            <option value="waiting_response">Esperando respuesta</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="field-task-priority">Prioridad</label>
+          <select id="field-task-priority" class="input" name="priority">
+            <option value="critica">Crítica</option>
+            <option value="alta">Alta</option>
+            <option value="media" selected>Media</option>
+            <option value="baja">Baja</option>
+          </select>
+        </div>
+        <div class="field field-full">
+          <label for="field-task-detail">Detalle</label>
+          <textarea id="field-task-detail" class="input" name="detail"></textarea>
+        </div>
+        <div class="field field-full">
+          <label for="field-task-next-action">Próxima acción</label>
+          <textarea id="field-task-next-action" class="input" name="next_action"></textarea>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="task-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.cmdltAction(event)">Cancelar</button>
+        <button id="task-delete" class="btn btn-secondary" type="button" onclick="window.cmdltAction(event)" hidden>🗑️ Eliminar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="customize-dialog" class="editor-dialog" aria-labelledby="customize-dialog-title">
+    <form id="customize-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">✏️ Personalización</p>
+          <h2 id="customize-dialog-title">Modo edición</h2>
+        </div>
+        <button id="customize-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.cmdltAction(event)">×</button>
+      </div>
+      <div class="dialog-fields">
+        <div class="field">
+          <label for="field-custom-page-title">Título principal</label>
+          <input id="field-custom-page-title" class="input" name="pageTitle" type="text">
+        </div>
+        <div class="field field-full">
+          <label for="field-custom-subtitle">Subtítulo principal</label>
+          <textarea id="field-custom-subtitle" class="input" name="pageSubtitle"></textarea>
+        </div>
+        <div class="field">
+          <label for="field-custom-calendar-title">Título del calendario</label>
+          <input id="field-custom-calendar-title" class="input" name="calendarTitle" type="text">
+        </div>
+        <div class="field">
+          <label for="field-custom-contacts-title">Título de contactos</label>
+          <input id="field-custom-contacts-title" class="input" name="contactsTitle" type="text">
+        </div>
+        <div class="field">
+          <label for="field-custom-tasks-title">Título de tareas</label>
+          <input id="field-custom-tasks-title" class="input" name="tasksTitle" type="text">
+        </div>
+      </div>
+      <div class="customize-grid">
+        <div>
+          <p class="eyebrow">Orden de las pestañas</p>
+          <div id="customize-tabs-list" class="reorder-list"></div>
+        </div>
+        <div>
+          <p class="eyebrow">Orden del tablero</p>
+          <div id="customize-sections-list" class="reorder-list"></div>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="customize-reset" class="btn btn-secondary" type="button" onclick="window.cmdltAction(event)">Restablecer</button>
+        <button id="customize-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.cmdltAction(event)">Cancelar</button>
+        <button class="btn btn-primary" type="submit">Guardar diseño</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

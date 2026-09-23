@@ -9,9 +9,9 @@
 
   const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-  const SOURCE_LABELS = { coalicion: 'Coalición Venezuela', florangel: 'Dra Florangel', ucv: 'UCV', networking: 'Networking Fund. Ingenia', otros: 'Otros' };
-  const FIXED_SOURCE_COLOR = { coalicion: '#1d4ed8', florangel: '#be185d', ucv: '#0f766e', networking: '#7c3aed', otros: '#57534e' };
-  const FIXED_SOURCE_EMOJI = { coalicion: '🤝', florangel: '🩺', ucv: '🎓', networking: '🌐', otros: '📌' };
+  const SOURCE_LABELS = { coalicion: 'Coalición Venezuela', florangel: 'Dra Florangel', ucv: 'UCV', cmdlt: 'Centro Médico Docente de La Trinidad', networking: 'Networking Fund. Ingenia', otros: 'Otros' };
+  const FIXED_SOURCE_COLOR = { coalicion: '#1d4ed8', florangel: '#be185d', ucv: '#0f766e', cmdlt: '#0369a1', networking: '#7c3aed', otros: '#57534e' };
+  const FIXED_SOURCE_EMOJI = { coalicion: '🤝', florangel: '🩺', ucv: '🎓', cmdlt: '🏥', networking: '🌐', otros: '📌' };
 
   // Calendarios creados al vuelo desde "Otra organización o calendario":
   // el registro (nombre + color) vive en ingenia_board_state bajo esta
@@ -25,15 +25,16 @@
   // al crear una tarea o al listarlas en la pestaña Organizaciones. "otros"
   // queda fuera a propósito — es el cajón genérico legado, ya no se ofrece
   // para datos nuevos, solo se sigue mostrando si ya hay eventos viejos ahí.
-  const REAL_ORGS = ['coalicion', 'florangel', 'ucv', 'networking'];
+  const REAL_ORGS = ['coalicion', 'florangel', 'ucv', 'cmdlt', 'networking'];
   const ORG_LINKS = {
     ucv: './Directorio y Agenda Relaciones UCV.dc.html',
     coalicion: './evento-coalicion-venezuela.html',
-    florangel: './dra-florangel.html'
+    florangel: './dra-florangel.html',
+    cmdlt: './cmdlt.html'
   };
   // La pestaña Organizaciones no lista "networking": es este mismo
   // dashboard, no una organización externa con tablero propio.
-  const ORG_DIRECTORY = ['coalicion', 'florangel', 'ucv'];
+  const ORG_DIRECTORY = ['coalicion', 'florangel', 'ucv', 'cmdlt'];
 
   const TEAM_TASKS_KEY = 'ingenia-team-tasks-v1';
   const TASK_STATUSES = [
@@ -355,7 +356,7 @@
       state.client.from('coalicion_events').select('id,title,event_date,start_time,location,maps_url,notes,status').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
-      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
+      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
     ]);
 
     const anyFailed = coalicionRes.error && florangelRes.error && ucvRes.error && ingeniaRes.error;
@@ -411,14 +412,18 @@
 
     const networkingRaw = ingeniaRowsEarly.find(function (r) { return r.key === 'ingenia-networking-events-v1'; });
     const otrosRaw = ingeniaRowsEarly.find(function (r) { return r.key === 'ingenia-otros-events-v1'; });
+    const cmdltRaw = ingeniaRowsEarly.find(function (r) { return r.key === 'ingenia-custom-cmdlt-events-v1'; });
     const networkingEvents = (Array.isArray(networkingRaw && networkingRaw.value) ? networkingRaw.value : []).map(function (e) {
       return { id: 'networking-' + e.id, rawId: e.id, source: 'networking', title: e.title, date: e.event_date, time: e.start_time, location: e.location, notes: e.notes || '', raw: e };
     });
     const otrosEvents = (Array.isArray(otrosRaw && otrosRaw.value) ? otrosRaw.value : []).map(function (e) {
       return { id: 'otros-' + e.id, rawId: e.id, source: 'otros', title: e.title, date: e.event_date, time: e.start_time, location: e.location, notes: e.notes || '', raw: e };
     });
+    const cmdltEvents = (Array.isArray(cmdltRaw && cmdltRaw.value) ? cmdltRaw.value : []).map(function (e) {
+      return { id: 'cmdlt-' + e.id, rawId: e.id, source: 'cmdlt', title: e.title, date: e.event_date, time: e.start_time, location: e.location, notes: e.notes || '', raw: e };
+    });
 
-    state.events = coalicionEvents.concat(florangelEvents, ucvEvents, networkingEvents, otrosEvents, customEvents).filter(function (e) { return !!e.date; });
+    state.events = coalicionEvents.concat(florangelEvents, ucvEvents, networkingEvents, otrosEvents, cmdltEvents, customEvents).filter(function (e) { return !!e.date; });
     dom.loadingState.hidden = true;
     renderLegend();
     populateSourceSelect();

@@ -55,6 +55,8 @@
   --source-florangel-soft: #fce7f3;
   --source-ucv: #0f766e;
   --source-ucv-soft: #e6fffb;
+  --source-cmdlt: #0369a1;
+  --source-cmdlt-soft: #e0f2fe;
   --source-networking: #7c3aed;
   --source-networking-soft: #ede9fe;
   --source-otros: #57534e;
@@ -388,14 +390,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .source-dot.src-coalicion { background: var(--source-coalicion); }
 .source-dot.src-florangel { background: var(--source-florangel); }
 .source-dot.src-ucv { background: var(--source-ucv); }
+.source-dot.src-cmdlt { background: var(--source-cmdlt); }
 .source-dot.src-networking { background: var(--source-networking); }
 .source-dot.src-otros { background: var(--source-otros); }
 .calendar-event.src-coalicion { background: var(--source-coalicion-soft); color: var(--source-coalicion); }
 .calendar-event.src-florangel { background: var(--source-florangel-soft); color: var(--source-florangel); }
 .calendar-event.src-ucv { background: var(--source-ucv-soft); color: var(--source-ucv); }
+.calendar-event.src-cmdlt { background: var(--source-cmdlt-soft); color: var(--source-cmdlt); }
 .calendar-event.src-networking { background: var(--source-networking-soft); color: var(--source-networking); }
 .calendar-event.src-otros { background: var(--source-otros-soft); color: var(--source-otros); }
-.calendar-event.src-coalicion:hover, .calendar-event.src-florangel:hover, .calendar-event.src-ucv:hover,
+.calendar-event.src-coalicion:hover, .calendar-event.src-florangel:hover, .calendar-event.src-ucv:hover, .calendar-event.src-cmdlt:hover,
 .calendar-event.src-networking:hover, .calendar-event.src-otros:hover { filter: brightness(.95); }
 
 /* Fuentes creadas al vuelo ("Otra organización o calendario"): el color lo
@@ -416,6 +420,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .agenda-row-source.src-coalicion { background: var(--source-coalicion-soft); color: var(--source-coalicion); }
 .agenda-row-source.src-florangel { background: var(--source-florangel-soft); color: var(--source-florangel); }
 .agenda-row-source.src-ucv { background: var(--source-ucv-soft); color: var(--source-ucv); }
+.agenda-row-source.src-cmdlt { background: var(--source-cmdlt-soft); color: var(--source-cmdlt); }
 .agenda-row-source.src-networking { background: var(--source-networking-soft); color: var(--source-networking); }
 .agenda-row-source.src-otros { background: var(--source-otros-soft); color: var(--source-otros); }
 
