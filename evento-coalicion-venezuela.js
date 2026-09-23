@@ -496,8 +496,6 @@
 
   function cacheDom() {
     dom.appShell = document.getElementById('app-shell');
-    dom.sessionName = document.getElementById('session-name');
-    dom.sessionRole = document.getElementById('session-role');
     dom.loadingState = document.getElementById('loading-state');
     dom.connectivityBanner = document.getElementById('connectivity-banner');
     dom.retryLoad = document.getElementById('retry-load');
