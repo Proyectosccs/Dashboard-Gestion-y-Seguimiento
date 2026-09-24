@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
   <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=18">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=17" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=18" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -182,6 +182,13 @@
         <div class="field">
           <label for="field-event-time">Hora</label>
           <input id="field-event-time" class="input" name="start_time" type="time">
+        </div>
+        <div class="field">
+          <label for="field-event-ingenia">¿Participó Fundación Ingenia?</label>
+          <select id="field-event-ingenia" class="input" name="participates_ingenia">
+            <option value="no">No</option>
+            <option value="si">Sí</option>
+          </select>
         </div>
         <div class="field field-full">
           <label for="field-event-location">Ubicación</label>

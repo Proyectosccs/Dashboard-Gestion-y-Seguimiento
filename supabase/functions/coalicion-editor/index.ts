@@ -92,6 +92,14 @@ Deno.serve(async (request: Request) => {
       return jsonResponse(origin, 200, { data: saved });
     }
 
+    if (action === 'archive') {
+      if (body?.entity !== 'event' || typeof body?.id !== 'string') {
+        return jsonResponse(origin, 400, { error: 'invalid archive request' });
+      }
+      const archived = await callRpc('coalicion_archive_event_public', { p_id: body.id });
+      return jsonResponse(origin, 200, { data: archived });
+    }
+
     return jsonResponse(origin, 400, { error: 'unsupported action' });
   } catch (_error) {
     return jsonResponse(origin, 500, { error: 'operation unavailable' });

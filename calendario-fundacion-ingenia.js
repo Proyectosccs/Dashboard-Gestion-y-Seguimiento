@@ -383,7 +383,7 @@
     dom.connectivityBanner.hidden = true;
 
     const [coalicionRes, florangelRes, ucvRes, ingeniaRes] = await Promise.all([
-      state.client.from('coalicion_events').select('id,title,event_date,start_time,location,maps_url,notes,status').is('archived_at', null),
+      state.client.from('coalicion_events').select('id,title,event_date,start_time,location,maps_url,notes,status,participo_fundacion_ingenia').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
       state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
@@ -952,6 +952,10 @@
 
   // ---------- Agregar evento (a la fuente elegida) ----------
 
+  function readParticipatesIngenia(raw) {
+    return raw && (raw.participatesIngenia === true || raw.participo_fundacion_ingenia === true) ? 'si' : 'no';
+  }
+
   function openEventDialog(existing) {
     hideError(dom.eventError);
     dom.eventForm.reset();
@@ -959,8 +963,7 @@
     populateSourceSelect();
     dom.newCalendarField.hidden = true;
     dom.eventDialogTitle.textContent = existing ? 'Editar evento' : 'Agregar evento';
-    dom.eventForm.elements.source.disabled = !!existing;
-    dom.eventDelete.hidden = !existing || existing.source === 'coalicion';
+    dom.eventDelete.hidden = !existing;
     if (existing) {
       dom.eventForm.elements.source.value = existing.source;
       dom.eventForm.elements.title.value = existing.title || '';
@@ -968,14 +971,16 @@
       dom.eventForm.elements.start_time.value = existing.time ? existing.time.slice(0, 5) : '';
       dom.eventForm.elements.location.value = existing.location || '';
       dom.eventForm.elements.notes.value = existing.notes || '';
+      dom.eventForm.elements.participates_ingenia.value = readParticipatesIngenia(existing.raw);
     } else {
       dom.eventForm.elements.event_date.value = state.selectedDay || new Date().toISOString().slice(0, 10);
+      dom.eventForm.elements.participates_ingenia.value = 'no';
     }
     dom.eventDialog.showModal();
     dom.eventForm.elements.title.focus();
   }
 
-  function closeEventDialog() { dom.eventDialog.close(); dom.eventForm.elements.source.disabled = false; state.editingEvent = null; }
+  function closeEventDialog() { dom.eventDialog.close(); state.editingEvent = null; }
 
   function refreshCalendarsAfterChange(eventDate) {
     if (eventDate) state.selectedDay = eventDate;
@@ -991,6 +996,7 @@
     const startTime = dom.eventForm.elements.start_time.value;
     const location = dom.eventForm.elements.location.value.trim();
     const notes = dom.eventForm.elements.notes.value.trim();
+    const participatesIngenia = dom.eventForm.elements.participates_ingenia.value === 'si';
     if (!title || !eventDate) { showError(dom.eventError, 'Título y fecha son obligatorios.'); return; }
     if (source === 'coalicion' && !location) { showError(dom.eventError, 'Coalición Venezuela necesita una ubicación (o edítalo luego para agregar el link de Maps).'); return; }
 
@@ -1003,8 +1009,14 @@
     const submitBtn = dom.eventForm.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     let ok = false;
-    const fields = { title: title, event_date: eventDate, start_time: startTime, location: location, notes: notes };
-    const existing = state.editingEvent;
+    const fields = { title: title, event_date: eventDate, start_time: startTime, location: location, notes: notes, participatesIngenia: participatesIngenia };
+    let existing = state.editingEvent;
+
+    if (existing && source !== NEW_CALENDAR_VALUE && source !== existing.source) {
+      const moved = await deleteEventFromSource(existing);
+      if (!moved) { submitBtn.disabled = false; showError(dom.eventError, 'No se pudo mover el evento de organización — revisa tu conexión.'); return; }
+      existing = null;
+    }
 
     if (source === NEW_CALENDAR_VALUE) {
       const created = await createCustomCalendar(newCalendarName);
@@ -1024,17 +1036,21 @@
     refreshCalendarsAfterChange(eventDate);
   }
 
+  async function deleteEventFromSource(existing) {
+    if (existing.source === 'coalicion') return deleteCoalicionEvent(existing);
+    if (existing.source === 'florangel') return deleteFromArrayKey('florangel_board_state', 'florangel-events-v1', existing.rawId);
+    if (existing.source === 'ucv') return deleteUcvEvent(existing);
+    if (existing.source === 'networking') return deleteFromArrayKey('ingenia_board_state', 'ingenia-networking-events-v1', existing.rawId);
+    if (existing.source === 'otros') return deleteFromArrayKey('ingenia_board_state', 'ingenia-otros-events-v1', existing.rawId);
+    return deleteFromArrayKey('ingenia_board_state', 'ingenia-custom-' + existing.source + '-events-v1', existing.rawId);
+  }
+
   async function deleteEditingEvent() {
     const existing = state.editingEvent;
-    if (!existing || existing.source === 'coalicion') return;
+    if (!existing) return;
     const submitBtn = dom.eventForm.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
-    let ok = false;
-    if (existing.source === 'florangel') ok = await deleteFromArrayKey('florangel_board_state', 'florangel-events-v1', existing.rawId);
-    else if (existing.source === 'ucv') ok = await deleteUcvEvent(existing);
-    else if (existing.source === 'networking') ok = await deleteFromArrayKey('ingenia_board_state', 'ingenia-networking-events-v1', existing.rawId);
-    else if (existing.source === 'otros') ok = await deleteFromArrayKey('ingenia_board_state', 'ingenia-otros-events-v1', existing.rawId);
-    else ok = await deleteFromArrayKey('ingenia_board_state', 'ingenia-custom-' + existing.source + '-events-v1', existing.rawId);
+    const ok = await deleteEventFromSource(existing);
     submitBtn.disabled = false;
     if (!ok) { showError(dom.eventError, 'No se pudo eliminar — revisa tu conexión.'); return; }
     closeEventDialog();
@@ -1332,9 +1348,21 @@
           action: 'save', entity: 'event', id: existing ? existing.rawId : null,
           payload: {
             title: fields.title, event_date: fields.event_date, start_time: fields.start_time || '', location: fields.location,
-            maps_url: (raw && raw.maps_url) || '', notes: fields.notes, status: (raw && raw.status) || 'planned'
+            maps_url: (raw && raw.maps_url) || '', notes: fields.notes, status: (raw && raw.status) || 'planned',
+            participo_fundacion_ingenia: fields.participatesIngenia
           }
         })
+      });
+      return res.ok;
+    } catch (_err) { return false; }
+  }
+
+  async function deleteCoalicionEvent(existing) {
+    try {
+      const res = await fetch(COALICION_EDITOR_URL, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'archive', entity: 'event', id: existing.rawId })
       });
       return res.ok;
     } catch (_err) { return false; }
@@ -1345,7 +1373,8 @@
     const next = upsertById(current, existing, function (base) {
       return Object.assign({}, base, {
         id: existing ? existing.rawId : uid(), title: fields.title, event_date: fields.event_date,
-        start_time: fields.start_time, location: fields.location, notes: fields.notes
+        start_time: fields.start_time, location: fields.location, notes: fields.notes,
+        participatesIngenia: fields.participatesIngenia
       });
     });
     return writeBoardKey('florangel_board_state', 'florangel-events-v1', next);
@@ -1363,14 +1392,15 @@
         const dates = Array.isArray(j.dates) ? j.dates.slice() : [];
         const idx = dates.indexOf(existing.date);
         if (idx > -1) dates[idx] = fields.event_date; else dates.push(fields.event_date);
-        return Object.assign({}, j, { title: fields.title, dates: dates, time: fields.start_time || '', location: fields.location, notes: fields.notes });
+        return Object.assign({}, j, { title: fields.title, dates: dates, time: fields.start_time || '', location: fields.location, notes: fields.notes, participatesIngenia: fields.participatesIngenia });
       });
       return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
     }
     const next = current.concat({
       id: uid(), title: fields.title, dates: [fields.event_date], time: fields.start_time || '',
       location: fields.location, notes: fields.notes, status: 'planned', eventType: 'other',
-      owner: '', doctors: '', students: '', assignedVolunteers: [], checks: {}
+      owner: '', doctors: '', students: '', assignedVolunteers: [], checks: {},
+      participatesIngenia: fields.participatesIngenia
     });
     return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
   }
@@ -1380,7 +1410,8 @@
     const next = upsertById(current, existing, function (base) {
       return Object.assign({}, base, {
         id: existing ? existing.rawId : uid(), title: fields.title, event_date: fields.event_date,
-        start_time: fields.start_time, location: fields.location, notes: fields.notes
+        start_time: fields.start_time, location: fields.location, notes: fields.notes,
+        participatesIngenia: fields.participatesIngenia
       });
     });
     return writeBoardKey('ingenia_board_state', key, next);

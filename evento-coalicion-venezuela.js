@@ -376,6 +376,7 @@
     in_progress: 'En ejecución',
     completed: 'Completado'
   };
+  const PARTICIPATES_INGENIA_OPTIONS = { no: 'No', si: 'Sí' };
   const AFFILIATIONS = {
     '': 'Selecciona una opción',
     'Coalicion con amor a Venezuela': 'Coalicion con amor a Venezuela',
@@ -415,6 +416,9 @@
     client: null,
     view: 'summary',
     calendarMonth: new Date().toISOString().slice(0, 7),
+    calendarViewMode: 'month',
+    calendarWeekStart: mondayOf(new Date().toISOString().slice(0, 10)),
+    calendarYear: new Date().getUTCFullYear(),
     contacts: [],
     events: [],
     query: '',
@@ -444,14 +448,21 @@
     const target = event.currentTarget;
     if (!target) return;
     if (target.dataset.view) return setView(target.dataset.view);
+    if (target.dataset.calendarView) return setCalendarViewMode(target.dataset.calendarView);
     if (target.dataset.action === 'move-task-status') { moveTaskStatus(target.dataset.id, target.dataset.status); return; }
     if (target.dataset.taskId) { openTaskDialog(findById(state.allTasks, target.dataset.taskId)); return; }
     if (target.dataset.action) return handleAction(target.dataset.action, target.tagName === 'SELECT' ? target.value : target.dataset.id);
     const actionsById = {
       'retry-load': loadAllData,
-      'calendar-prev': function () { changeMonth(-1); },
-      'calendar-next': function () { changeMonth(1); },
-      'calendar-today': function () { state.calendarMonth = new Date().toISOString().slice(0, 7); renderCalendar(); },
+      'calendar-prev': function () { changePeriod(-1); },
+      'calendar-next': function () { changePeriod(1); },
+      'calendar-today': function () {
+        const todayIso = new Date().toISOString().slice(0, 10);
+        state.calendarMonth = todayIso.slice(0, 7);
+        state.calendarWeekStart = mondayOf(todayIso);
+        state.calendarYear = new Date().getUTCFullYear();
+        renderCalendar();
+      },
       'contact-search-clear': clearContactSearch,
       'dialog-close': requestCloseEditor,
       'dialog-cancel': requestCloseEditor,
@@ -495,8 +506,17 @@
     dom.summaryTeamList = document.getElementById('summary-team-list');
     dom.summaryJornadasList = document.getElementById('summary-jornadas-list');
     dom.nextEventCard = document.getElementById('next-event-card');
-    dom.calendarMonthLabel = document.getElementById('calendar-month-label');
+    dom.calendarViewSwitcher = document.getElementById('calendar-view-switcher');
+    dom.calendarPeriodNav = document.getElementById('calendar-period-nav');
+    dom.calendarPeriodLabel = document.getElementById('calendar-period-label');
+    dom.calendarMonthView = document.getElementById('calendar-month-view');
     dom.calendarGrid = document.getElementById('calendar-grid');
+    dom.calendarWeekView = document.getElementById('calendar-week-view');
+    dom.calendarWeekGrid = document.getElementById('calendar-week-grid');
+    dom.calendarYearView = document.getElementById('calendar-year-view');
+    dom.calendarYearGrid = document.getElementById('calendar-year-grid');
+    dom.calendarAgendaView = document.getElementById('calendar-agenda-view');
+    dom.calendarAgendaList = document.getElementById('calendar-agenda-list');
     dom.contactSearch = document.getElementById('contact-search');
     dom.contactSearchClear = document.getElementById('contact-search-clear');
     dom.contactResultCount = document.getElementById('contact-result-count');
@@ -695,6 +715,10 @@
     if (action === 'filter-semaforo') toggleSemaforoFilter(id);
     if (action === 'toggle-need') toggleNeedCategory(id);
     if (action === 'select-jornada') selectJornada(id);
+    if (action === 'calendar-year-day') {
+      state.calendarMonth = id.slice(0, 7);
+      setCalendarViewMode('month');
+    }
   }
 
   function renderAll() {
@@ -780,11 +804,61 @@
     }).join(''));
   }
 
+  function mondayOf(iso) {
+    const date = new Date(iso + 'T00:00:00Z');
+    const offset = (date.getUTCDay() + 6) % 7;
+    date.setUTCDate(date.getUTCDate() - offset);
+    return date.toISOString().slice(0, 10);
+  }
+
+  function setCalendarViewMode(mode) {
+    if (['week', 'month', 'year', 'agenda'].indexOf(mode) === -1) return;
+    state.calendarViewMode = mode;
+    dom.calendarViewSwitcher.querySelectorAll('.calendar-view-btn').forEach(function (btn) {
+      if (btn.dataset.calendarView === mode) btn.setAttribute('aria-current', 'page');
+      else btn.removeAttribute('aria-current');
+    });
+    renderCalendar();
+  }
+
+  function changePeriod(delta) {
+    if (state.calendarViewMode === 'week') {
+      const date = new Date(state.calendarWeekStart + 'T00:00:00Z');
+      date.setUTCDate(date.getUTCDate() + delta * 7);
+      state.calendarWeekStart = date.toISOString().slice(0, 10);
+    } else if (state.calendarViewMode === 'year') {
+      state.calendarYear += delta;
+    } else {
+      const parts = state.calendarMonth.split('-').map(Number);
+      const date = new Date(Date.UTC(parts[0], parts[1] - 1 + delta, 1));
+      state.calendarMonth = date.getUTCFullYear() + '-' + String(date.getUTCMonth() + 1).padStart(2, '0');
+    }
+    renderCalendar();
+  }
+
+  function eventsOnDay(iso) {
+    return state.events.filter(function (item) { return item.event_date === iso; })
+      .sort(function (a, b) { return (a.start_time || '99:99').localeCompare(b.start_time || '99:99'); });
+  }
+
   function renderCalendar() {
+    const mode = state.calendarViewMode;
+    dom.calendarMonthView.hidden = mode !== 'month';
+    dom.calendarWeekView.hidden = mode !== 'week';
+    dom.calendarYearView.hidden = mode !== 'year';
+    dom.calendarAgendaView.hidden = mode !== 'agenda';
+    dom.calendarPeriodNav.hidden = mode === 'agenda';
+    if (mode === 'week') renderWeekView();
+    else if (mode === 'year') renderYearView();
+    else if (mode === 'agenda') renderAgendaView();
+    else renderMonthView();
+  }
+
+  function renderMonthView() {
     const parts = state.calendarMonth.split('-').map(Number);
     const year = parts[0];
     const monthIndex = parts[1] - 1;
-    dom.calendarMonthLabel.textContent = MONTHS[monthIndex] + ' ' + year;
+    dom.calendarPeriodLabel.textContent = MONTHS[monthIndex] + ' ' + year;
     const first = new Date(Date.UTC(year, monthIndex, 1));
     const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
     const mondayOffset = (first.getUTCDay() + 6) % 7;
@@ -793,7 +867,7 @@
     for (let blank = 0; blank < mondayOffset; blank += 1) markup += '<div class="calendar-day is-blank" aria-hidden="true"></div>';
     for (let day = 1; day <= lastDay; day += 1) {
       const iso = year + '-' + String(monthIndex + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-      const dayEvents = state.events.filter(function (item) { return item.event_date === iso; });
+      const dayEvents = eventsOnDay(iso);
       markup += '<div class="calendar-day' + (iso === today ? ' is-today' : '') + '">' +
         '<span class="calendar-number">' + day + '</span>' +
         dayEvents.map(function (item) {
@@ -801,6 +875,92 @@
         }).join('') + '</div>';
     }
     renderMarkup(dom.calendarGrid, markup);
+  }
+
+  function formatShortDate(date) {
+    return date.getUTCDate() + ' ' + MONTHS[date.getUTCMonth()].slice(0, 3) + '.';
+  }
+
+  function renderWeekView() {
+    const startDate = new Date(state.calendarWeekStart + 'T00:00:00Z');
+    const endDate = new Date(startDate);
+    endDate.setUTCDate(endDate.getUTCDate() + 6);
+    dom.calendarPeriodLabel.textContent = formatShortDate(startDate) + ' – ' + formatShortDate(endDate) + ' ' + endDate.getUTCFullYear();
+    const today = new Date().toISOString().slice(0, 10);
+    let markup = '';
+    for (let i = 0; i < 7; i += 1) {
+      const d = new Date(startDate);
+      d.setUTCDate(d.getUTCDate() + i);
+      const iso = d.toISOString().slice(0, 10);
+      const dayEvents = eventsOnDay(iso);
+      markup += '<div class="calendar-week-day' + (iso === today ? ' is-today' : '') + '">' +
+        '<div class="calendar-week-day-head">' + WEEKDAYS[i] + '</div>' +
+        '<div class="calendar-week-day-number">' + d.getUTCDate() + '</div>' +
+        '<div class="calendar-week-events">' +
+          (dayEvents.length ? dayEvents.map(function (item) {
+            return '<button class="calendar-event" type="button" data-action="edit-event" data-id="' + safe(item.id) + '" style="white-space:normal;height:auto">' + safe(formatTime(item.start_time) + ' · ' + item.title) + '</button>';
+          }).join('') : '<span style="font-size:11px;color:var(--color-neutral-500)">Sin eventos</span>') +
+        '</div>' +
+      '</div>';
+    }
+    renderMarkup(dom.calendarWeekGrid, markup);
+  }
+
+  function renderYearView() {
+    const year = state.calendarYear;
+    dom.calendarPeriodLabel.textContent = String(year);
+    const today = new Date().toISOString().slice(0, 10);
+    let markup = '';
+    for (let m = 0; m < 12; m += 1) {
+      const first = new Date(Date.UTC(year, m, 1));
+      const lastDay = new Date(Date.UTC(year, m + 1, 0)).getUTCDate();
+      const mondayOffset = (first.getUTCDay() + 6) % 7;
+      let days = WEEKDAYS.map(function (w) { return '<div class="calendar-year-weekday">' + w[0] + '</div>'; }).join('');
+      for (let blank = 0; blank < mondayOffset; blank += 1) days += '<div class="calendar-year-day is-blank"></div>';
+      for (let day = 1; day <= lastDay; day += 1) {
+        const iso = year + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+        const dayEvents = eventsOnDay(iso);
+        days += '<button type="button" class="calendar-year-day' + (iso === today ? ' is-today' : '') + '" data-action="calendar-year-day" data-id="' + iso + '">' +
+          '<span>' + day + '</span>' +
+          '<span class="calendar-year-day-dots">' + (dayEvents.length ? '<span class="calendar-year-day-dot"></span>' : '') + '</span>' +
+        '</button>';
+      }
+      markup += '<div class="calendar-year-month"><h4 class="calendar-year-month-label">' + MONTHS[m] + '</h4><div class="calendar-year-days">' + days + '</div></div>';
+    }
+    renderMarkup(dom.calendarYearGrid, markup);
+  }
+
+  function renderAgendaView() {
+    const today = new Date().toISOString().slice(0, 10);
+    const upcoming = state.events.filter(function (e) { return e.event_date >= today; })
+      .sort(function (a, b) {
+        if (a.event_date !== b.event_date) return a.event_date < b.event_date ? -1 : 1;
+        return (a.start_time || '99:99').localeCompare(b.start_time || '99:99');
+      });
+    if (!upcoming.length) {
+      renderMarkup(dom.calendarAgendaList, '<div class="empty-state"><strong>Sin próximos eventos</strong><span>No hay eventos programados a partir de hoy.</span></div>');
+      return;
+    }
+    const groups = [];
+    upcoming.forEach(function (e) {
+      let group = groups[groups.length - 1];
+      if (!group || group.date !== e.event_date) { group = { date: e.event_date, items: [] }; groups.push(group); }
+      group.items.push(e);
+    });
+    renderMarkup(dom.calendarAgendaList, groups.map(function (g) {
+      return '<div>' +
+        '<h4 class="calendar-agenda-group-label">' + safe(formatDate(g.date)) + '</h4>' +
+        '<div class="agenda-list">' + g.items.map(function (e) {
+          const timeLabel = e.start_time ? formatTime(e.start_time) : 'Hora por confirmar';
+          return '<button type="button" class="agenda-row" data-action="edit-event" data-id="' + safe(e.id) + '" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
+            '<div>' +
+              '<p class="agenda-row-title">' + safe(e.title) + '</p>' +
+              '<p class="agenda-row-meta">◷ ' + safe(timeLabel) + (e.location ? ' · ⌖ ' + safe(e.location) : '') + '</p>' +
+            '</div>' +
+          '</button>';
+        }).join('') + '</div>' +
+      '</div>';
+    }).join(''));
   }
 
   function renderContacts() {
@@ -1525,6 +1685,7 @@
     return field('Nombre del evento', 'title', item.title, 'text', true, '', 'field-full') +
       field('Fecha', 'event_date', item.event_date || new Date().toISOString().slice(0, 10), 'date', true) +
       field('Hora de inicio', 'start_time', timeInput(item.start_time), 'time', false) +
+      selectField('¿Participó Fundación Ingenia?', 'participo_fundacion_ingenia', item.participo_fundacion_ingenia === true ? 'si' : 'no', PARTICIPATES_INGENIA_OPTIONS) +
       field('📍 Dirección (opcional si agregas Maps)', 'location', item.location, 'text', false, '', 'field-full', 'Ej.: Calle Real de Mare Abajo, frente al bulevar', 'Puedes dejarla vacía si pegas el enlace de Google Maps.') +
       field('🗺️ Enlace de Google Maps (opcional si agregas dirección)', 'maps_url', item.maps_url, 'url', false, 'url', 'field-full', 'Pega el enlace del punto exacto', 'Debes completar la dirección o este enlace. Acepta maps.google.com y maps.app.goo.gl.') +
       selectField('Estado', 'status', item.status || 'planned', EVENT_STATUS) +
@@ -1587,7 +1748,10 @@
   function normalizePayload(type, data) {
     const trimmed = {};
     Object.keys(data).forEach(function (key) { trimmed[key] = typeof data[key] === 'string' ? data[key].trim() : data[key]; });
-    if (type === 'event') trimmed.start_time = trimmed.start_time || null;
+    if (type === 'event') {
+      trimmed.start_time = trimmed.start_time || null;
+      trimmed.participo_fundacion_ingenia = data.participo_fundacion_ingenia === 'si';
+    }
     return trimmed;
   }
 
@@ -1625,13 +1789,6 @@
     dom.contactSearch.value = '';
     renderContacts();
     dom.contactSearch.focus();
-  }
-
-  function changeMonth(delta) {
-    const parts = state.calendarMonth.split('-').map(Number);
-    const date = new Date(Date.UTC(parts[0], parts[1] - 1 + delta, 1));
-    state.calendarMonth = date.toISOString().slice(0, 7);
-    renderCalendar();
   }
 
   async function callEditorApi(action, payload) {

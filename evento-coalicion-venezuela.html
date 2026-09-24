@@ -6,11 +6,11 @@
   <meta name="description" content="Control operativo móvil para eventos de Coalición Venezuela y Fundación Ingenia.">
   <title>Resumen — Evento Coalición Venezuela</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./evento-coalicion-venezuela.css?v=7">
+  <link rel="stylesheet" href="./evento-coalicion-venezuela.css?v=8">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-  <script src="./evento-coalicion-venezuela.js?v=17" defer></script>
+  <script src="./evento-coalicion-venezuela.js?v=18" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -97,13 +97,36 @@
         </div>
         <button class="btn btn-primary" type="button" data-action="new-event" onclick="window.coalicionAction(event)">➕ Agregar evento</button>
       </div>
-      <div class="calendar-toolbar panel">
-        <button id="calendar-prev" class="icon-button" type="button" aria-label="Mes anterior" onclick="window.coalicionAction(event)">‹</button>
-        <h3 id="calendar-month-label"></h3>
-        <button id="calendar-next" class="icon-button" type="button" aria-label="Mes siguiente" onclick="window.coalicionAction(event)">›</button>
-        <button id="calendar-today" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)">Hoy</button>
+      <div id="calendar-toolbar" class="calendar-toolbar panel">
+        <div id="calendar-view-switcher" class="calendar-view-switcher">
+          <button type="button" class="calendar-view-btn" data-calendar-view="week" onclick="window.coalicionAction(event)">Semana</button>
+          <button type="button" class="calendar-view-btn" data-calendar-view="month" aria-current="page" onclick="window.coalicionAction(event)">Mes</button>
+          <button type="button" class="calendar-view-btn" data-calendar-view="year" onclick="window.coalicionAction(event)">Año</button>
+          <button type="button" class="calendar-view-btn" data-calendar-view="agenda" onclick="window.coalicionAction(event)">Agenda</button>
+        </div>
+        <div id="calendar-period-nav" class="calendar-period-nav">
+          <button id="calendar-prev" class="icon-button" type="button" aria-label="Anterior" onclick="window.coalicionAction(event)">‹</button>
+          <h3 id="calendar-period-label"></h3>
+          <button id="calendar-next" class="icon-button" type="button" aria-label="Siguiente" onclick="window.coalicionAction(event)">›</button>
+          <button id="calendar-today" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)">Hoy</button>
+        </div>
       </div>
-      <div id="calendar-grid" class="calendar-grid panel"></div>
+
+      <div id="calendar-month-view">
+        <div id="calendar-grid" class="calendar-grid panel"></div>
+      </div>
+
+      <div id="calendar-week-view" class="panel" hidden>
+        <div id="calendar-week-grid" class="calendar-week-grid"></div>
+      </div>
+
+      <div id="calendar-year-view" class="panel" hidden>
+        <div id="calendar-year-grid" class="calendar-year-grid"></div>
+      </div>
+
+      <div id="calendar-agenda-view" class="panel" hidden>
+        <div id="calendar-agenda-list" class="calendar-agenda-list"></div>
+      </div>
     </section>
 
     <section id="tasks-view" class="view" aria-labelledby="tasks-title" hidden>

@@ -780,6 +780,11 @@
               <option value="planned">Planificada</option><option value="confirmed">Confirmada</option><option value="executing">Ejecutándose</option><option value="closed">Cerrada</option>
             </select>
           </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">¿Participó Fundación Ingenia?
+            <select value="{{ journeyParticipatesIngeniaValue }}" onChange="{{ onJourneyParticipatesIngenia }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <option value="no">No</option><option value="si">Sí</option>
+            </select>
+          </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Médicos participantes
             <input type="text" placeholder="Nombres separados por coma" value="{{ journeyForm.doctors }}" onChange="{{ onJourneyDoctors }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
@@ -1695,7 +1700,7 @@ class Component extends DCLogic {
     ui: cloneUI(SAVED_UI), customizeOpen: false, customizeForm: cloneUI(SAVED_UI),
     calendarMonth: TODAY.slice(0, 7), dayModal: null, journeyModal: null,
     journeyCalendarMonth: TODAY.slice(0, 7),
-    journeyForm: { title: '', eventType: 'health', dates: [TODAY], time: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, specialtyUnit: '', doctors: '', students: '' },
+    journeyForm: { title: '', eventType: 'health', dates: [TODAY], time: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, specialtyUnit: '', doctors: '', students: '', participatesIngenia: false },
     modal: null, type: 'meeting', notes: '', date: TODAY, follow: '',
     taskModal: null,
     taskForm: { title: '', responsable: '', newResponsableName: '', status: 'pendiente', followupStatus: '', priority: 'media', detail: '', nextAction: '', dueDate: '' },
@@ -2133,7 +2138,7 @@ class Component extends DCLogic {
   };
 
   blankJourney(date) {
-    return { title: '', eventType: 'health', dates: date ? [date] : [], time: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, assignedVolunteers: [], specialtyUnit: '', doctors: '', students: '' };
+    return { title: '', eventType: 'health', dates: date ? [date] : [], time: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, assignedVolunteers: [], specialtyUnit: '', doctors: '', students: '', participatesIngenia: false };
   }
 
   blankVolunteer() {
@@ -3055,6 +3060,7 @@ class Component extends DCLogic {
       dayJourneys: selectedDayJourneys, dayModalEmpty: selectedDayJourneys.length === 0,
       journeyModalOpen: !!s.journeyModal, journeyModalTitle: s.journeyModal === 'new' ? 'Nuevo evento UCV' : 'Editar evento UCV',
       journeyForm: s.journeyForm, journeyChecks: journeyChecks, eventTypes: EVENT_TYPES,
+      journeyParticipatesIngeniaValue: s.journeyForm.participatesIngenia ? 'si' : 'no',
       journeyCalendarLabel: journeyCalendarLabel, journeyDateCells: journeyDateCells,
       journeyDateChips: journeyDateChips, journeyDateChipsEmpty: journeyDateChipsEmpty,
       prevJourneyMonth: () => this.moveJourneyCalendar(-1),
@@ -3176,6 +3182,7 @@ class Component extends DCLogic {
       onJourneyStudents: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { students: e.target.value }) }),
       onJourneyOwner: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { owner: e.target.value }) }),
       onJourneyStatus: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { status: e.target.value }) }),
+      onJourneyParticipatesIngenia: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { participatesIngenia: e.target.value === 'si' }) }),
       onJourneyNotes: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { notes: e.target.value }) }),
       newTask: this.newTask,
       closeTaskModal: this.closeTaskModal,
