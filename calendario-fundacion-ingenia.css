@@ -49,6 +49,10 @@
   --coalition-warning-soft: #fdf3d6;
   --coalition-collapse: #1c1c1c;
   --coalition-collapse-soft: #e6e6e6;
+  /* Deben coincidir exactamente con FIXED_SOURCE_COLOR en
+     calendario-fundacion-ingenia.js (esa copia pinta la tarjeta de cada
+     organización en "Organizaciones"; ninguna de las dos debe cambiar sin
+     la otra). */
   --source-coalicion: #1d4ed8;
   --source-coalicion-soft: #e8f0ff;
   --source-florangel: #be185d;

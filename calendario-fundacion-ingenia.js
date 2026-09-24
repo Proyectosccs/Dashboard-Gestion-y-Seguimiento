@@ -10,7 +10,10 @@
   const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   const SOURCE_LABELS = { coalicion: 'Coalición Venezuela', florangel: 'Dra Florangel', ucv: 'UCV', cmdlt: 'Centro Médico Docente de La Trinidad', networking: 'Networking Fund. Ingenia', otros: 'Otros' };
-  const FIXED_SOURCE_COLOR = { coalicion: '#1d4ed8', florangel: '#be185d', ucv: '#0f766e', cmdlt: '#0369a1', networking: '#7c3aed', otros: '#57534e' };
+  // Deben coincidir exactamente con --source-<clave> en
+  // calendario-fundacion-ingenia.css (ahí pinta la leyenda y los eventos;
+  // aquí solo se usa para la tarjeta de cada organización en "Organizaciones").
+  const FIXED_SOURCE_COLOR = { coalicion: '#1d4ed8', florangel: '#be185d', ucv: '#166534', cmdlt: '#b45309', networking: '#7c3aed', otros: '#57534e' };
   const FIXED_SOURCE_EMOJI = { coalicion: '🤝', florangel: '🩺', ucv: '🎓', cmdlt: '🏥', networking: '🌐', otros: '📌' };
 
   // Calendarios creados al vuelo desde "Otra organización o calendario":
@@ -18,11 +21,12 @@
   // clave; cada uno guarda sus eventos en su propia clave
   // 'ingenia-custom-<id>-events-v1', mismo patrón que networking/otros.
   const CUSTOM_CALENDARS_KEY = 'ingenia-custom-calendars-v1';
-  // Ningún color aquí debe repetir los de FIXED_SOURCE_COLOR — de lo
-  // contrario una organización creada al vuelo se confunde visualmente con
-  // una de las organizaciones fijas (pasó con "#7c3aed" = Networking y
-  // "#be185d" = Dra Florangel).
-  const CUSTOM_PALETTE = ['#16a34a', '#dc2626', '#eab308', '#0891b2', '#4d7c0f', '#a21caf', '#365314', '#701a75', '#164e63', '#78350f'];
+  // Ningún color aquí debe repetir ni acercarse demasiado a los de
+  // FIXED_SOURCE_COLOR — de lo contrario una organización creada al vuelo
+  // se confunde visualmente con una de las organizaciones fijas (pasó con
+  // "#7c3aed" = Networking, "#be185d" = Dra Florangel, y con el verde de
+  // UCV — por eso no hay ningún verde en esta paleta).
+  const CUSTOM_PALETTE = ['#dc2626', '#0891b2', '#eab308', '#a21caf', '#9f1239', '#78350f', '#1e40af', '#701a75', '#164e63', '#4c0519'];
   const NEW_CALENDAR_VALUE = '__new__';
 
   // Organizaciones "reales" (con tablero propio o no) que se pueden elegir
