@@ -114,6 +114,9 @@
     teamMembers: [],
     calendarMonth: new Date().toISOString().slice(0, 7),
     selectedDay: new Date().toISOString().slice(0, 10),
+    calendarViewMode: 'month',
+    calendarWeekStart: mondayOf(new Date().toISOString().slice(0, 10)),
+    calendarYear: new Date().getFullYear(),
     editingEvent: null,
     editingTask: null,
     dragTaskId: null,
@@ -131,13 +134,17 @@
     const target = event.currentTarget;
     if (!target) return;
     if (target.dataset.view) return setView(target.dataset.view);
+    if (target.dataset.calendarView) return setCalendarViewMode(target.dataset.calendarView);
     const actionsById = {
       'retry-load': loadAll,
-      'calendar-prev': function () { changeMonth(-1); },
-      'calendar-next': function () { changeMonth(1); },
+      'calendar-prev': function () { changePeriod(-1); },
+      'calendar-next': function () { changePeriod(1); },
       'calendar-today': function () {
-        state.calendarMonth = new Date().toISOString().slice(0, 7);
-        state.selectedDay = new Date().toISOString().slice(0, 10);
+        const todayIso = new Date().toISOString().slice(0, 10);
+        state.calendarMonth = todayIso.slice(0, 7);
+        state.selectedDay = todayIso;
+        state.calendarWeekStart = mondayOf(todayIso);
+        state.calendarYear = new Date().getFullYear();
         renderCalendar();
       },
       'new-event-btn': openEventDialog,
@@ -176,6 +183,11 @@
         const el = document.getElementById('agenda-title');
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 50);
+    }
+    if (target.dataset.yearDay) {
+      state.selectedDay = target.dataset.yearDay;
+      state.calendarMonth = target.dataset.yearDay.slice(0, 7);
+      setCalendarViewMode('month');
     }
     if (target.dataset.eventId) {
       openEventDialog(findById(state.events, target.dataset.eventId));
@@ -261,10 +273,19 @@
     dom.connectivityBanner = document.getElementById('connectivity-banner');
     dom.calendarView = document.getElementById('calendar-view');
     dom.sourceLegend = document.getElementById('source-legend');
-    dom.calendarMonthLabel = document.getElementById('calendar-month-label');
+    dom.calendarViewSwitcher = document.getElementById('calendar-view-switcher');
+    dom.calendarToolbar = document.getElementById('calendar-toolbar');
+    dom.calendarPeriodLabel = document.getElementById('calendar-period-label');
+    dom.calendarMonthView = document.getElementById('calendar-month-view');
     dom.calendarGrid = document.getElementById('calendar-grid');
     dom.agendaTitle = document.getElementById('agenda-title');
     dom.agendaList = document.getElementById('agenda-list');
+    dom.calendarWeekView = document.getElementById('calendar-week-view');
+    dom.calendarWeekGrid = document.getElementById('calendar-week-grid');
+    dom.calendarYearView = document.getElementById('calendar-year-view');
+    dom.calendarYearGrid = document.getElementById('calendar-year-grid');
+    dom.calendarAgendaView = document.getElementById('calendar-agenda-view');
+    dom.calendarAgendaList = document.getElementById('calendar-agenda-list');
     dom.eventDialog = document.getElementById('event-dialog');
     dom.eventDialogTitle = document.getElementById('event-dialog-title');
     dom.eventForm = document.getElementById('event-form');
@@ -536,10 +557,35 @@
     toast('Diseño guardado.', 'success');
   }
 
-  function changeMonth(delta) {
-    const parts = state.calendarMonth.split('-').map(Number);
-    const date = new Date(Date.UTC(parts[0], parts[1] - 1 + delta, 1));
-    state.calendarMonth = date.getUTCFullYear() + '-' + String(date.getUTCMonth() + 1).padStart(2, '0');
+  function mondayOf(iso) {
+    const date = new Date(iso + 'T00:00:00Z');
+    const offset = (date.getUTCDay() + 6) % 7;
+    date.setUTCDate(date.getUTCDate() - offset);
+    return date.toISOString().slice(0, 10);
+  }
+
+  function setCalendarViewMode(mode) {
+    if (['week', 'month', 'year', 'agenda'].indexOf(mode) === -1) return;
+    state.calendarViewMode = mode;
+    dom.calendarViewSwitcher.querySelectorAll('.calendar-view-btn').forEach(function (btn) {
+      if (btn.dataset.calendarView === mode) btn.setAttribute('aria-current', 'page');
+      else btn.removeAttribute('aria-current');
+    });
+    renderCalendar();
+  }
+
+  function changePeriod(delta) {
+    if (state.calendarViewMode === 'week') {
+      const date = new Date(state.calendarWeekStart + 'T00:00:00Z');
+      date.setUTCDate(date.getUTCDate() + delta * 7);
+      state.calendarWeekStart = date.toISOString().slice(0, 10);
+    } else if (state.calendarViewMode === 'year') {
+      state.calendarYear += delta;
+    } else {
+      const parts = state.calendarMonth.split('-').map(Number);
+      const date = new Date(Date.UTC(parts[0], parts[1] - 1 + delta, 1));
+      state.calendarMonth = date.getUTCFullYear() + '-' + String(date.getUTCMonth() + 1).padStart(2, '0');
+    }
     renderCalendar();
   }
 
@@ -549,10 +595,24 @@
   }
 
   function renderCalendar() {
+    renderLegend();
+    const mode = state.calendarViewMode;
+    dom.calendarMonthView.hidden = mode !== 'month';
+    dom.calendarWeekView.hidden = mode !== 'week';
+    dom.calendarYearView.hidden = mode !== 'year';
+    dom.calendarAgendaView.hidden = mode !== 'agenda';
+    dom.calendarToolbar.hidden = mode === 'agenda';
+    if (mode === 'week') renderWeekView();
+    else if (mode === 'year') renderYearView();
+    else if (mode === 'agenda') renderAgendaView();
+    else renderMonthView();
+  }
+
+  function renderMonthView() {
     const parts = state.calendarMonth.split('-').map(Number);
     const year = parts[0];
     const monthIndex = parts[1] - 1;
-    dom.calendarMonthLabel.textContent = MONTHS[monthIndex] + ' ' + year;
+    dom.calendarPeriodLabel.textContent = MONTHS[monthIndex] + ' ' + year;
     const first = new Date(Date.UTC(year, monthIndex, 1));
     const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
     const mondayOffset = (first.getUTCDay() + 6) % 7;
@@ -574,6 +634,100 @@
     }
     renderMarkup(dom.calendarGrid, markup);
     renderAgenda();
+  }
+
+  function formatShortDate(date) {
+    return date.getUTCDate() + ' ' + MONTHS[date.getUTCMonth()].slice(0, 3) + '.';
+  }
+
+  function renderWeekView() {
+    const startDate = new Date(state.calendarWeekStart + 'T00:00:00Z');
+    const endDate = new Date(startDate);
+    endDate.setUTCDate(endDate.getUTCDate() + 6);
+    dom.calendarPeriodLabel.textContent = formatShortDate(startDate) + ' – ' + formatShortDate(endDate) + ' ' + endDate.getUTCFullYear();
+    const today = new Date().toISOString().slice(0, 10);
+    let markup = '';
+    for (let i = 0; i < 7; i += 1) {
+      const d = new Date(startDate);
+      d.setUTCDate(d.getUTCDate() + i);
+      const iso = d.toISOString().slice(0, 10);
+      const dayEvents = eventsOnDay(iso);
+      markup += '<div class="calendar-week-day' + (iso === today ? ' is-today' : '') + '">' +
+        '<div class="calendar-week-day-head">' + WEEKDAYS[i] + '</div>' +
+        '<div class="calendar-week-day-number">' + d.getUTCDate() + '</div>' +
+        '<div class="calendar-week-events">' +
+          (dayEvents.length ? dayEvents.map(function (e) {
+            const cs = sourceClassStyle(e.source);
+            const timeLabel = e.time ? formatTime(e.time) : '';
+            return '<button type="button" class="calendar-event ' + cs.cls + '" ' + cs.style + ' data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" style="white-space:normal;height:auto">' + (timeLabel ? safe(timeLabel) + ' · ' : '') + safe(e.title) + '</button>';
+          }).join('') : '<span style="font-size:11px;color:var(--color-neutral-500)">Sin eventos</span>') +
+        '</div>' +
+      '</div>';
+    }
+    renderMarkup(dom.calendarWeekGrid, markup);
+  }
+
+  function renderYearView() {
+    const year = state.calendarYear;
+    dom.calendarPeriodLabel.textContent = String(year);
+    const today = new Date().toISOString().slice(0, 10);
+    let markup = '';
+    for (let m = 0; m < 12; m += 1) {
+      const first = new Date(Date.UTC(year, m, 1));
+      const lastDay = new Date(Date.UTC(year, m + 1, 0)).getUTCDate();
+      const mondayOffset = (first.getUTCDay() + 6) % 7;
+      let days = WEEKDAYS.map(function (w) { return '<div class="calendar-year-weekday">' + w[0] + '</div>'; }).join('');
+      for (let blank = 0; blank < mondayOffset; blank += 1) days += '<div class="calendar-year-day is-blank"></div>';
+      for (let day = 1; day <= lastDay; day += 1) {
+        const iso = year + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+        const dayEvents = eventsOnDay(iso);
+        const sources = [];
+        dayEvents.forEach(function (e) { if (sources.indexOf(e.source) === -1) sources.push(e.source); });
+        days += '<button type="button" class="calendar-year-day' + (iso === today ? ' is-today' : '') + '" data-year-day="' + iso + '" onclick="window.ingeniaAction(event)">' +
+          '<span>' + day + '</span>' +
+          '<span class="calendar-year-day-dots">' + sources.slice(0, 4).map(function (s) { return sourceDotHtml(s); }).join('') + '</span>' +
+        '</button>';
+      }
+      markup += '<div class="calendar-year-month"><h4 class="calendar-year-month-label">' + MONTHS[m] + '</h4><div class="calendar-year-days">' + days + '</div></div>';
+    }
+    renderMarkup(dom.calendarYearGrid, markup);
+  }
+
+  function renderAgendaView() {
+    const today = new Date().toISOString().slice(0, 10);
+    const upcoming = state.events.filter(function (e) { return e.date >= today; })
+      .sort(function (a, b) {
+        if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+        return (a.time || '99:99').localeCompare(b.time || '99:99');
+      });
+    if (!upcoming.length) {
+      renderMarkup(dom.calendarAgendaList, '<div class="empty-state"><strong>Sin próximos eventos</strong><span>No hay eventos programados a partir de hoy.</span></div>');
+      return;
+    }
+    const groups = [];
+    upcoming.forEach(function (e) {
+      let group = groups[groups.length - 1];
+      if (!group || group.date !== e.date) { group = { date: e.date, items: [] }; groups.push(group); }
+      group.items.push(e);
+    });
+    renderMarkup(dom.calendarAgendaList, groups.map(function (g) {
+      return '<div>' +
+        '<h4 class="calendar-agenda-group-label">' + safe(formatDate(g.date)) + '</h4>' +
+        '<div class="agenda-list">' + g.items.map(function (e) {
+          const timeLabel = e.time ? formatTime(e.time) : (e.timeText || 'Hora por confirmar');
+          const info = sourceInfo(e.source);
+          const cs = sourceClassStyle(e.source);
+          return '<button type="button" class="agenda-row" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
+            sourceDotHtml(e.source) +
+            '<div>' +
+              '<p class="agenda-row-title">' + safe(e.title) + '</p>' +
+              '<p class="agenda-row-meta">◷ ' + safe(timeLabel) + (e.location ? ' · ⌖ ' + safe(e.location) : '') + '</p>' +
+              '<span class="agenda-row-source ' + cs.cls + '" ' + cs.style + '>' + safe(info.label) + '</span>' +
+            '</div>' +
+          '</button>';
+        }).join('') + '</div>' +
+      '</div>';
+    }).join(''));
   }
 
   function renderAgenda() {
