@@ -373,10 +373,18 @@
   const EVENT_STATUS = {
     planned: 'Planificado',
     confirmed: 'Confirmado',
-    in_progress: 'En ejecución',
+    in_progress: 'En Ejecución',
     completed: 'Completado'
   };
   const PARTICIPATES_INGENIA_OPTIONS = { no: 'No', si: 'Sí' };
+  const JORNADA_TYPE_OPTIONS = { '': 'Sin especificar', insumos: 'Insumos', medica: 'Médica' };
+  const MEDICAL_SPECIALTIES = [
+    'Medicina General', 'Medicina Interna', 'Pediatría', 'Ginecología y Obstetricia',
+    'Cardiología', 'Dermatología', 'Oftalmología', 'Otorrinolaringología', 'Psiquiatría',
+    'Psicología', 'Nutrición y Dietética', 'Odontología', 'Fisioterapia', 'Endocrinología',
+    'Urología', 'Traumatología', 'Gastroenterología', 'Neurología'
+  ];
+  const OTHER_SPECIALTY_VALUE = '__otros__';
   const AFFILIATIONS = {
     '': 'Selecciona una opción',
     'Coalicion con amor a Venezuela': 'Coalicion con amor a Venezuela',
@@ -719,6 +727,8 @@
       state.calendarMonth = id.slice(0, 7);
       setCalendarViewMode('month');
     }
+    if (action === 'jornada-type-change') onJornadaTypeChange();
+    if (action === 'specialty-other-change') onSpecialtyOtherChange();
   }
 
   function renderAll() {
@@ -1680,16 +1690,72 @@
       textareaField('Notas operativas', 'notes', item.notes, 'field-full');
   }
 
+  function jornadaTypeFieldMarkup(item) {
+    const current = item.jornada_type || '';
+    const options = Object.keys(JORNADA_TYPE_OPTIONS).map(function (key) {
+      return '<option value="' + safe(key) + '"' + (current === key ? ' selected' : '') + '>' + safe(JORNADA_TYPE_OPTIONS[key]) + '</option>';
+    }).join('');
+    return '<div class="field"><label for="field-jornada_type">Tipo de Jornada</label>' +
+      '<select id="field-jornada_type" class="input" name="jornada_type" data-action="jornada-type-change" onchange="window.coalicionAction(event)">' + options + '</select></div>';
+  }
+
+  function specialtiesChecklistMarkup(item) {
+    const specialties = Array.isArray(item.specialties) ? item.specialties : [];
+    const canonicalChecked = specialties.filter(function (s) { return MEDICAL_SPECIALTIES.indexOf(s) > -1; });
+    const customList = specialties.filter(function (s) { return MEDICAL_SPECIALTIES.indexOf(s) === -1; });
+    const isMedica = item.jornada_type === 'medica';
+    const hasCustom = customList.length > 0;
+    const items = MEDICAL_SPECIALTIES.map(function (label) {
+      const checked = canonicalChecked.indexOf(label) > -1 ? ' checked' : '';
+      return '<label class="checkbox-chip"><input type="checkbox" class="event-specialty-checkbox" value="' + safe(label) + '"' + checked + '>' + safe(label) + '</label>';
+    });
+    items.push('<label class="checkbox-chip"><input type="checkbox" id="field-event-specialty-other" class="event-specialty-checkbox" value="' + OTHER_SPECIALTY_VALUE + '"' + (hasCustom ? ' checked' : '') + ' data-action="specialty-other-change" onchange="window.coalicionAction(event)">Otros</label>');
+    return '<div class="field field-full" id="event-specialties-field"' + (isMedica ? '' : ' hidden') + '>' +
+      '<label>Especialidades (selección múltiple)</label>' +
+      '<div id="event-specialties-list" class="checkbox-list">' + items.join('') + '</div>' +
+      '<div class="field" id="event-custom-specialty-field"' + (hasCustom ? '' : ' hidden') + ' style="margin-top: 8px">' +
+        '<label for="field-event-custom-specialty">Otras especialidades (separadas por coma)</label>' +
+        '<input id="field-event-custom-specialty" class="input" name="custom_specialties" type="text" value="' + safe(customList.join(', ')) + '" placeholder="Ej. Alergología, Reumatología">' +
+      '</div>' +
+    '</div>';
+  }
+
   function eventFields(record) {
     const item = record || {};
-    return field('Nombre del evento', 'title', item.title, 'text', true, '', 'field-full') +
+    return field('Nombre del Evento', 'title', item.title, 'text', true, '', 'field-full') +
+      jornadaTypeFieldMarkup(item) +
+      specialtiesChecklistMarkup(item) +
       field('Fecha', 'event_date', item.event_date || new Date().toISOString().slice(0, 10), 'date', true) +
-      field('Hora de inicio', 'start_time', timeInput(item.start_time), 'time', false) +
+      field('Hora de Inicio', 'start_time', timeInput(item.start_time), 'time', false) +
+      field('Hora de Finalización', 'end_time', timeInput(item.end_time), 'time', false) +
       selectField('¿Participó Fundación Ingenia?', 'participo_fundacion_ingenia', item.participo_fundacion_ingenia === true ? 'si' : 'no', PARTICIPATES_INGENIA_OPTIONS) +
-      field('📍 Dirección (opcional si agregas Maps)', 'location', item.location, 'text', false, '', 'field-full', 'Ej.: Calle Real de Mare Abajo, frente al bulevar', 'Puedes dejarla vacía si pegas el enlace de Google Maps.') +
-      field('🗺️ Enlace de Google Maps (opcional si agregas dirección)', 'maps_url', item.maps_url, 'url', false, 'url', 'field-full', 'Pega el enlace del punto exacto', 'Debes completar la dirección o este enlace. Acepta maps.google.com y maps.app.goo.gl.') +
+      field('Lugar', 'venue', item.venue, 'text', false, '', '', 'Ej. Oficinas Fundación Ingenia') +
+      field('Dirección', 'location', item.location, 'text', false, '', '', 'Ej. Calle Real de Mare Abajo') +
       selectField('Estado', 'status', item.status || 'planned', EVENT_STATUS) +
-      textareaField('Indicaciones y notas', 'notes', item.notes, 'field-full');
+      textareaField('Descripción', 'description', item.description, 'field-full') +
+      textareaField('Notas y Requerimientos', 'notes', item.notes, 'field-full');
+  }
+
+  function onJornadaTypeChange() {
+    const select = dom.editorForm.elements.jornada_type;
+    const specialtiesField = document.getElementById('event-specialties-field');
+    if (select && specialtiesField) specialtiesField.hidden = select.value !== 'medica';
+  }
+
+  function onSpecialtyOtherChange() {
+    const other = document.getElementById('field-event-specialty-other');
+    const customField = document.getElementById('event-custom-specialty-field');
+    if (customField) customField.hidden = !(other && other.checked);
+  }
+
+  function readEventSpecialties() {
+    const canonical = Array.from(dom.editorForm.querySelectorAll('.event-specialty-checkbox:checked'))
+      .map(function (cb) { return cb.value; })
+      .filter(function (v) { return v !== OTHER_SPECIALTY_VALUE; });
+    const customField = dom.editorForm.elements.custom_specialties;
+    const customRaw = customField ? customField.value.trim() : '';
+    const custom = customRaw ? customRaw.split(',').map(function (s) { return s.trim(); }).filter(Boolean) : [];
+    return canonical.concat(custom);
   }
 
   async function saveEditor(event) {
@@ -1697,6 +1763,10 @@
     if (!state.editor) return;
     hideDialogError();
     const data = Object.fromEntries(new FormData(dom.editorForm).entries());
+    if (state.editor.type === 'event') {
+      data.specialties = data.jornada_type === 'medica' ? readEventSpecialties() : [];
+      delete data.custom_specialties;
+    }
     const validation = validateEditor(state.editor.type, data);
     if (validation) {
       showDialogError(validation.message);
@@ -1739,8 +1809,7 @@
     if (type === 'event') {
       if (!data.title.trim()) return issue('title', 'Escribe el nombre del evento.');
       if (!data.event_date) return issue('event_date', 'Selecciona la fecha del evento.');
-      if (!data.location.trim() && !data.maps_url.trim()) return issue('location', 'Agrega una dirección o un enlace de Google Maps.');
-      if (data.maps_url && !isGoogleMapsUrl(data.maps_url)) return issue('maps_url', 'Pega un enlace válido de Google Maps.');
+      if (!data.venue.trim() && !data.location.trim()) return issue('venue', 'Agrega un lugar o una dirección.');
     }
     return null;
   }
@@ -1750,6 +1819,7 @@
     Object.keys(data).forEach(function (key) { trimmed[key] = typeof data[key] === 'string' ? data[key].trim() : data[key]; });
     if (type === 'event') {
       trimmed.start_time = trimmed.start_time || null;
+      trimmed.end_time = trimmed.end_time || null;
       trimmed.participo_fundacion_ingenia = data.participo_fundacion_ingenia === 'si';
     }
     return trimmed;

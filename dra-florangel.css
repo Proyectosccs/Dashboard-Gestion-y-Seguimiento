@@ -348,6 +348,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .calendar-year-day-dots { display: flex; gap: 1px; min-height: 4px; }
 .calendar-agenda-list { display: flex; flex-direction: column; gap: 18px; }
 .calendar-agenda-group-label { margin: 0 0 8px; font-size: 13px; font-weight: 700; text-transform: capitalize; color: var(--color-neutral-700); }
+.checkbox-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.checkbox-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--color-neutral-300); border-radius: 999px; background: var(--color-neutral-100); font-size: 12px; font-weight: 600; cursor: pointer; }
+.checkbox-chip input { margin: 0; }
 .agenda-list { display: flex; flex-direction: column; gap: 8px; }
 .agenda-row { width: 100%; box-sizing: border-box; display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--color-neutral-300); background: #fff; }
 .agenda-row:hover { border-color: var(--color-accent-400); background: var(--color-neutral-100); }

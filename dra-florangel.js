@@ -11,6 +11,16 @@
   const EVENTS_KEY = 'florangel-events-v1';
   const UI_KEY = 'florangel-ui-v1';
 
+  // Campos compartidos del formulario de eventos, iguales en todos los
+  // calendarios (Networking, Organización, Dra Florangel, CMDLT, Coalición).
+  const MEDICAL_SPECIALTIES = [
+    'Medicina General', 'Medicina Interna', 'Pediatría', 'Ginecología y Obstetricia',
+    'Cardiología', 'Dermatología', 'Oftalmología', 'Otorrinolaringología', 'Psiquiatría',
+    'Psicología', 'Nutrición y Dietética', 'Odontología', 'Fisioterapia', 'Endocrinología',
+    'Urología', 'Traumatología', 'Gastroenterología', 'Neurología'
+  ];
+  const OTHER_SPECIALTY_VALUE = '__otros__';
+
   // Modo edición: textos y orden personalizables, igual que en el tablero
   // UCV — pero sin los controles de tamaño de burbuja/título, porque este
   // sitio usa una hoja de estilos fija en vez de estilos calculados en JS.
@@ -122,6 +132,8 @@
       'event-dialog-close': closeEventDialog,
       'event-dialog-cancel': closeEventDialog,
       'event-delete': deleteEditingEvent,
+      'field-event-jornada-type': onJornadaTypeChange,
+      'field-event-specialty-other': onSpecialtyOtherChange,
       'customize-open': openCustomize,
       'customize-dialog-close': closeCustomize,
       'customize-dialog-cancel': closeCustomize,
@@ -187,6 +199,10 @@
     dom.eventForm = document.getElementById('event-form');
     dom.eventDialogTitle = document.getElementById('event-dialog-title');
     dom.eventError = document.getElementById('event-error');
+    dom.eventJornadaTypeSelect = document.getElementById('field-event-jornada-type');
+    dom.eventSpecialtiesField = document.getElementById('event-specialties-field');
+    dom.eventSpecialtiesList = document.getElementById('event-specialties-list');
+    dom.eventCustomSpecialtyField = document.getElementById('event-custom-specialty-field');
     dom.eventDelete = document.getElementById('event-delete');
     dom.pageTitle = document.getElementById('page-title');
     dom.pageSubtitle = document.getElementById('page-subtitle');
@@ -794,6 +810,49 @@
     }).join(''));
   }
 
+  function populateSpecialtiesList(checkedList) {
+    const canonicalChecked = [];
+    let customChecked = [];
+    if (checkedList) {
+      checkedList.forEach(function (s) {
+        if (MEDICAL_SPECIALTIES.indexOf(s) > -1) canonicalChecked.push(s); else customChecked.push(s);
+      });
+    } else {
+      Array.from(dom.eventSpecialtiesList.querySelectorAll('.event-specialty-checkbox:checked')).forEach(function (cb) {
+        if (cb.value !== OTHER_SPECIALTY_VALUE) canonicalChecked.push(cb.value);
+      });
+    }
+    const items = MEDICAL_SPECIALTIES.map(function (label) {
+      const checked = canonicalChecked.indexOf(label) > -1 ? ' checked' : '';
+      return '<label class="checkbox-chip"><input type="checkbox" class="event-specialty-checkbox" value="' + safe(label) + '"' + checked + '>' + safe(label) + '</label>';
+    });
+    const hasCustom = checkedList ? customChecked.length > 0 : (document.getElementById('field-event-specialty-other') && document.getElementById('field-event-specialty-other').checked);
+    items.push('<label class="checkbox-chip"><input type="checkbox" id="field-event-specialty-other" class="event-specialty-checkbox" value="' + OTHER_SPECIALTY_VALUE + '"' + (hasCustom ? ' checked' : '') + ' onchange="window.florangelAction(event)">Otros</label>');
+    renderMarkup(dom.eventSpecialtiesList, items.join(''));
+    dom.eventCustomSpecialtyField.hidden = !hasCustom;
+    if (checkedList) dom.eventForm.elements.custom_specialties.value = customChecked.join(', ');
+  }
+
+  function onJornadaTypeChange() {
+    const isMedica = dom.eventJornadaTypeSelect.value === 'medica';
+    dom.eventSpecialtiesField.hidden = !isMedica;
+    if (isMedica) populateSpecialtiesList();
+  }
+
+  function onSpecialtyOtherChange() {
+    const other = document.getElementById('field-event-specialty-other');
+    dom.eventCustomSpecialtyField.hidden = !(other && other.checked);
+  }
+
+  function readSpecialties() {
+    const canonical = Array.from(dom.eventSpecialtiesList.querySelectorAll('.event-specialty-checkbox:checked'))
+      .map(function (cb) { return cb.value; })
+      .filter(function (v) { return v !== OTHER_SPECIALTY_VALUE; });
+    const customRaw = dom.eventForm.elements.custom_specialties.value.trim();
+    const custom = customRaw ? customRaw.split(',').map(function (s) { return s.trim(); }).filter(Boolean) : [];
+    return canonical.concat(custom);
+  }
+
   function openEventDialog(evt) {
     state.eventEditor = evt ? evt.id : null;
     dom.eventDialogTitle.textContent = evt ? 'Editar evento' : 'Agregar evento';
@@ -802,9 +861,17 @@
     dom.eventForm.elements.title.value = evt ? evt.title : '';
     dom.eventForm.elements.event_date.value = evt ? evt.event_date : (state.calendarMonth + '-01');
     dom.eventForm.elements.start_time.value = evt ? timeInput(evt.start_time) : '';
+    dom.eventForm.elements.end_time.value = evt ? timeInput(evt.end_time) : '';
+    dom.eventForm.elements.venue.value = evt ? (evt.venue || '') : '';
     dom.eventForm.elements.location.value = evt ? (evt.location || '') : '';
+    dom.eventForm.elements.status.value = evt ? (evt.status || 'planned') : 'planned';
+    dom.eventForm.elements.description.value = evt ? (evt.description || '') : '';
     dom.eventForm.elements.notes.value = evt ? (evt.notes || '') : '';
     dom.eventForm.elements.participates_ingenia.value = evt && evt.participatesIngenia === true ? 'si' : 'no';
+    dom.eventForm.elements.jornada_type.value = evt ? (evt.jornadaType || '') : '';
+    const isMedica = evt && evt.jornadaType === 'medica';
+    dom.eventSpecialtiesField.hidden = !isMedica;
+    populateSpecialtiesList(isMedica ? (evt.specialties || []) : []);
     dom.eventDialog.showModal();
     dom.eventForm.elements.title.focus();
   }
@@ -816,14 +883,21 @@
     const title = dom.eventForm.elements.title.value.trim();
     const eventDate = dom.eventForm.elements.event_date.value;
     if (!title || !eventDate) { showError(dom.eventError, 'Nombre y fecha son obligatorios.'); return; }
+    const jornadaType = dom.eventJornadaTypeSelect.value;
     const payload = {
       id: state.eventEditor || uid(),
       title: title,
       event_date: eventDate,
       start_time: dom.eventForm.elements.start_time.value,
+      end_time: dom.eventForm.elements.end_time.value,
+      venue: dom.eventForm.elements.venue.value.trim(),
       location: dom.eventForm.elements.location.value.trim(),
+      status: dom.eventForm.elements.status.value,
+      description: dom.eventForm.elements.description.value.trim(),
       notes: dom.eventForm.elements.notes.value.trim(),
       participatesIngenia: dom.eventForm.elements.participates_ingenia.value === 'si',
+      jornadaType: jornadaType,
+      specialties: jornadaType === 'medica' ? readSpecialties() : [],
       created_at: new Date().toISOString()
     };
     if (state.eventEditor) {

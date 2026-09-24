@@ -6,9 +6,9 @@
   <meta name="description" content="Tareas y calendario de jornadas — Dra Florangel.">
   <title>Dra Florangel — Tareas y jornadas</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./dra-florangel.css?v=10">
+  <link rel="stylesheet" href="./dra-florangel.css?v=11">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./dra-florangel.js?v=10" defer></script>
+  <script src="./dra-florangel.js?v=11" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -185,16 +185,36 @@
       <div id="event-error" class="notice notice-error" role="alert" hidden></div>
       <div class="dialog-fields">
         <div class="field field-full">
-          <label for="field-event-title">Nombre del evento</label>
+          <label for="field-event-title">Nombre del Evento</label>
           <input id="field-event-title" class="input" name="title" type="text" required>
+        </div>
+        <div class="field">
+          <label for="field-event-jornada-type">Tipo de Jornada</label>
+          <select id="field-event-jornada-type" class="input" name="jornada_type" onchange="window.florangelAction(event)">
+            <option value="">Sin especificar</option>
+            <option value="insumos">Insumos</option>
+            <option value="medica">Médica</option>
+          </select>
+        </div>
+        <div class="field field-full" id="event-specialties-field" hidden>
+          <label>Especialidades (selección múltiple)</label>
+          <div id="event-specialties-list" class="checkbox-list"></div>
+          <div class="field" id="event-custom-specialty-field" hidden style="margin-top: 8px">
+            <label for="field-event-custom-specialty">Otras especialidades (separadas por coma)</label>
+            <input id="field-event-custom-specialty" class="input" name="custom_specialties" type="text" placeholder="Ej. Alergología, Reumatología">
+          </div>
         </div>
         <div class="field">
           <label for="field-event-date">Fecha</label>
           <input id="field-event-date" class="input" name="event_date" type="date" required>
         </div>
         <div class="field">
-          <label for="field-event-time">Hora</label>
+          <label for="field-event-time">Hora de Inicio</label>
           <input id="field-event-time" class="input" name="start_time" type="time">
+        </div>
+        <div class="field">
+          <label for="field-event-end-time">Hora de Finalización</label>
+          <input id="field-event-end-time" class="input" name="end_time" type="time">
         </div>
         <div class="field">
           <label for="field-event-ingenia">¿Participó Fundación Ingenia?</label>
@@ -203,12 +223,29 @@
             <option value="si">Sí</option>
           </select>
         </div>
-        <div class="field field-full">
-          <label for="field-event-location">Ubicación</label>
-          <input id="field-event-location" class="input" name="location" type="text">
+        <div class="field">
+          <label for="field-event-venue">Lugar</label>
+          <input id="field-event-venue" class="input" name="venue" type="text" placeholder="Ej. Oficinas Fundación Ingenia">
+        </div>
+        <div class="field">
+          <label for="field-event-location">Dirección</label>
+          <input id="field-event-location" class="input" name="location" type="text" placeholder="Ej. Calle Real de Mare Abajo">
+        </div>
+        <div class="field">
+          <label for="field-event-status">Estado</label>
+          <select id="field-event-status" class="input" name="status">
+            <option value="planned">Planificado</option>
+            <option value="confirmed">Confirmado</option>
+            <option value="in_progress">En Ejecución</option>
+            <option value="completed">Completado</option>
+          </select>
         </div>
         <div class="field field-full">
-          <label for="field-event-notes">Notas</label>
+          <label for="field-event-description">Descripción</label>
+          <textarea id="field-event-description" class="input" name="description"></textarea>
+        </div>
+        <div class="field field-full">
+          <label for="field-event-notes">Notas y Requerimientos</label>
           <textarea id="field-event-notes" class="input" name="notes"></textarea>
         </div>
       </div>

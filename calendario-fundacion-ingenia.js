@@ -29,6 +29,23 @@
   const CUSTOM_PALETTE = ['#dc2626', '#0891b2', '#eab308', '#a21caf', '#9f1239', '#78350f', '#1e40af', '#701a75', '#164e63', '#4c0519'];
   const NEW_CALENDAR_VALUE = '__new__';
 
+  // Campos compartidos del formulario de eventos, iguales en todos los
+  // calendarios (Networking, Organización, Dra Florangel, CMDLT, Coalición).
+  const EVENT_STATUS = { planned: 'Planificado', confirmed: 'Confirmado', in_progress: 'En Ejecución', completed: 'Completado' };
+  const JORNADA_TYPES = { insumos: 'Insumos', medica: 'Médica' };
+  const MEDICAL_SPECIALTIES = [
+    'Medicina General', 'Medicina Interna', 'Pediatría', 'Ginecología y Obstetricia',
+    'Cardiología', 'Dermatología', 'Oftalmología', 'Otorrinolaringología', 'Psiquiatría',
+    'Psicología', 'Nutrición y Dietética', 'Odontología', 'Fisioterapia', 'Endocrinología',
+    'Urología', 'Traumatología', 'Gastroenterología', 'Neurología'
+  ];
+  const OTHER_SPECIALTY_VALUE = '__otros__';
+  // UCV ya usa sus propios valores de "status" (planned/confirmed/executing/closed)
+  // en sus jornadas — se traduce en ambas direcciones para que el Estado
+  // compartido no le pise su propio esquema.
+  const SHARED_STATUS_TO_UCV = { planned: 'planned', confirmed: 'confirmed', in_progress: 'executing', completed: 'closed' };
+  const UCV_STATUS_TO_SHARED = { planned: 'planned', confirmed: 'confirmed', executing: 'in_progress', closed: 'completed' };
+
   // Organizaciones "reales" (con tablero propio o no) que se pueden elegir
   // al crear una tarea o al listarlas en la pestaña Organizaciones. "otros"
   // queda fuera a propósito — es el cajón genérico legado, ya no se ofrece
@@ -159,6 +176,8 @@
       'event-dialog-close': closeEventDialog,
       'event-dialog-cancel': closeEventDialog,
       'event-delete': deleteEditingEvent,
+      'field-event-jornada-type': onJornadaTypeChange,
+      'field-event-specialty-other': onSpecialtyOtherChange,
       'new-task-btn': openTaskDialog,
       'task-dialog-close': closeTaskDialog,
       'task-dialog-cancel': closeTaskDialog,
@@ -300,7 +319,12 @@
     dom.eventForm = document.getElementById('event-form');
     dom.eventError = document.getElementById('event-error');
     dom.eventSourceSelect = document.getElementById('field-event-source');
+    dom.eventCollaboratorsList = document.getElementById('event-collaborators-list');
     dom.newCalendarField = document.getElementById('new-calendar-field');
+    dom.eventJornadaTypeSelect = document.getElementById('field-event-jornada-type');
+    dom.eventSpecialtiesField = document.getElementById('event-specialties-field');
+    dom.eventSpecialtiesList = document.getElementById('event-specialties-list');
+    dom.eventCustomSpecialtyField = document.getElementById('event-custom-specialty-field');
     dom.eventDelete = document.getElementById('event-delete');
     dom.tasksBoard = document.getElementById('tasks-board');
     dom.taskDialog = document.getElementById('task-dialog');
@@ -376,6 +400,7 @@
     const isNew = dom.eventSourceSelect.value === NEW_CALENDAR_VALUE;
     dom.newCalendarField.hidden = !isNew;
     if (isNew) dom.eventForm.elements.new_calendar_name.focus();
+    populateCollaboratorsList();
   }
 
   async function loadAll() {
@@ -383,7 +408,7 @@
     dom.connectivityBanner.hidden = true;
 
     const [coalicionRes, florangelRes, ucvRes, ingeniaRes] = await Promise.all([
-      state.client.from('coalicion_events').select('id,title,event_date,start_time,location,maps_url,notes,status,participo_fundacion_ingenia').is('archived_at', null),
+      state.client.from('coalicion_events').select('id,title,event_date,start_time,end_time,venue,location,maps_url,notes,status,description,jornada_type,specialties,collaborating_orgs,participo_fundacion_ingenia').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
       state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
@@ -956,6 +981,71 @@
     return raw && (raw.participatesIngenia === true || raw.participo_fundacion_ingenia === true) ? 'si' : 'no';
   }
 
+  // Normaliza los campos nuevos del formulario (Estado, Lugar, Hora de
+  // Finalización, Descripción, Tipo de Jornada, Especialidades,
+  // Organizaciones colaboradoras) sin importar la fuente — cada una guarda
+  // estos datos con su propia convención de nombres (camelCase para los
+  // arreglos JSON, snake_case para las columnas de Coalición), y UCV ya
+  // tenía su propio "status" (planned/confirmed/executing/closed) que hay
+  // que traducir para no pisarlo.
+  function readEventExtra(source, raw) {
+    raw = raw || {};
+    const status = source === 'ucv' ? (UCV_STATUS_TO_SHARED[raw.status] || 'planned') : (raw.status || 'planned');
+    const venue = raw.venue || '';
+    const endTime = raw.endTime || raw.end_time || '';
+    const description = raw.description || '';
+    const jornadaType = raw.jornadaType || raw.jornada_type || '';
+    const specialties = Array.isArray(raw.specialties) ? raw.specialties : [];
+    const collaboratingOrgs = Array.isArray(raw.collaboratingOrgs) ? raw.collaboratingOrgs : (Array.isArray(raw.collaborating_orgs) ? raw.collaborating_orgs : []);
+    return { status: status, venue: venue, endTime: endTime, description: description, jornadaType: jornadaType, specialties: specialties, collaboratingOrgs: collaboratingOrgs };
+  }
+
+  function populateCollaboratorsList(checkedIds) {
+    const primary = dom.eventSourceSelect.value;
+    const previouslyChecked = checkedIds || Array.from(dom.eventCollaboratorsList.querySelectorAll('input:checked')).map(function (cb) { return cb.value; });
+    const allOrgs = REAL_ORGS.map(function (key) { return { id: key, label: SOURCE_LABELS[key], emoji: FIXED_SOURCE_EMOJI[key] }; })
+      .concat(state.customCalendars.map(function (c) { return { id: c.id, label: c.name, emoji: '🏷️' }; }));
+    const options = allOrgs.filter(function (o) { return o.id !== primary; });
+    renderMarkup(dom.eventCollaboratorsList, options.map(function (o) {
+      const checked = previouslyChecked.indexOf(o.id) > -1 ? ' checked' : '';
+      return '<label class="checkbox-chip"><input type="checkbox" class="event-collaborator-checkbox" value="' + safe(o.id) + '"' + checked + '>' + o.emoji + ' ' + safe(o.label) + '</label>';
+    }).join(''));
+  }
+
+  function populateSpecialtiesList(checkedList) {
+    const canonicalChecked = [];
+    let customChecked = [];
+    if (checkedList) {
+      checkedList.forEach(function (s) {
+        if (MEDICAL_SPECIALTIES.indexOf(s) > -1) canonicalChecked.push(s); else customChecked.push(s);
+      });
+    } else {
+      Array.from(dom.eventSpecialtiesList.querySelectorAll('.event-specialty-checkbox:checked')).forEach(function (cb) {
+        if (cb.value !== OTHER_SPECIALTY_VALUE) canonicalChecked.push(cb.value);
+      });
+    }
+    const items = MEDICAL_SPECIALTIES.map(function (label) {
+      const checked = canonicalChecked.indexOf(label) > -1 ? ' checked' : '';
+      return '<label class="checkbox-chip"><input type="checkbox" class="event-specialty-checkbox" value="' + safe(label) + '"' + checked + '>' + safe(label) + '</label>';
+    });
+    const hasCustom = checkedList ? customChecked.length > 0 : (document.getElementById('field-event-specialty-other') && document.getElementById('field-event-specialty-other').checked);
+    items.push('<label class="checkbox-chip"><input type="checkbox" id="field-event-specialty-other" class="event-specialty-checkbox" value="' + OTHER_SPECIALTY_VALUE + '"' + (hasCustom ? ' checked' : '') + ' onchange="window.ingeniaAction(event)">Otros</label>');
+    renderMarkup(dom.eventSpecialtiesList, items.join(''));
+    dom.eventCustomSpecialtyField.hidden = !hasCustom;
+    if (checkedList) dom.eventForm.elements.custom_specialties.value = customChecked.join(', ');
+  }
+
+  function onJornadaTypeChange() {
+    const isMedica = dom.eventJornadaTypeSelect.value === 'medica';
+    dom.eventSpecialtiesField.hidden = !isMedica;
+    if (isMedica) populateSpecialtiesList();
+  }
+
+  function onSpecialtyOtherChange() {
+    const other = document.getElementById('field-event-specialty-other');
+    dom.eventCustomSpecialtyField.hidden = !(other && other.checked);
+  }
+
   function openEventDialog(existing) {
     hideError(dom.eventError);
     dom.eventForm.reset();
@@ -965,16 +1055,29 @@
     dom.eventDialogTitle.textContent = existing ? 'Editar evento' : 'Agregar evento';
     dom.eventDelete.hidden = !existing;
     if (existing) {
+      const extra = readEventExtra(existing.source, existing.raw);
       dom.eventForm.elements.source.value = existing.source;
       dom.eventForm.elements.title.value = existing.title || '';
       dom.eventForm.elements.event_date.value = existing.date || '';
       dom.eventForm.elements.start_time.value = existing.time ? existing.time.slice(0, 5) : '';
+      dom.eventForm.elements.end_time.value = extra.endTime ? extra.endTime.slice(0, 5) : '';
+      dom.eventForm.elements.venue.value = extra.venue;
       dom.eventForm.elements.location.value = existing.location || '';
+      dom.eventForm.elements.status.value = extra.status;
+      dom.eventForm.elements.description.value = extra.description;
       dom.eventForm.elements.notes.value = existing.notes || '';
       dom.eventForm.elements.participates_ingenia.value = readParticipatesIngenia(existing.raw);
+      dom.eventForm.elements.jornada_type.value = extra.jornadaType;
+      dom.eventSpecialtiesField.hidden = extra.jornadaType !== 'medica';
+      if (extra.jornadaType === 'medica') populateSpecialtiesList(extra.specialties); else populateSpecialtiesList([]);
+      populateCollaboratorsList(extra.collaboratingOrgs);
     } else {
       dom.eventForm.elements.event_date.value = state.selectedDay || new Date().toISOString().slice(0, 10);
       dom.eventForm.elements.participates_ingenia.value = 'no';
+      dom.eventForm.elements.status.value = 'planned';
+      dom.eventSpecialtiesField.hidden = true;
+      populateSpecialtiesList([]);
+      populateCollaboratorsList([]);
     }
     dom.eventDialog.showModal();
     dom.eventForm.elements.title.focus();
@@ -987,6 +1090,19 @@
     renderCalendar();
   }
 
+  function readSpecialties() {
+    const canonical = Array.from(dom.eventSpecialtiesList.querySelectorAll('.event-specialty-checkbox:checked'))
+      .map(function (cb) { return cb.value; })
+      .filter(function (v) { return v !== OTHER_SPECIALTY_VALUE; });
+    const customRaw = dom.eventForm.elements.custom_specialties.value.trim();
+    const custom = customRaw ? customRaw.split(',').map(function (s) { return s.trim(); }).filter(Boolean) : [];
+    return canonical.concat(custom);
+  }
+
+  function readCollaboratingOrgs() {
+    return Array.from(dom.eventCollaboratorsList.querySelectorAll('.event-collaborator-checkbox:checked')).map(function (cb) { return cb.value; });
+  }
+
   async function onEventSubmit(e) {
     e.preventDefault();
     hideError(dom.eventError);
@@ -994,11 +1110,18 @@
     const title = dom.eventForm.elements.title.value.trim();
     const eventDate = dom.eventForm.elements.event_date.value;
     const startTime = dom.eventForm.elements.start_time.value;
+    const endTime = dom.eventForm.elements.end_time.value;
+    const venue = dom.eventForm.elements.venue.value.trim();
     const location = dom.eventForm.elements.location.value.trim();
+    const status = dom.eventForm.elements.status.value;
+    const description = dom.eventForm.elements.description.value.trim();
     const notes = dom.eventForm.elements.notes.value.trim();
     const participatesIngenia = dom.eventForm.elements.participates_ingenia.value === 'si';
-    if (!title || !eventDate) { showError(dom.eventError, 'Título y fecha son obligatorios.'); return; }
-    if (source === 'coalicion' && !location) { showError(dom.eventError, 'Coalición Venezuela necesita una ubicación (o edítalo luego para agregar el link de Maps).'); return; }
+    const jornadaType = dom.eventJornadaTypeSelect.value;
+    const specialties = jornadaType === 'medica' ? readSpecialties() : [];
+    const collaboratingOrgs = readCollaboratingOrgs();
+    if (!title || !eventDate) { showError(dom.eventError, 'Nombre del evento y fecha son obligatorios.'); return; }
+    if (source === 'coalicion' && !venue && !location) { showError(dom.eventError, 'Coalición Venezuela necesita un lugar o una dirección.'); return; }
 
     let newCalendarName = '';
     if (source === NEW_CALENDAR_VALUE) {
@@ -1009,7 +1132,12 @@
     const submitBtn = dom.eventForm.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     let ok = false;
-    const fields = { title: title, event_date: eventDate, start_time: startTime, location: location, notes: notes, participatesIngenia: participatesIngenia };
+    const fields = {
+      title: title, event_date: eventDate, start_time: startTime, end_time: endTime,
+      venue: venue, location: location, status: status, description: description, notes: notes,
+      participatesIngenia: participatesIngenia, jornadaType: jornadaType, specialties: specialties,
+      collaboratingOrgs: collaboratingOrgs
+    };
     let existing = state.editingEvent;
 
     if (existing && source !== NEW_CALENDAR_VALUE && source !== existing.source) {
@@ -1337,8 +1465,8 @@
   }
 
   async function saveCoalicionEvent(fields, existing) {
-    // Al editar, conservamos status/maps_url originales — este formulario
-    // simplificado no los toca, así que no se deben perder.
+    // El link de Maps ya no se edita desde este formulario — se conserva el
+    // que tuviera el evento (si tenía uno de antes) sin tocarlo.
     const raw = existing && existing.raw;
     try {
       const res = await fetch(COALICION_EDITOR_URL, {
@@ -1347,9 +1475,11 @@
         body: JSON.stringify({
           action: 'save', entity: 'event', id: existing ? existing.rawId : null,
           payload: {
-            title: fields.title, event_date: fields.event_date, start_time: fields.start_time || '', location: fields.location,
-            maps_url: (raw && raw.maps_url) || '', notes: fields.notes, status: (raw && raw.status) || 'planned',
-            participo_fundacion_ingenia: fields.participatesIngenia
+            title: fields.title, event_date: fields.event_date, start_time: fields.start_time || '',
+            end_time: fields.end_time || '', venue: fields.venue, location: fields.location,
+            maps_url: (raw && raw.maps_url) || '', status: fields.status, notes: fields.notes,
+            description: fields.description, jornada_type: fields.jornadaType, specialties: fields.specialties,
+            collaborating_orgs: fields.collaboratingOrgs, participo_fundacion_ingenia: fields.participatesIngenia
           }
         })
       });
@@ -1373,8 +1503,10 @@
     const next = upsertById(current, existing, function (base) {
       return Object.assign({}, base, {
         id: existing ? existing.rawId : uid(), title: fields.title, event_date: fields.event_date,
-        start_time: fields.start_time, location: fields.location, notes: fields.notes,
-        participatesIngenia: fields.participatesIngenia
+        start_time: fields.start_time, end_time: fields.end_time, venue: fields.venue,
+        location: fields.location, status: fields.status, description: fields.description, notes: fields.notes,
+        participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
+        specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs
       });
     });
     return writeBoardKey('florangel_board_state', 'florangel-events-v1', next);
@@ -1382,25 +1514,34 @@
 
   async function saveUcvEvent(fields, existing) {
     const current = await readBoardKey('ucv_board_state', 'ucv-journeys-v3', []);
+    const sharedStatus = SHARED_STATUS_TO_UCV[fields.status] || 'planned';
     if (existing) {
       // Las jornadas de UCV traen campos que este formulario no maneja
-      // (eventType, status, voluntarios asignados, checks...) — se preservan
-      // tal cual, solo se actualizan título/fecha/hora/ubicación/notas. Si la
+      // (eventType, voluntarios asignados, checks...) — se preservan tal
+      // cual. "status" se traduce a los valores propios de UCV (ver
+      // SHARED_STATUS_TO_UCV) para no romper su propio esquema. Si la
       // jornada tenía varias fechas, solo se reemplaza la de este evento.
       const next = current.map(function (j) {
         if (j.id !== existing.rawId) return j;
         const dates = Array.isArray(j.dates) ? j.dates.slice() : [];
         const idx = dates.indexOf(existing.date);
         if (idx > -1) dates[idx] = fields.event_date; else dates.push(fields.event_date);
-        return Object.assign({}, j, { title: fields.title, dates: dates, time: fields.start_time || '', location: fields.location, notes: fields.notes, participatesIngenia: fields.participatesIngenia });
+        return Object.assign({}, j, {
+          title: fields.title, dates: dates, time: fields.start_time || '', endTime: fields.end_time,
+          venue: fields.venue, location: fields.location, status: sharedStatus, description: fields.description,
+          notes: fields.notes, participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
+          specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs
+        });
       });
       return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
     }
     const next = current.concat({
       id: uid(), title: fields.title, dates: [fields.event_date], time: fields.start_time || '',
-      location: fields.location, notes: fields.notes, status: 'planned', eventType: 'other',
-      owner: '', doctors: '', students: '', assignedVolunteers: [], checks: {},
-      participatesIngenia: fields.participatesIngenia
+      endTime: fields.end_time, venue: fields.venue, location: fields.location, status: sharedStatus,
+      description: fields.description, eventType: 'other',
+      owner: '', doctors: '', students: '', assignedVolunteers: [], checks: {}, notes: fields.notes,
+      participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
+      specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs
     });
     return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
   }
@@ -1410,8 +1551,10 @@
     const next = upsertById(current, existing, function (base) {
       return Object.assign({}, base, {
         id: existing ? existing.rawId : uid(), title: fields.title, event_date: fields.event_date,
-        start_time: fields.start_time, location: fields.location, notes: fields.notes,
-        participatesIngenia: fields.participatesIngenia
+        start_time: fields.start_time, end_time: fields.end_time, venue: fields.venue,
+        location: fields.location, status: fields.status, description: fields.description, notes: fields.notes,
+        participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
+        specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs
       });
     });
     return writeBoardKey('ingenia_board_state', key, next);
