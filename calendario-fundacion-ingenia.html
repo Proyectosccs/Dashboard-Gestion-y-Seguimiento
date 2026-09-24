@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=15">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=16">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=15" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=16" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -51,21 +51,23 @@
       </div>
       <div class="calendar-layout">
         <aside class="calendar-sidebar panel">
-          <div class="calendar-view-switcher" id="calendar-view-switcher">
-            <button type="button" class="calendar-view-btn" data-calendar-view="week" onclick="window.ingeniaAction(event)">Semana <span class="calendar-view-key">W</span></button>
-            <button type="button" class="calendar-view-btn" data-calendar-view="month" aria-current="page" onclick="window.ingeniaAction(event)">Mes <span class="calendar-view-key">M</span></button>
-            <button type="button" class="calendar-view-btn" data-calendar-view="year" onclick="window.ingeniaAction(event)">Año <span class="calendar-view-key">Y</span></button>
-            <button type="button" class="calendar-view-btn" data-calendar-view="agenda" onclick="window.ingeniaAction(event)">Agenda <span class="calendar-view-key">A</span></button>
-          </div>
           <div id="source-legend" class="source-legend"></div>
         </aside>
 
         <div class="calendar-main">
           <div id="calendar-toolbar" class="calendar-toolbar panel">
-            <button id="calendar-prev" class="icon-button" type="button" aria-label="Anterior" onclick="window.ingeniaAction(event)">‹</button>
-            <h3 id="calendar-period-label"></h3>
-            <button id="calendar-next" class="icon-button" type="button" aria-label="Siguiente" onclick="window.ingeniaAction(event)">›</button>
-            <button id="calendar-today" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)">Hoy</button>
+            <div class="calendar-view-switcher" id="calendar-view-switcher">
+              <button type="button" class="calendar-view-btn" data-calendar-view="week" onclick="window.ingeniaAction(event)">Semana</button>
+              <button type="button" class="calendar-view-btn" data-calendar-view="month" aria-current="page" onclick="window.ingeniaAction(event)">Mes</button>
+              <button type="button" class="calendar-view-btn" data-calendar-view="year" onclick="window.ingeniaAction(event)">Año</button>
+              <button type="button" class="calendar-view-btn" data-calendar-view="agenda" onclick="window.ingeniaAction(event)">Agenda</button>
+            </div>
+            <div id="calendar-period-nav" class="calendar-period-nav">
+              <button id="calendar-prev" class="icon-button" type="button" aria-label="Anterior" onclick="window.ingeniaAction(event)">‹</button>
+              <h3 id="calendar-period-label"></h3>
+              <button id="calendar-next" class="icon-button" type="button" aria-label="Siguiente" onclick="window.ingeniaAction(event)">›</button>
+              <button id="calendar-today" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)">Hoy</button>
+            </div>
           </div>
 
           <div id="calendar-month-view">

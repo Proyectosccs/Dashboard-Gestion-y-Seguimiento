@@ -18,7 +18,11 @@
   // clave; cada uno guarda sus eventos en su propia clave
   // 'ingenia-custom-<id>-events-v1', mismo patrón que networking/otros.
   const CUSTOM_CALENDARS_KEY = 'ingenia-custom-calendars-v1';
-  const CUSTOM_PALETTE = ['#7c3aed', '#be185d', '#0f766e', '#c67139', '#1d4ed8', '#15803d', '#a16207', '#4338ca', '#b91c1c', '#0e7490'];
+  // Ningún color aquí debe repetir los de FIXED_SOURCE_COLOR — de lo
+  // contrario una organización creada al vuelo se confunde visualmente con
+  // una de las organizaciones fijas (pasó con "#7c3aed" = Networking y
+  // "#be185d" = Dra Florangel).
+  const CUSTOM_PALETTE = ['#16a34a', '#dc2626', '#eab308', '#0891b2', '#4d7c0f', '#a21caf', '#365314', '#701a75', '#164e63', '#78350f'];
   const NEW_CALENDAR_VALUE = '__new__';
 
   // Organizaciones "reales" (con tablero propio o no) que se pueden elegir
@@ -275,6 +279,7 @@
     dom.sourceLegend = document.getElementById('source-legend');
     dom.calendarViewSwitcher = document.getElementById('calendar-view-switcher');
     dom.calendarToolbar = document.getElementById('calendar-toolbar');
+    dom.calendarPeriodNav = document.getElementById('calendar-period-nav');
     dom.calendarPeriodLabel = document.getElementById('calendar-period-label');
     dom.calendarMonthView = document.getElementById('calendar-month-view');
     dom.calendarGrid = document.getElementById('calendar-grid');
@@ -601,7 +606,7 @@
     dom.calendarWeekView.hidden = mode !== 'week';
     dom.calendarYearView.hidden = mode !== 'year';
     dom.calendarAgendaView.hidden = mode !== 'agenda';
-    dom.calendarToolbar.hidden = mode === 'agenda';
+    dom.calendarPeriodNav.hidden = mode === 'agenda';
     if (mode === 'week') renderWeekView();
     else if (mode === 'year') renderYearView();
     else if (mode === 'agenda') renderAgendaView();
@@ -754,11 +759,9 @@
   }
 
   function renderLegend() {
-    // "otros" solo se sigue mostrando en la leyenda si ya hay eventos viejos
-    // etiquetados así — ya no se ofrece para datos nuevos (ver REAL_ORGS).
-    const hasOtros = state.events.some(function (e) { return e.source === 'otros'; });
-    const fixedKeys = REAL_ORGS.concat(hasOtros ? ['otros'] : []);
-    const items = fixedKeys.map(function (key) {
+    // "otros" (el cajón genérico legado) no se muestra en la leyenda: la
+    // lista debe crecer solo con organizaciones reales conforme se agregan.
+    const items = REAL_ORGS.map(function (key) {
       return '<span class="source-legend-item">' + sourceDotHtml(key) + safe(SOURCE_LABELS[key]) + '</span>';
     }).concat(state.customCalendars.map(function (c) {
       return '<span class="source-legend-item">' + sourceDotHtml(c.id) + safe(c.name) + '</span>';
