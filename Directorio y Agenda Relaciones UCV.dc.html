@@ -157,11 +157,23 @@
             <div style="font-family: var(--font-heading); font-size: 25px">{{ uiText.calendarTitle }}</div>
             <div style="font-size: 12.5px; color: var(--color-neutral-700)">Cada evento agregado aparece aquí y en “Próximos eventos” del tablero operativo.</div>
           </div>
-          <button aria-label="Mes anterior" onClick="{{ previousMonth }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); width: 38px; height: 38px; border-radius: 999px; cursor: pointer; font-size: 18px">‹</button>
-          <div style="font-family: var(--font-heading); font-size: 18px; min-width: 165px; text-align: center; text-transform: capitalize">{{ calendarMonthLabel }}</div>
-          <button aria-label="Mes siguiente" onClick="{{ nextMonth }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); width: 38px; height: 38px; border-radius: 999px; cursor: pointer; font-size: 18px">›</button>
-          <button onClick="{{ goToday }}" style="border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 9px 13px; cursor: pointer; font-weight: 700">Hoy</button>
           <button onClick="{{ newJourney }}" style="border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 10px 15px; cursor: pointer; font-weight: 700" style-hover="{{ primaryHover }}">＋ Evento</button>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px">
+          <div style="display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--color-neutral-100)">
+            <sc-for list="{{ calendarViewOptions }}" as="v" hint-placeholder-count="4">
+              <button type="button" onClick="{{ v.select }}" style="{{ v.style }}">{{ v.label }}</button>
+            </sc-for>
+          </div>
+          <sc-if value="{{ calendarShowsPeriodNav }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; align-items: center; gap: 10px">
+              <button aria-label="Anterior" onClick="{{ previousPeriod }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); width: 38px; height: 38px; border-radius: 999px; cursor: pointer; font-size: 18px">‹</button>
+              <div style="font-family: var(--font-heading); font-size: 18px; min-width: 165px; text-align: center; text-transform: capitalize">{{ calendarPeriodLabel }}</div>
+              <button aria-label="Siguiente" onClick="{{ nextPeriod }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); width: 38px; height: 38px; border-radius: 999px; cursor: pointer; font-size: 18px">›</button>
+              <button onClick="{{ goToday }}" style="border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 9px 13px; cursor: pointer; font-weight: 700">Hoy</button>
+            </div>
+          </sc-if>
         </div>
 
         <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px">
@@ -170,31 +182,98 @@
           </sc-for>
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(7, minmax(42px, 1fr)); gap: 6px">
-          <sc-for list="{{ weekDays }}" as="d" hint-placeholder-count="7">
-            <div style="font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-neutral-600); font-weight: 700; text-align: center; padding: 3px 0">{{ d }}</div>
-          </sc-for>
-          <sc-for list="{{ calendarCells }}" as="cell" hint-placeholder-count="35">
-            <sc-if value="{{ cell.blank }}" hint-placeholder-val="{{ false }}"><div style="min-height: 96px"></div></sc-if>
-            <sc-if value="{{ cell.day }}" hint-placeholder-val="{{ true }}">
-              <button onClick="{{ cell.open }}" style="{{ cell.style }}" style-hover="{{ calendarCellHover }}">
-                <span style="display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700"><span style="{{ cell.numberStyle }}">{{ cell.number }}</span><span style="margin-left: auto; font-size: 10px; color: var(--color-neutral-600)">{{ cell.countLabel }}</span></span>
-                <span style="display: flex; flex-direction: column; gap: 4px; margin-top: auto">
-                  <sc-for list="{{ cell.events }}" as="e" hint-placeholder-count="2">
-                    <span style="{{ e.style }}">{{ e.time }}{{ e.title }}</span>
+        <sc-if value="{{ calendarIsMonth }}" hint-placeholder-val="{{ true }}">
+          <div style="display: grid; grid-template-columns: repeat(7, minmax(42px, 1fr)); gap: 6px">
+            <sc-for list="{{ weekDays }}" as="d" hint-placeholder-count="7">
+              <div style="font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-neutral-600); font-weight: 700; text-align: center; padding: 3px 0">{{ d }}</div>
+            </sc-for>
+            <sc-for list="{{ calendarCells }}" as="cell" hint-placeholder-count="35">
+              <sc-if value="{{ cell.blank }}" hint-placeholder-val="{{ false }}"><div style="min-height: 96px"></div></sc-if>
+              <sc-if value="{{ cell.day }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ cell.open }}" style="{{ cell.style }}" style-hover="{{ calendarCellHover }}">
+                  <span style="display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700"><span style="{{ cell.numberStyle }}">{{ cell.number }}</span><span style="margin-left: auto; font-size: 10px; color: var(--color-neutral-600)">{{ cell.countLabel }}</span></span>
+                  <span style="display: flex; flex-direction: column; gap: 4px; margin-top: auto">
+                    <sc-for list="{{ cell.events }}" as="e" hint-placeholder-count="2">
+                      <span style="{{ e.style }}">{{ e.time }}{{ e.title }}</span>
+                    </sc-for>
+                    <sc-if value="{{ cell.hasMore }}" hint-placeholder-val="{{ false }}"><span style="font-size: 9.5px; color: var(--color-neutral-600); text-align: left">＋{{ cell.moreCount }} más</span></sc-if>
+                    <sc-if value="{{ cell.hasVolunteerInfo }}" hint-placeholder-val="{{ false }}">
+                      <span style="display: flex; gap: 6px; font-size: 9px; font-weight: 700">
+                        <sc-if value="{{ cell.showAvailable }}" hint-placeholder-val="{{ false }}"><span style="color: #1f7a3d">🟢 {{ cell.volunteerAvailableCount }}</span></sc-if>
+                        <sc-if value="{{ cell.showAssigned }}" hint-placeholder-val="{{ false }}"><span style="color: #1f5aa3">🔵 {{ cell.volunteerAssignedCount }}</span></sc-if>
+                      </span>
+                    </sc-if>
+                  </span>
+                </button>
+              </sc-if>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ calendarIsWeek }}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; overflow-x: auto">
+            <sc-for list="{{ calendarWeekCells }}" as="cell" hint-placeholder-count="7">
+              <div style="{{ cell.style }}">
+                <div style="font-size: 10.5px; text-transform: uppercase; font-weight: 700; color: var(--color-neutral-600)">{{ cell.label }} {{ cell.number }}</div>
+                <div style="display: flex; flex-direction: column; gap: 4px; flex: 1">
+                  <sc-for list="{{ cell.events }}" as="e" hint-placeholder-count="3">
+                    <button onClick="{{ e.open }}" style="{{ e.style }}">{{ e.time }}{{ e.title }}</button>
                   </sc-for>
-                  <sc-if value="{{ cell.hasMore }}" hint-placeholder-val="{{ false }}"><span style="font-size: 9.5px; color: var(--color-neutral-600); text-align: left">＋{{ cell.moreCount }} más</span></sc-if>
-                  <sc-if value="{{ cell.hasVolunteerInfo }}" hint-placeholder-val="{{ false }}">
-                    <span style="display: flex; gap: 6px; font-size: 9px; font-weight: 700">
-                      <sc-if value="{{ cell.showAvailable }}" hint-placeholder-val="{{ false }}"><span style="color: #1f7a3d">🟢 {{ cell.volunteerAvailableCount }}</span></sc-if>
-                      <sc-if value="{{ cell.showAssigned }}" hint-placeholder-val="{{ false }}"><span style="color: #1f5aa3">🔵 {{ cell.volunteerAssignedCount }}</span></sc-if>
-                    </span>
-                  </sc-if>
-                </span>
-              </button>
+                  <sc-if value="{{ cell.noEvents }}" hint-placeholder-val="{{ false }}"><span style="font-size: 10.5px; color: var(--color-neutral-600)">Sin eventos</span></sc-if>
+                </div>
+                <button onClick="{{ cell.open }}" style="border: none; background: transparent; color: var(--color-neutral-600); font-size: 11px; cursor: pointer; text-align: left; padding: 0">＋ agregar</button>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ calendarIsYear }}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px">
+            <sc-for list="{{ calendarYearMonths }}" as="mo" hint-placeholder-count="12">
+              <div style="padding: 12px; border: 1px solid var(--color-neutral-200); border-radius: 18px; background: #fff">
+                <div style="font-family: var(--font-heading); font-size: 13px; font-weight: 700; text-align: center; text-transform: capitalize; margin-bottom: 8px">{{ mo.label }}</div>
+                <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px">
+                  <sc-for list="{{ mo.weekdays }}" as="w" hint-placeholder-count="7">
+                    <div style="font-size: 8.5px; color: var(--color-neutral-500); text-align: center">{{ w }}</div>
+                  </sc-for>
+                  <sc-for list="{{ mo.days }}" as="d" hint-placeholder-count="35">
+                    <sc-if value="{{ d.blank }}" hint-placeholder-val="{{ false }}"><div></div></sc-if>
+                    <sc-if value="{{ d.day }}" hint-placeholder-val="{{ true }}">
+                      <button onClick="{{ d.open }}" style="{{ d.style }}">
+                        <span>{{ d.number }}</span>
+                        <sc-if value="{{ d.dotVisible }}" hint-placeholder-val="{{ false }}"><span style="display: block; width: 4px; height: 4px; border-radius: 999px; background: var(--color-accent-500); margin: 1px auto 0"></span></sc-if>
+                      </button>
+                    </sc-if>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ calendarIsAgenda }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 18px">
+            <sc-for list="{{ calendarAgendaGroups }}" as="g" hint-placeholder-count="2">
+              <div>
+                <h4 style="font-family: var(--font-heading); font-size: 13px; font-weight: 700; text-transform: capitalize; color: var(--color-neutral-700); margin: 0 0 8px">{{ g.label }}</h4>
+                <div style="display: flex; flex-direction: column; gap: 9px">
+                  <sc-for list="{{ g.items }}" as="j" hint-placeholder-count="2">
+                    <button onClick="{{ j.edit }}" style="text-align: left; border: 1px solid var(--color-neutral-200); border-left: 5px solid {{ j.color }}; border-radius: 17px; background: #fff; padding: 12px 14px; cursor: pointer">
+                      <div style="display: flex; gap: 8px; align-items: center">
+                        <strong style="font-size: 13.5px; min-width: 0; flex: 1">{{ j.title }}</strong>
+                        <span style="font-size: 10.5px; color: {{ j.color }}; font-weight: 700">{{ j.statusLabel }}</span>
+                      </div>
+                      <div style="font-size: 12px; color: var(--color-neutral-700); margin-top: 5px">{{ j.timeLabel }} · {{ j.location }}</div>
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ calendarAgendaEmpty }}" hint-placeholder-val="{{ true }}">
+              <div style="border: 1px dashed var(--color-neutral-400); border-radius: 17px; padding: 20px; text-align: center; font-size: 12.5px; color: var(--color-neutral-600)">No hay eventos próximos.</div>
             </sc-if>
-          </sc-for>
-        </div>
+          </div>
+        </sc-if>
       </div>
     </sc-if>
 
@@ -1645,6 +1724,13 @@ function timeInput(value) {
   return value ? String(value).slice(0, 5) : '';
 }
 
+function mondayOf(iso) {
+  const date = new Date(iso + 'T00:00:00Z');
+  const offset = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - offset);
+  return date.toISOString().slice(0, 10);
+}
+
 function normalizeUI(value) {
   const v = value || {};
   const tabs = Array.isArray(v.tabOrder) && v.tabOrder.length === 6 ? v.tabOrder.filter(x => NAV_ITEMS[x]) : DEFAULT_UI.tabOrder.slice();
@@ -1705,6 +1791,7 @@ class Component extends DCLogic {
     },
     ui: cloneUI(SAVED_UI), customizeOpen: false, customizeForm: cloneUI(SAVED_UI),
     calendarMonth: TODAY.slice(0, 7), dayModal: null, journeyModal: null,
+    calendarViewMode: 'month', calendarWeekStart: mondayOf(TODAY), calendarYear: Number(TODAY.slice(0, 4)),
     journeyForm: { title: '', eventType: 'health', dates: [TODAY], time: '', endTime: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, specialtyUnit: '', doctors: '', students: '', participatesIngenia: false, participants: [], jornadaType: '', specialties: [] },
     modal: null, type: 'meeting', notes: '', date: TODAY, follow: '',
     taskModal: null,
@@ -2294,6 +2381,21 @@ class Component extends DCLogic {
     this.setState({ calendarMonth: month });
   }
 
+  setCalendarViewMode(mode) { this.setState({ calendarViewMode: mode }); }
+
+  changePeriod(delta) {
+    const s = this.state;
+    if (s.calendarViewMode === 'week') {
+      const d = new Date(s.calendarWeekStart + 'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate() + delta * 7);
+      this.setState({ calendarWeekStart: d.toISOString().slice(0, 10) });
+    } else if (s.calendarViewMode === 'year') {
+      this.setState({ calendarYear: s.calendarYear + delta });
+    } else {
+      this.moveCalendar(delta);
+    }
+  }
+
   toggleJourneyCheck(key) {
     const current = this.state.journeyForm;
     const checks = Object.assign({}, current.checks || {}, { [key]: !(current.checks || {})[key] });
@@ -2464,7 +2566,7 @@ class Component extends DCLogic {
         countLabel: dayJourneys.length ? dayJourneys.length + (dayJourneys.length === 1 ? ' evento' : ' eventos') : '',
         events: dayJourneys.slice(0, 3).map(j => {
           const meta = JOURNEY_STATUS[j.status] || JOURNEY_STATUS.planned;
-          const brief = (j.title || 'Evento por confirmar') + (j.owner ? ' de ' + j.owner : '') + (j.location ? ' en ' + j.location : '');
+          const brief = (j.title || 'Evento por confirmar') + (j.owner && j.owner !== 'Por confirmar' ? ' de ' + j.owner : '') + (j.location ? ' en ' + j.location : '');
           return { color: meta.color, soft: meta.soft, time: j.time ? j.time + ' · ' : '', title: brief, style: { display: 'block', textAlign: 'left', borderLeft: '3px solid ' + meta.color, background: meta.soft, borderRadius: Math.max(6, bubble.radius - 8), padding: bubble.eventPadding, fontSize: bubble.eventFont, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } };
         }),
         hasMore: dayJourneys.length > 3,
@@ -2480,6 +2582,86 @@ class Component extends DCLogic {
       });
     }
     while (calendarCells.length % 7) calendarCells.push({ blank: true, day: false });
+
+    // ---------- Semana / Año / Agenda (mismo patrón de vistas que el resto
+    // de los calendarios del sitio — ver calendario-fundacion-ingenia.js) ----------
+    const calendarViewLabels = { week: 'Semana', month: 'Mes', year: 'Año', agenda: 'Agenda' };
+    const calendarViewOptions = ['week', 'month', 'year', 'agenda'].map(mode => ({
+      id: mode, label: calendarViewLabels[mode],
+      select: () => this.setCalendarViewMode(mode),
+      style: {
+        padding: '8px 14px', border: 'none', borderRadius: 999, cursor: 'pointer', fontSize: 13, fontWeight: 700,
+        background: s.calendarViewMode === mode ? 'var(--color-accent-500)' : 'transparent',
+        color: s.calendarViewMode === mode ? '#fff' : 'var(--color-neutral-800)'
+      }
+    }));
+    const calendarIsMonth = s.calendarViewMode === 'month';
+    const calendarIsWeek = s.calendarViewMode === 'week';
+    const calendarIsYear = s.calendarViewMode === 'year';
+    const calendarIsAgenda = s.calendarViewMode === 'agenda';
+    const calendarShowsPeriodNav = !calendarIsAgenda;
+
+    const weekStartDate = new Date(s.calendarWeekStart + 'T00:00:00Z');
+    const weekEndDate = new Date(weekStartDate);
+    weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 6);
+    const shortDate = d => d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()];
+    const calendarWeekCells = [];
+    for (let i = 0; i < 7; i += 1) {
+      const d = new Date(weekStartDate);
+      d.setUTCDate(d.getUTCDate() + i);
+      const iso = d.toISOString().slice(0, 10);
+      const dayJourneys = sortedJourneys.filter(j => (j.dates || []).indexOf(iso) > -1);
+      const isToday = iso === TODAY;
+      calendarWeekCells.push({
+        label: WEEK_DAYS[i], number: d.getUTCDate(), noEvents: dayJourneys.length === 0,
+        style: { minHeight: 220, padding: 10, boxSizing: 'border-box', border: isToday ? '2px solid var(--color-accent-500)' : '1px solid var(--color-neutral-200)', borderRadius: 16, background: isToday ? 'var(--color-accent-100)' : 'var(--color-neutral-100)', display: 'flex', flexDirection: 'column', gap: 6 },
+        open: () => this.openCalendarDay(iso),
+        events: dayJourneys.map(j => {
+          const meta = JOURNEY_STATUS[j.status] || JOURNEY_STATUS.planned;
+          const brief = (j.title || 'Evento por confirmar') + (j.location ? ' en ' + j.location : '');
+          return {
+            time: j.time ? j.time + ' · ' : '', title: brief, open: () => this.openJourney(j.id),
+            style: { display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'left', border: 'none', borderLeft: '3px solid ' + meta.color, background: meta.soft, borderRadius: 8, padding: '4px 6px', fontSize: 10.5, cursor: 'pointer', whiteSpace: 'normal' }
+          };
+        })
+      });
+    }
+
+    const calendarPeriodLabel = calendarIsWeek
+      ? shortDate(weekStartDate) + ' – ' + shortDate(weekEndDate) + ' ' + weekEndDate.getUTCFullYear()
+      : calendarIsYear ? String(s.calendarYear) : MONTH_NAMES[calendarMonthNum] + ' ' + calendarYear;
+
+    const calendarYearMonths = [];
+    for (let m = 0; m < 12; m += 1) {
+      const yFirst = new Date(Date.UTC(s.calendarYear, m, 1));
+      const yLast = new Date(Date.UTC(s.calendarYear, m + 1, 0)).getUTCDate();
+      const yOffset = (yFirst.getUTCDay() + 6) % 7;
+      const days = [];
+      for (let blank = 0; blank < yOffset; blank += 1) days.push({ blank: true, day: false });
+      for (let day = 1; day <= yLast; day += 1) {
+        const iso = s.calendarYear + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+        const hasEvents = sortedJourneys.some(j => (j.dates || []).indexOf(iso) > -1);
+        const isToday = iso === TODAY;
+        days.push({
+          blank: false, day: true, number: day, dotVisible: hasEvents,
+          open: () => this.openCalendarDay(iso),
+          style: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, padding: '2px 0', border: 'none', borderRadius: 6, background: isToday ? 'var(--color-accent-500)' : 'transparent', color: isToday ? '#fff' : 'var(--color-text)', fontSize: 10, fontWeight: isToday ? 700 : 400, cursor: 'pointer' }
+        });
+      }
+      while (days.length % 7) days.push({ blank: true, day: false });
+      calendarYearMonths.push({ label: MONTH_NAMES[m], weekdays: WEEK_DAYS.map(w => w[0]), days: days });
+    }
+
+    const calendarAgendaGroups = [];
+    sortedJourneys.filter(j => (j.dates || []).some(d => d >= TODAY)).forEach(j => {
+      (j.dates || []).filter(d => d >= TODAY).forEach(d => {
+        let group = calendarAgendaGroups.find(g => g.date === d);
+        if (!group) { group = { date: d, label: fmt(d), items: [] }; calendarAgendaGroups.push(group); }
+        group.items.push(journeyCard(j));
+      });
+    });
+    calendarAgendaGroups.sort((a, b) => a.date.localeCompare(b.date));
+    const calendarAgendaEmpty = calendarAgendaGroups.length === 0;
 
     const selectedDayJourneys = s.dayModal ? sortedJourneys.filter(j => (j.dates || []).indexOf(s.dayModal) > -1).map(journeyCard) : [];
     const formChecks = s.journeyForm.checks || {};
@@ -3040,6 +3222,10 @@ class Component extends DCLogic {
       calendarMonthLabel: MONTH_NAMES[calendarMonthNum] + ' ' + calendarYear,
       journeyLegend: Object.keys(JOURNEY_STATUS).map(key => ({ label: JOURNEY_STATUS[key].label, color: JOURNEY_STATUS[key].color })),
       weekDays: WEEK_DAYS, calendarCells: calendarCells,
+      calendarViewOptions: calendarViewOptions, calendarIsMonth: calendarIsMonth, calendarIsWeek: calendarIsWeek,
+      calendarIsYear: calendarIsYear, calendarIsAgenda: calendarIsAgenda, calendarShowsPeriodNav: calendarShowsPeriodNav,
+      calendarPeriodLabel: calendarPeriodLabel, calendarWeekCells: calendarWeekCells, calendarYearMonths: calendarYearMonths,
+      calendarAgendaGroups: calendarAgendaGroups, calendarAgendaEmpty: calendarAgendaEmpty,
       dayModalOpen: !!s.dayModal, dayModalTitle: s.dayModal ? 'Eventos · ' + fmt(s.dayModal) : 'Eventos',
       dayJourneys: selectedDayJourneys, dayModalEmpty: selectedDayJourneys.length === 0,
       journeyModalOpen: !!s.journeyModal, journeyModalTitle: s.journeyModal === 'new' ? 'Nuevo evento UCV' : 'Editar evento UCV',
@@ -3151,9 +3337,9 @@ class Component extends DCLogic {
       closeDayModal: this.closeDayModal,
       addJourneyForDay: () => this.newJourney(s.dayModal || TODAY),
       saveJourney: this.saveJourney,
-      previousMonth: () => this.moveCalendar(-1),
-      nextMonth: () => this.moveCalendar(1),
-      goToday: () => this.setState({ calendarMonth: TODAY.slice(0, 7) }),
+      previousPeriod: () => this.changePeriod(-1),
+      nextPeriod: () => this.changePeriod(1),
+      goToday: () => this.setState({ calendarMonth: TODAY.slice(0, 7), calendarWeekStart: mondayOf(TODAY), calendarYear: Number(TODAY.slice(0, 4)) }),
       calendarCellHover: { background: 'var(--color-neutral-100)', borderColor: 'var(--color-accent-300)' },
       onJourneyTitle: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { title: e.target.value }) }),
       onJourneyDate: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { dates: e.target.value ? [e.target.value] : [] }) }),
