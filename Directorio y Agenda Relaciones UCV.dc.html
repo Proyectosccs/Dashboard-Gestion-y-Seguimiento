@@ -750,34 +750,21 @@
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px; grid-column: 1 / -1">Nombre del evento
             <input type="text" placeholder="Ej. Evento de salud integral" value="{{ journeyForm.title }}" onChange="{{ onJourneyTitle }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
-          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Tipo de evento
-            <select value="{{ journeyForm.eventType }}" onChange="{{ onJourneyEventType }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
-              <sc-for list="{{ eventTypes }}" as="t" hint-placeholder-count="6"><option value="{{ t.id }}">{{ t.label }}</option></sc-for>
-            </select>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Fecha
+            <input type="date" value="{{ journeyFormDateValue }}" onChange="{{ onJourneyDate }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
-          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Hora (opcional)
-            <input type="time" value="{{ journeyForm.time }}" onChange="{{ onJourneyTime }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Hora de Inicio
+            <input type="time" value="{{ journeyFormTimeValue }}" onChange="{{ onJourneyTime }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
-          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Lugar
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Hora de Finalización
+            <input type="time" value="{{ journeyFormEndTimeValue }}" onChange="{{ onJourneyEndTime }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+          </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px; grid-column: 1 / -1">Ubicación
             <input type="text" placeholder="Por confirmar" value="{{ journeyForm.location }}" onChange="{{ onJourneyLocation }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
-          </label>
-          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Especialidad o área
-            <input type="text" placeholder="Por confirmar" value="{{ journeyForm.area }}" onChange="{{ onJourneyArea }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
-          </label>
-          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Especialidad vinculada
-            <select value="{{ journeyForm.specialtyUnit }}" onChange="{{ onJourneySpecialtyUnit }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
-              <option value="">Sin vincular</option>
-              <sc-for list="{{ unitOptions }}" as="o" hint-placeholder-count="6"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
-            </select>
-          </label>
-          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Responsable
-            <select value="{{ journeyForm.owner }}" onChange="{{ onJourneyOwner }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
-              <sc-for list="{{ contactOwnerOptions }}" as="o" hint-placeholder-count="8"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
-            </select>
           </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Estado
             <select value="{{ journeyForm.status }}" onChange="{{ onJourneyStatus }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
-              <option value="planned">Planificada</option><option value="confirmed">Confirmada</option><option value="executing">Ejecutándose</option><option value="closed">Cerrada</option>
+              <option value="planned">Planificada</option><option value="confirmed">Confirmada</option><option value="executing">Ejecutándose</option><option value="closed">Cerrada</option><option value="cancelled">Cancelada</option>
             </select>
           </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">¿Participó Fundación Ingenia?
@@ -785,44 +772,20 @@
               <option value="no">No</option><option value="si">Sí</option>
             </select>
           </label>
-          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Médicos participantes
-            <input type="text" placeholder="Nombres separados por coma" value="{{ journeyForm.doctors }}" onChange="{{ onJourneyDoctors }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
-          </label>
-          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Estudiantes participantes
-            <input type="text" placeholder="Nombres separados por coma" value="{{ journeyForm.students }}" onChange="{{ onJourneyStudents }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
-          </label>
         </div>
 
         <div style="background: var(--color-accent-2-100); border: 1px solid var(--color-accent-2-300); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
           <div>
-            <div style="font-family: var(--font-heading); font-size: 16px">Fecha(s) del evento</div>
-            <div style="font-size: 11.5px; color: var(--color-neutral-700)">Toca uno o varios días en el calendario. La hora es opcional y aplica a todas las fechas seleccionadas.</div>
+            <div style="font-family: var(--font-heading); font-size: 16px">Participantes</div>
+            <div style="font-size: 11.5px; color: var(--color-neutral-700)">Selecciona a los responsables del equipo y contactos que participan en este evento.</div>
           </div>
-          <div style="background: #fff; border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px">
-            <div style="display: flex; align-items: center; gap: 8px">
-              <button type="button" aria-label="Mes anterior" onClick="{{ prevJourneyMonth }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); width: 30px; height: 30px; border-radius: 999px; cursor: pointer; font-size: 15px">‹</button>
-              <div style="font-family: var(--font-heading); font-size: 15px; flex: 1; text-align: center; text-transform: capitalize">{{ journeyCalendarLabel }}</div>
-              <button type="button" aria-label="Mes siguiente" onClick="{{ nextJourneyMonth }}" style="border: 1px solid var(--color-neutral-300); background: var(--color-neutral-100); width: 30px; height: 30px; border-radius: 999px; cursor: pointer; font-size: 15px">›</button>
-            </div>
-            <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px">
-              <sc-for list="{{ weekDays }}" as="d" hint-placeholder-count="7">
-                <div style="font-size: 9.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--color-neutral-600); font-weight: 700; text-align: center">{{ d }}</div>
-              </sc-for>
-              <sc-for list="{{ journeyDateCells }}" as="cell" hint-placeholder-count="35">
-                <sc-if value="{{ cell.blank }}" hint-placeholder-val="{{ false }}"><div></div></sc-if>
-                <sc-if value="{{ cell.day }}" hint-placeholder-val="{{ true }}">
-                  <button type="button" onClick="{{ cell.toggle }}" style="{{ cell.style }}">{{ cell.number }}</button>
-                </sc-if>
-              </sc-for>
-            </div>
-          </div>
-          <div style="display: flex; flex-wrap: wrap; gap: 6px">
-            <sc-for list="{{ journeyDateChips }}" as="d" hint-placeholder-count="2">
-              <span style="display: inline-flex; align-items: center; gap: 5px; background: #fff; border-radius: 999px; padding: 5px 6px 5px 11px; font-size: 12px; font-weight: 700">{{ d.label }}<button type="button" aria-label="Quitar fecha" onClick="{{ d.remove }}" style="border: none; background: transparent; cursor: pointer; font-size: 11px; padding: 0 3px">✕</button></span>
+          <div style="display: flex; flex-direction: column; gap: 4px; max-height: 190px; overflow-y: auto; border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff">
+            <sc-for list="{{ journeyParticipantsChecklist }}" as="o" hint-placeholder-count="4">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; padding: 3px 0">
+                <input type="checkbox" checked="{{ o.checked }}" onChange="{{ o.toggle }}" />
+                {{ o.label }}
+              </label>
             </sc-for>
-            <sc-if value="{{ journeyDateChipsEmpty }}" hint-placeholder-val="{{ true }}">
-              <span style="font-size: 11.5px; color: var(--color-neutral-700)">Sin fechas seleccionadas todavía.</span>
-            </sc-if>
           </div>
         </div>
 
@@ -841,7 +804,7 @@
           </div>
         </div>
 
-        <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Notas y requerimientos
+        <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Notas y Requerimientos
           <textarea placeholder="Información pendiente, materiales, coordinación, data…" value="{{ journeyForm.notes }}" onChange="{{ onJourneyNotes }}" rows="3" style="border: 1px solid var(--color-neutral-300); border-radius: 16px; padding: 11px 12px; background: #fff; color: var(--color-text); resize: none"></textarea>
         </label>
         <div style="display: flex; gap: 10px; justify-content: flex-end">
@@ -1533,7 +1496,8 @@ const JOURNEY_STATUS = {
   planned: { label: 'Planificada', color: '#c67139', soft: '#fff0e6' },
   confirmed: { label: 'Confirmada', color: '#2fa89b', soft: '#e6f6f3' },
   executing: { label: 'Ejecutándose', color: '#4a7fd4', soft: '#eaf1fc' },
-  closed: { label: 'Cerrada', color: '#4f8f68', soft: '#edf6ef' }
+  closed: { label: 'Cerrada', color: '#4f8f68', soft: '#edf6ef' },
+  cancelled: { label: 'Cancelada', color: '#a02525', soft: '#fdebeb' }
 };
 const JOURNEY_STATUS_MIGRATION = { draft: 'planned', preparing: 'confirmed', confirmed: 'confirmed', completed: 'closed' };
 function migrateJourneyStatus(id) { return JOURNEY_STATUS[id] ? id : (JOURNEY_STATUS_MIGRATION[id] || 'planned'); }
@@ -1636,7 +1600,11 @@ function writeStore(key, value) {
 
 function normalizeJourney(j) {
   const withDates = (Array.isArray(j.dates) && j.dates.length) ? j : Object.assign({}, j, { dates: j.date ? [j.date] : [] });
-  return Object.assign({ specialtyUnit: '', doctors: '', students: '' }, withDates, { status: migrateJourneyStatus(withDates.status) });
+  return Object.assign({ specialtyUnit: '', doctors: '', students: '', endTime: '', participants: [] }, withDates, { status: migrateJourneyStatus(withDates.status) });
+}
+
+function timeInput(value) {
+  return value ? String(value).slice(0, 5) : '';
 }
 
 function normalizeUI(value) {
@@ -1699,8 +1667,7 @@ class Component extends DCLogic {
     },
     ui: cloneUI(SAVED_UI), customizeOpen: false, customizeForm: cloneUI(SAVED_UI),
     calendarMonth: TODAY.slice(0, 7), dayModal: null, journeyModal: null,
-    journeyCalendarMonth: TODAY.slice(0, 7),
-    journeyForm: { title: '', eventType: 'health', dates: [TODAY], time: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, specialtyUnit: '', doctors: '', students: '', participatesIngenia: false },
+    journeyForm: { title: '', eventType: 'health', dates: [TODAY], time: '', endTime: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, specialtyUnit: '', doctors: '', students: '', participatesIngenia: false, participants: [] },
     modal: null, type: 'meeting', notes: '', date: TODAY, follow: '',
     taskModal: null,
     taskForm: { title: '', responsable: '', newResponsableName: '', status: 'pendiente', followupStatus: '', priority: 'media', detail: '', nextAction: '', dueDate: '' },
@@ -2138,7 +2105,7 @@ class Component extends DCLogic {
   };
 
   blankJourney(date) {
-    return { title: '', eventType: 'health', dates: date ? [date] : [], time: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, assignedVolunteers: [], specialtyUnit: '', doctors: '', students: '', participatesIngenia: false };
+    return { title: '', eventType: 'health', dates: date ? [date] : [], time: '', endTime: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, assignedVolunteers: [], specialtyUnit: '', doctors: '', students: '', participatesIngenia: false, participants: [] };
   }
 
   blankVolunteer() {
@@ -2231,17 +2198,14 @@ class Component extends DCLogic {
   newJourney = (date) => this.setState({
     dayModal: null,
     journeyModal: 'new',
-    journeyCalendarMonth: (typeof date === 'string' ? date : TODAY).slice(0, 7),
     journeyForm: this.blankJourney(typeof date === 'string' ? date : TODAY)
   });
 
   openJourney(id) {
     const journey = this.state.journeys.find(j => j.id === id);
     if (!journey) return;
-    const firstDate = (journey.dates && journey.dates[0]) || TODAY;
     this.setState({
       dayModal: null, journeyModal: id,
-      journeyCalendarMonth: firstDate.slice(0, 7),
       journeyForm: Object.assign(this.blankJourney(), journey, { dates: (journey.dates || []).slice(), checks: Object.assign({}, journey.checks || {}) })
     });
   }
@@ -2250,18 +2214,11 @@ class Component extends DCLogic {
   openCalendarDay(date) { this.setState({ dayModal: date }); }
   closeDayModal = () => this.setState({ dayModal: null });
 
-  moveJourneyCalendar(delta) {
-    const p = this.state.journeyCalendarMonth.split('-');
-    const d = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1 + delta, 1));
-    const month = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
-    this.setState({ journeyCalendarMonth: month });
-  }
-
-  toggleJourneyDate(date) {
-    const form = this.state.journeyForm;
-    const current = form.dates || [];
-    const next = current.indexOf(date) > -1 ? current.filter(d => d !== date) : current.concat([date]).sort();
-    this.setState({ journeyForm: Object.assign({}, form, { dates: next }) });
+  toggleJourneyParticipant(key) {
+    const s = this.state;
+    const current = s.journeyForm.participants || [];
+    const next = current.indexOf(key) > -1 ? current.filter(x => x !== key) : current.concat([key]);
+    this.setState({ journeyForm: Object.assign({}, s.journeyForm, { participants: next }) });
   }
 
   saveJourney = () => {
@@ -2587,35 +2544,18 @@ class Component extends DCLogic {
     while (availCalendarCells.length % 7) availCalendarCells.push({ blank: true, day: false });
     const volunteerCalendarLabel = MONTH_NAMES[vCalendarMonthNum] + ' ' + vCalendarYear;
 
-    const jMonthParts = s.journeyCalendarMonth.split('-');
-    const jCalendarYear = Number(jMonthParts[0]);
-    const jCalendarMonthNum = Number(jMonthParts[1]) - 1;
-    const jFirstDay = new Date(Date.UTC(jCalendarYear, jCalendarMonthNum, 1));
-    const jLastDate = new Date(Date.UTC(jCalendarYear, jCalendarMonthNum + 1, 0)).getUTCDate();
-    const jMondayOffset = (jFirstDay.getUTCDay() + 6) % 7;
-    const journeySelectedDates = s.journeyForm.dates || [];
-    const journeyDateCells = [];
-    for (let blank = 0; blank < jMondayOffset; blank += 1) journeyDateCells.push({ blank: true, day: false });
-    for (let day = 1; day <= jLastDate; day += 1) {
-      const iso = s.journeyCalendarMonth + '-' + String(day).padStart(2, '0');
-      const isToday = iso === TODAY;
-      const isSelected = journeySelectedDates.indexOf(iso) > -1;
-      journeyDateCells.push({
-        blank: false, day: true, number: day,
-        toggle: () => this.toggleJourneyDate(iso),
-        style: {
-          minHeight: 38, borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 12.5, fontWeight: 700,
-          border: isToday ? '2px solid var(--color-accent-500)' : '1px solid var(--color-neutral-200)',
-          background: isSelected ? 'var(--color-accent-500)' : '#fff',
-          color: isSelected ? '#fff' : 'var(--color-text)'
-        }
-      });
-    }
-    while (journeyDateCells.length % 7) journeyDateCells.push({ blank: true, day: false });
-    const journeyCalendarLabel = MONTH_NAMES[jCalendarMonthNum] + ' ' + jCalendarYear;
-    const journeyDateChips = journeySelectedDates.map(d => ({ label: fmt(d), remove: () => this.toggleJourneyDate(d) }));
-    const journeyDateChipsEmpty = journeyDateChips.length === 0;
+    const journeyFormDateValue = (s.journeyForm.dates && s.journeyForm.dates[0]) || '';
+    const journeyFormTimeValue = timeInput(s.journeyForm.time);
+    const journeyFormEndTimeValue = timeInput(s.journeyForm.endTime);
+    const journeyParticipantsChecklist = s.teamMembers.map(m => ({
+      key: 'team:' + m.id, label: '👤 ' + m.name,
+      checked: (s.journeyForm.participants || []).indexOf('team:' + m.id) > -1,
+      toggle: () => this.toggleJourneyParticipant('team:' + m.id)
+    })).concat(s.contacts.map(c => ({
+      key: 'contact:' + c.id, label: '🤝 ' + c.name,
+      checked: (s.journeyForm.participants || []).indexOf('contact:' + c.id) > -1,
+      toggle: () => this.toggleJourneyParticipant('contact:' + c.id)
+    })));
 
     const volunteerAvailChips = (s.volunteerForm.availability || []).map(d => ({
       label: fmt(d),
@@ -2810,14 +2750,6 @@ class Component extends DCLogic {
         }
       };
     });
-
-    const contactOwnerOptions = (() => {
-      const list = ['Por confirmar', 'Equipo CONEKTADOS'].concat(s.contacts.map(c => c.name));
-      const current = s.journeyForm.owner;
-      if (current && list.indexOf(current) === -1) list.unshift(current);
-      const seen = {};
-      return list.filter(n => { if (seen[n]) return false; seen[n] = true; return true; }).map(n => ({ id: n, label: n }));
-    })();
 
     // Responsables de la tarea: el roster compartido de "Tareas de Equipo"
     // en Networking Fundación Ingenia — checklist de selección múltiple.
@@ -3059,12 +2991,10 @@ class Component extends DCLogic {
       dayModalOpen: !!s.dayModal, dayModalTitle: s.dayModal ? 'Eventos · ' + fmt(s.dayModal) : 'Eventos',
       dayJourneys: selectedDayJourneys, dayModalEmpty: selectedDayJourneys.length === 0,
       journeyModalOpen: !!s.journeyModal, journeyModalTitle: s.journeyModal === 'new' ? 'Nuevo evento UCV' : 'Editar evento UCV',
-      journeyForm: s.journeyForm, journeyChecks: journeyChecks, eventTypes: EVENT_TYPES,
+      journeyForm: s.journeyForm, journeyChecks: journeyChecks,
       journeyParticipatesIngeniaValue: s.journeyForm.participatesIngenia ? 'si' : 'no',
-      journeyCalendarLabel: journeyCalendarLabel, journeyDateCells: journeyDateCells,
-      journeyDateChips: journeyDateChips, journeyDateChipsEmpty: journeyDateChipsEmpty,
-      prevJourneyMonth: () => this.moveJourneyCalendar(-1),
-      nextJourneyMonth: () => this.moveJourneyCalendar(1),
+      journeyFormDateValue: journeyFormDateValue, journeyFormTimeValue: journeyFormTimeValue,
+      journeyFormEndTimeValue: journeyFormEndTimeValue, journeyParticipantsChecklist: journeyParticipantsChecklist,
       journeyReadiness: JOURNEY_QUESTIONS.filter(q => !!formChecks[q.key]).length + '/' + JOURNEY_QUESTIONS.length,
       customizeOpen: s.customizeOpen, customizeForm: draftUI, customizeTabs: customizeTabs, customizeSections: customizeSections,
       timelineEmpty: timeline.length === 0,
@@ -3124,7 +3054,7 @@ class Component extends DCLogic {
       modalOpen: !!s.modal, modal: modal, form: { notes: s.notes, date: s.date, follow: s.follow },
       taskModalOpen: !!s.taskModal, taskModalTitle: s.taskModal === 'new' ? 'Nueva tarea' : 'Editar tarea', taskForm: s.taskForm,
       isEditingTask: !!s.taskModal && s.taskModal !== 'new', deleteCurrentTask: this.deleteTask,
-      taskStatusOptions: taskStatusOptions, taskFollowupOptions: taskFollowupOptions, taskFollowupOpen: s.taskForm.status === 'en_proceso', taskPriorityOptions: taskPriorityOptions, extraUnitChips: extraUnitChips, contactOwnerOptions: contactOwnerOptions,
+      taskStatusOptions: taskStatusOptions, taskFollowupOptions: taskFollowupOptions, taskFollowupOpen: s.taskForm.status === 'en_proceso', taskPriorityOptions: taskPriorityOptions, extraUnitChips: extraUnitChips,
       taskResponsableChecklist: taskResponsableChecklist, taskResponsableIsNew: taskResponsableIsNew,
       onToggleNewResponsable: this.toggleNewResponsable,
       taskResponsableFilter: s.taskResponsableFilter, taskResponsableFilterOptions: taskResponsableFilterOptions,
@@ -3173,14 +3103,10 @@ class Component extends DCLogic {
       goToday: () => this.setState({ calendarMonth: TODAY.slice(0, 7) }),
       calendarCellHover: { background: 'var(--color-neutral-100)', borderColor: 'var(--color-accent-300)' },
       onJourneyTitle: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { title: e.target.value }) }),
-      onJourneyEventType: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { eventType: e.target.value }) }),
+      onJourneyDate: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { dates: e.target.value ? [e.target.value] : [] }) }),
       onJourneyTime: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { time: e.target.value }) }),
+      onJourneyEndTime: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { endTime: e.target.value }) }),
       onJourneyLocation: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { location: e.target.value }) }),
-      onJourneyArea: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { area: e.target.value }) }),
-      onJourneySpecialtyUnit: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { specialtyUnit: e.target.value }) }),
-      onJourneyDoctors: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { doctors: e.target.value }) }),
-      onJourneyStudents: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { students: e.target.value }) }),
-      onJourneyOwner: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { owner: e.target.value }) }),
       onJourneyStatus: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { status: e.target.value }) }),
       onJourneyParticipatesIngenia: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { participatesIngenia: e.target.value === 'si' }) }),
       onJourneyNotes: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { notes: e.target.value }) }),

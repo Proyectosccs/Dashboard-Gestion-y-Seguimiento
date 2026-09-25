@@ -374,7 +374,8 @@
     planned: 'Planificado',
     confirmed: 'Confirmado',
     in_progress: 'En Ejecución',
-    completed: 'Completado'
+    completed: 'Completado',
+    cancelled: 'Cancelada'
   };
   const PARTICIPATES_INGENIA_OPTIONS = { no: 'No', si: 'Sí' };
   const JORNADA_TYPE_OPTIONS = { '': 'Sin especificar', insumos: 'Insumos', medica: 'Médica' };
@@ -1720,6 +1721,26 @@
     '</div>';
   }
 
+  function participantsChecklistMarkup(item) {
+    const selected = Array.isArray(item.participants) ? item.participants : [];
+    const items = state.teamMembers.map(function (m) {
+      const key = 'team:' + m.id;
+      const checked = selected.indexOf(key) > -1 ? ' checked' : '';
+      return '<label class="checkbox-chip"><input type="checkbox" class="event-participant-checkbox" value="' + safe(key) + '"' + checked + '>👤 ' + safe(m.name) + '</label>';
+    }).concat(state.contacts.map(function (c) {
+      const key = 'contact:' + c.id;
+      const checked = selected.indexOf(key) > -1 ? ' checked' : '';
+      return '<label class="checkbox-chip"><input type="checkbox" class="event-participant-checkbox" value="' + safe(key) + '"' + checked + '>🤝 ' + safe(c.name) + '</label>';
+    }));
+    return '<div class="field field-full"><label>Participantes (opcional)</label>' +
+      '<div id="event-participants-list" class="checkbox-list">' + (items.length ? items.join('') : '<span style="font-size:12px;color:var(--color-neutral-600)">No hay participantes disponibles todavía.</span>') + '</div>' +
+    '</div>';
+  }
+
+  function readEventParticipants() {
+    return Array.from(dom.editorForm.querySelectorAll('.event-participant-checkbox:checked')).map(function (cb) { return cb.value; });
+  }
+
   function eventFields(record) {
     const item = record || {};
     return field('Nombre del Evento', 'title', item.title, 'text', true, '', 'field-full') +
@@ -1729,10 +1750,9 @@
       field('Hora de Inicio', 'start_time', timeInput(item.start_time), 'time', false) +
       field('Hora de Finalización', 'end_time', timeInput(item.end_time), 'time', false) +
       selectField('¿Participó Fundación Ingenia?', 'participo_fundacion_ingenia', item.participo_fundacion_ingenia === true ? 'si' : 'no', PARTICIPATES_INGENIA_OPTIONS) +
-      field('Lugar', 'venue', item.venue, 'text', false, '', '', 'Ej. Oficinas Fundación Ingenia') +
-      field('Dirección', 'location', item.location, 'text', false, '', '', 'Ej. Calle Real de Mare Abajo') +
+      field('Ubicación', 'location', item.location, 'text', false, '', 'field-full', 'Ej. Oficinas Fundación Ingenia, Calle Real de Mare Abajo') +
       selectField('Estado', 'status', item.status || 'planned', EVENT_STATUS) +
-      textareaField('Descripción', 'description', item.description, 'field-full') +
+      participantsChecklistMarkup(item) +
       textareaField('Notas y Requerimientos', 'notes', item.notes, 'field-full');
   }
 
@@ -1765,6 +1785,7 @@
     const data = Object.fromEntries(new FormData(dom.editorForm).entries());
     if (state.editor.type === 'event') {
       data.specialties = data.jornada_type === 'medica' ? readEventSpecialties() : [];
+      data.participants = readEventParticipants();
       delete data.custom_specialties;
     }
     const validation = validateEditor(state.editor.type, data);
@@ -1809,7 +1830,7 @@
     if (type === 'event') {
       if (!data.title.trim()) return issue('title', 'Escribe el nombre del evento.');
       if (!data.event_date) return issue('event_date', 'Selecciona la fecha del evento.');
-      if (!data.venue.trim() && !data.location.trim()) return issue('venue', 'Agrega un lugar o una dirección.');
+      if (!data.location.trim()) return issue('location', 'Agrega una ubicación.');
     }
     return null;
   }

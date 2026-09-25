@@ -214,6 +214,7 @@
     dom.eventSpecialtiesField = document.getElementById('event-specialties-field');
     dom.eventSpecialtiesList = document.getElementById('event-specialties-list');
     dom.eventCustomSpecialtyField = document.getElementById('event-custom-specialty-field');
+    dom.eventParticipantsList = document.getElementById('event-participants-list');
     dom.eventDelete = document.getElementById('event-delete');
     dom.tasksKpiGrid = document.getElementById('tasks-kpi-grid');
     dom.tasksResponsableFilter = document.getElementById('tasks-responsable-filter');
@@ -643,6 +644,20 @@
     return canonical.concat(custom);
   }
 
+  function populateParticipantsList(checkedKeys) {
+    const previouslyChecked = checkedKeys || Array.from(dom.eventParticipantsList.querySelectorAll('input:checked')).map(function (cb) { return cb.value; });
+    const items = state.teamMembers.map(function (m) {
+      const key = 'team:' + m.id;
+      const checked = previouslyChecked.indexOf(key) > -1 ? ' checked' : '';
+      return '<label class="checkbox-chip"><input type="checkbox" class="event-participant-checkbox" value="' + safe(key) + '"' + checked + '>👤 ' + safe(m.name) + '</label>';
+    });
+    renderMarkup(dom.eventParticipantsList, items.length ? items.join('') : '<span style="font-size:12px;color:var(--color-neutral-600)">No hay participantes disponibles todavía.</span>');
+  }
+
+  function readParticipants() {
+    return Array.from(dom.eventParticipantsList.querySelectorAll('.event-participant-checkbox:checked')).map(function (cb) { return cb.value; });
+  }
+
   function openEventDialog(existing) {
     hideError(dom.eventError);
     dom.eventForm.reset();
@@ -654,21 +669,21 @@
       dom.eventForm.elements.event_date.value = existing.event_date || '';
       dom.eventForm.elements.start_time.value = existing.start_time ? existing.start_time.slice(0, 5) : '';
       dom.eventForm.elements.end_time.value = existing.end_time ? existing.end_time.slice(0, 5) : '';
-      dom.eventForm.elements.venue.value = existing.venue || '';
       dom.eventForm.elements.location.value = existing.location || '';
       dom.eventForm.elements.status.value = existing.status || 'planned';
-      dom.eventForm.elements.description.value = existing.description || '';
       dom.eventForm.elements.notes.value = existing.notes || '';
       dom.eventForm.elements.participates_ingenia.value = existing.participatesIngenia === true ? 'si' : 'no';
       dom.eventForm.elements.jornada_type.value = existing.jornadaType || '';
       dom.eventSpecialtiesField.hidden = existing.jornadaType !== 'medica';
       populateSpecialtiesList(existing.jornadaType === 'medica' ? (existing.specialties || []) : []);
+      populateParticipantsList(existing.participants || []);
     } else {
       dom.eventForm.elements.event_date.value = state.selectedDay || new Date().toISOString().slice(0, 10);
       dom.eventForm.elements.participates_ingenia.value = 'no';
       dom.eventForm.elements.status.value = 'planned';
       dom.eventSpecialtiesField.hidden = true;
       populateSpecialtiesList([]);
+      populateParticipantsList([]);
     }
     dom.eventDialog.showModal();
     dom.eventForm.elements.title.focus();
@@ -690,14 +705,13 @@
       event_date: eventDate,
       start_time: dom.eventForm.elements.start_time.value,
       end_time: dom.eventForm.elements.end_time.value,
-      venue: dom.eventForm.elements.venue.value.trim(),
       location: dom.eventForm.elements.location.value.trim(),
       status: dom.eventForm.elements.status.value,
-      description: dom.eventForm.elements.description.value.trim(),
       notes: dom.eventForm.elements.notes.value.trim(),
       participatesIngenia: dom.eventForm.elements.participates_ingenia.value === 'si',
       jornadaType: jornadaType,
       specialties: jornadaType === 'medica' ? readSpecialties() : [],
+      participants: readParticipants(),
       created_at: existing ? existing.created_at : new Date().toISOString()
     });
     const next = existing

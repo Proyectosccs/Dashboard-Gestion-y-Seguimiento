@@ -203,6 +203,7 @@
     dom.eventSpecialtiesField = document.getElementById('event-specialties-field');
     dom.eventSpecialtiesList = document.getElementById('event-specialties-list');
     dom.eventCustomSpecialtyField = document.getElementById('event-custom-specialty-field');
+    dom.eventParticipantsList = document.getElementById('event-participants-list');
     dom.eventDelete = document.getElementById('event-delete');
     dom.pageTitle = document.getElementById('page-title');
     dom.pageSubtitle = document.getElementById('page-subtitle');
@@ -853,6 +854,20 @@
     return canonical.concat(custom);
   }
 
+  function populateParticipantsList(checkedKeys) {
+    const previouslyChecked = checkedKeys || Array.from(dom.eventParticipantsList.querySelectorAll('input:checked')).map(function (cb) { return cb.value; });
+    const items = state.teamMembers.map(function (m) {
+      const key = 'team:' + m.id;
+      const checked = previouslyChecked.indexOf(key) > -1 ? ' checked' : '';
+      return '<label class="checkbox-chip"><input type="checkbox" class="event-participant-checkbox" value="' + safe(key) + '"' + checked + '>👤 ' + safe(m.name) + '</label>';
+    });
+    renderMarkup(dom.eventParticipantsList, items.length ? items.join('') : '<span style="font-size:12px;color:var(--color-neutral-600)">No hay participantes disponibles todavía.</span>');
+  }
+
+  function readParticipants() {
+    return Array.from(dom.eventParticipantsList.querySelectorAll('.event-participant-checkbox:checked')).map(function (cb) { return cb.value; });
+  }
+
   function openEventDialog(evt) {
     state.eventEditor = evt ? evt.id : null;
     dom.eventDialogTitle.textContent = evt ? 'Editar evento' : 'Agregar evento';
@@ -862,16 +877,15 @@
     dom.eventForm.elements.event_date.value = evt ? evt.event_date : (state.calendarMonth + '-01');
     dom.eventForm.elements.start_time.value = evt ? timeInput(evt.start_time) : '';
     dom.eventForm.elements.end_time.value = evt ? timeInput(evt.end_time) : '';
-    dom.eventForm.elements.venue.value = evt ? (evt.venue || '') : '';
     dom.eventForm.elements.location.value = evt ? (evt.location || '') : '';
     dom.eventForm.elements.status.value = evt ? (evt.status || 'planned') : 'planned';
-    dom.eventForm.elements.description.value = evt ? (evt.description || '') : '';
     dom.eventForm.elements.notes.value = evt ? (evt.notes || '') : '';
     dom.eventForm.elements.participates_ingenia.value = evt && evt.participatesIngenia === true ? 'si' : 'no';
     dom.eventForm.elements.jornada_type.value = evt ? (evt.jornadaType || '') : '';
     const isMedica = evt && evt.jornadaType === 'medica';
     dom.eventSpecialtiesField.hidden = !isMedica;
     populateSpecialtiesList(isMedica ? (evt.specialties || []) : []);
+    populateParticipantsList(evt ? (evt.participants || []) : []);
     dom.eventDialog.showModal();
     dom.eventForm.elements.title.focus();
   }
@@ -890,14 +904,13 @@
       event_date: eventDate,
       start_time: dom.eventForm.elements.start_time.value,
       end_time: dom.eventForm.elements.end_time.value,
-      venue: dom.eventForm.elements.venue.value.trim(),
       location: dom.eventForm.elements.location.value.trim(),
       status: dom.eventForm.elements.status.value,
-      description: dom.eventForm.elements.description.value.trim(),
       notes: dom.eventForm.elements.notes.value.trim(),
       participatesIngenia: dom.eventForm.elements.participates_ingenia.value === 'si',
       jornadaType: jornadaType,
       specialties: jornadaType === 'medica' ? readSpecialties() : [],
+      participants: readParticipants(),
       created_at: new Date().toISOString()
     };
     if (state.eventEditor) {

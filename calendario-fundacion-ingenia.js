@@ -31,7 +31,7 @@
 
   // Campos compartidos del formulario de eventos, iguales en todos los
   // calendarios (Networking, Organización, Dra Florangel, CMDLT, Coalición).
-  const EVENT_STATUS = { planned: 'Planificado', confirmed: 'Confirmado', in_progress: 'En Ejecución', completed: 'Completado' };
+  const EVENT_STATUS = { planned: 'Planificado', confirmed: 'Confirmado', in_progress: 'En Ejecución', completed: 'Completado', cancelled: 'Cancelada' };
   const JORNADA_TYPES = { insumos: 'Insumos', medica: 'Médica' };
   const MEDICAL_SPECIALTIES = [
     'Medicina General', 'Medicina Interna', 'Pediatría', 'Ginecología y Obstetricia',
@@ -43,8 +43,8 @@
   // UCV ya usa sus propios valores de "status" (planned/confirmed/executing/closed)
   // en sus jornadas — se traduce en ambas direcciones para que el Estado
   // compartido no le pise su propio esquema.
-  const SHARED_STATUS_TO_UCV = { planned: 'planned', confirmed: 'confirmed', in_progress: 'executing', completed: 'closed' };
-  const UCV_STATUS_TO_SHARED = { planned: 'planned', confirmed: 'confirmed', executing: 'in_progress', closed: 'completed' };
+  const SHARED_STATUS_TO_UCV = { planned: 'planned', confirmed: 'confirmed', in_progress: 'executing', completed: 'closed', cancelled: 'cancelled' };
+  const UCV_STATUS_TO_SHARED = { planned: 'planned', confirmed: 'confirmed', executing: 'in_progress', closed: 'completed', cancelled: 'cancelled' };
 
   // Organizaciones "reales" (con tablero propio o no) que se pueden elegir
   // al crear una tarea o al listarlas en la pestaña Organizaciones. "otros"
@@ -137,6 +137,7 @@
     customCalendars: [],
     tasks: [],
     teamMembers: [],
+    orgContactsCache: {},
     calendarMonth: new Date().toISOString().slice(0, 7),
     selectedDay: new Date().toISOString().slice(0, 10),
     calendarViewMode: 'month',
@@ -325,6 +326,7 @@
     dom.eventSpecialtiesField = document.getElementById('event-specialties-field');
     dom.eventSpecialtiesList = document.getElementById('event-specialties-list');
     dom.eventCustomSpecialtyField = document.getElementById('event-custom-specialty-field');
+    dom.eventParticipantsList = document.getElementById('event-participants-list');
     dom.eventDelete = document.getElementById('event-delete');
     dom.tasksBoard = document.getElementById('tasks-board');
     dom.taskDialog = document.getElementById('task-dialog');
@@ -401,6 +403,7 @@
     dom.newCalendarField.hidden = !isNew;
     if (isNew) dom.eventForm.elements.new_calendar_name.focus();
     populateCollaboratorsList();
+    refreshParticipantsList();
   }
 
   async function loadAll() {
@@ -408,7 +411,7 @@
     dom.connectivityBanner.hidden = true;
 
     const [coalicionRes, florangelRes, ucvRes, ingeniaRes] = await Promise.all([
-      state.client.from('coalicion_events').select('id,title,event_date,start_time,end_time,venue,location,maps_url,notes,status,description,jornada_type,specialties,collaborating_orgs,participo_fundacion_ingenia').is('archived_at', null),
+      state.client.from('coalicion_events').select('id,title,event_date,start_time,end_time,location,maps_url,notes,status,jornada_type,specialties,collaborating_orgs,participants,participo_fundacion_ingenia').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
       state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
@@ -981,23 +984,78 @@
     return raw && (raw.participatesIngenia === true || raw.participo_fundacion_ingenia === true) ? 'si' : 'no';
   }
 
-  // Normaliza los campos nuevos del formulario (Estado, Lugar, Hora de
-  // Finalización, Descripción, Tipo de Jornada, Especialidades,
-  // Organizaciones colaboradoras) sin importar la fuente — cada una guarda
+  // Normaliza los campos nuevos del formulario (Estado, Hora de
+  // Finalización, Tipo de Jornada, Especialidades, Organizaciones
+  // colaboradoras, Participantes) sin importar la fuente — cada una guarda
   // estos datos con su propia convención de nombres (camelCase para los
   // arreglos JSON, snake_case para las columnas de Coalición), y UCV ya
-  // tenía su propio "status" (planned/confirmed/executing/closed) que hay
-  // que traducir para no pisarlo.
+  // tenía su propio "status" (planned/confirmed/executing/closed/cancelled)
+  // que hay que traducir para no pisarlo.
   function readEventExtra(source, raw) {
     raw = raw || {};
     const status = source === 'ucv' ? (UCV_STATUS_TO_SHARED[raw.status] || 'planned') : (raw.status || 'planned');
-    const venue = raw.venue || '';
     const endTime = raw.endTime || raw.end_time || '';
-    const description = raw.description || '';
     const jornadaType = raw.jornadaType || raw.jornada_type || '';
     const specialties = Array.isArray(raw.specialties) ? raw.specialties : [];
     const collaboratingOrgs = Array.isArray(raw.collaboratingOrgs) ? raw.collaboratingOrgs : (Array.isArray(raw.collaborating_orgs) ? raw.collaborating_orgs : []);
-    return { status: status, venue: venue, endTime: endTime, description: description, jornadaType: jornadaType, specialties: specialties, collaboratingOrgs: collaboratingOrgs };
+    const participants = Array.isArray(raw.participants) ? raw.participants : [];
+    return { status: status, endTime: endTime, jornadaType: jornadaType, specialties: specialties, collaboratingOrgs: collaboratingOrgs, participants: participants };
+  }
+
+  // Fuentes que tienen su propia lista de contactos, para ofrecerlos en
+  // "Participantes" junto con el roster compartido de Tareas de Equipo.
+  // Coalición vive en una tabla real de Postgres; las demás son un arreglo
+  // JSON en un board_state genérico.
+  const ORG_CONTACTS_BOARD_KEY = { cmdlt: { table: 'ingenia_board_state', key: 'cmdlt-contacts-v1' }, ucv: { table: 'ucv_board_state', key: 'ucv-contacts-v1' } };
+
+  async function loadOrgContacts(source) {
+    if (state.orgContactsCache[source]) return state.orgContactsCache[source];
+    let contacts = [];
+    try {
+      if (source === 'coalicion') {
+        const res = await state.client.from('coalicion_contacts').select('id,name').is('archived_at', null);
+        contacts = (res.data || []).map(function (c) { return { id: c.id, name: c.name }; });
+      } else if (ORG_CONTACTS_BOARD_KEY[source]) {
+        const cfg = ORG_CONTACTS_BOARD_KEY[source];
+        const res = await state.client.from(cfg.table).select('value').eq('key', cfg.key).maybeSingle();
+        const list = Array.isArray(res.data && res.data.value) ? res.data.value : [];
+        contacts = list.map(function (c) { return { id: c.id, name: c.name }; });
+      }
+    } catch (_err) { contacts = []; }
+    state.orgContactsCache[source] = contacts;
+    return contacts;
+  }
+
+  function populateParticipantsList(checkedKeys) {
+    const previouslyChecked = checkedKeys || Array.from(dom.eventParticipantsList.querySelectorAll('input:checked')).map(function (cb) { return cb.value; });
+    const source = dom.eventSourceSelect.value;
+    const orgContacts = state.orgContactsCache[source] || [];
+    const items = state.teamMembers.map(function (m) {
+      const key = 'team:' + m.id;
+      const checked = previouslyChecked.indexOf(key) > -1 ? ' checked' : '';
+      return '<label class="checkbox-chip"><input type="checkbox" class="event-participant-checkbox" value="' + safe(key) + '"' + checked + '>👤 ' + safe(m.name) + '</label>';
+    }).concat(orgContacts.map(function (c) {
+      const key = 'contact:' + c.id;
+      const checked = previouslyChecked.indexOf(key) > -1 ? ' checked' : '';
+      return '<label class="checkbox-chip"><input type="checkbox" class="event-participant-checkbox" value="' + safe(key) + '"' + checked + '>🤝 ' + safe(c.name) + '</label>';
+    }));
+    renderMarkup(dom.eventParticipantsList, items.length ? items.join('') : '<span style="font-size:12px;color:var(--color-neutral-600)">No hay participantes disponibles todavía.</span>');
+  }
+
+  // Recarga la lista de participantes para la organización actualmente
+  // elegida — primero con lo que ya haya en caché (para no bloquear la
+  // apertura del diálogo), y de nuevo cuando terminen de llegar sus
+  // contactos propios (si los tiene).
+  function refreshParticipantsList(checkedKeys) {
+    populateParticipantsList(checkedKeys);
+    const source = dom.eventSourceSelect.value;
+    loadOrgContacts(source).then(function () {
+      if (dom.eventSourceSelect.value === source) populateParticipantsList(checkedKeys);
+    });
+  }
+
+  function readParticipants() {
+    return Array.from(dom.eventParticipantsList.querySelectorAll('.event-participant-checkbox:checked')).map(function (cb) { return cb.value; });
   }
 
   function populateCollaboratorsList(checkedIds) {
@@ -1061,16 +1119,15 @@
       dom.eventForm.elements.event_date.value = existing.date || '';
       dom.eventForm.elements.start_time.value = existing.time ? existing.time.slice(0, 5) : '';
       dom.eventForm.elements.end_time.value = extra.endTime ? extra.endTime.slice(0, 5) : '';
-      dom.eventForm.elements.venue.value = extra.venue;
       dom.eventForm.elements.location.value = existing.location || '';
       dom.eventForm.elements.status.value = extra.status;
-      dom.eventForm.elements.description.value = extra.description;
       dom.eventForm.elements.notes.value = existing.notes || '';
       dom.eventForm.elements.participates_ingenia.value = readParticipatesIngenia(existing.raw);
       dom.eventForm.elements.jornada_type.value = extra.jornadaType;
       dom.eventSpecialtiesField.hidden = extra.jornadaType !== 'medica';
       if (extra.jornadaType === 'medica') populateSpecialtiesList(extra.specialties); else populateSpecialtiesList([]);
       populateCollaboratorsList(extra.collaboratingOrgs);
+      refreshParticipantsList(extra.participants);
     } else {
       dom.eventForm.elements.event_date.value = state.selectedDay || new Date().toISOString().slice(0, 10);
       dom.eventForm.elements.participates_ingenia.value = 'no';
@@ -1078,6 +1135,7 @@
       dom.eventSpecialtiesField.hidden = true;
       populateSpecialtiesList([]);
       populateCollaboratorsList([]);
+      refreshParticipantsList([]);
     }
     dom.eventDialog.showModal();
     dom.eventForm.elements.title.focus();
@@ -1111,17 +1169,16 @@
     const eventDate = dom.eventForm.elements.event_date.value;
     const startTime = dom.eventForm.elements.start_time.value;
     const endTime = dom.eventForm.elements.end_time.value;
-    const venue = dom.eventForm.elements.venue.value.trim();
     const location = dom.eventForm.elements.location.value.trim();
     const status = dom.eventForm.elements.status.value;
-    const description = dom.eventForm.elements.description.value.trim();
     const notes = dom.eventForm.elements.notes.value.trim();
     const participatesIngenia = dom.eventForm.elements.participates_ingenia.value === 'si';
     const jornadaType = dom.eventJornadaTypeSelect.value;
     const specialties = jornadaType === 'medica' ? readSpecialties() : [];
     const collaboratingOrgs = readCollaboratingOrgs();
+    const participants = readParticipants();
     if (!title || !eventDate) { showError(dom.eventError, 'Nombre del evento y fecha son obligatorios.'); return; }
-    if (source === 'coalicion' && !venue && !location) { showError(dom.eventError, 'Coalición Venezuela necesita un lugar o una dirección.'); return; }
+    if (source === 'coalicion' && !location) { showError(dom.eventError, 'Coalición Venezuela necesita una ubicación.'); return; }
 
     let newCalendarName = '';
     if (source === NEW_CALENDAR_VALUE) {
@@ -1134,9 +1191,9 @@
     let ok = false;
     const fields = {
       title: title, event_date: eventDate, start_time: startTime, end_time: endTime,
-      venue: venue, location: location, status: status, description: description, notes: notes,
+      location: location, status: status, notes: notes,
       participatesIngenia: participatesIngenia, jornadaType: jornadaType, specialties: specialties,
-      collaboratingOrgs: collaboratingOrgs
+      collaboratingOrgs: collaboratingOrgs, participants: participants
     };
     let existing = state.editingEvent;
 
@@ -1476,10 +1533,11 @@
           action: 'save', entity: 'event', id: existing ? existing.rawId : null,
           payload: {
             title: fields.title, event_date: fields.event_date, start_time: fields.start_time || '',
-            end_time: fields.end_time || '', venue: fields.venue, location: fields.location,
+            end_time: fields.end_time || '', location: fields.location,
             maps_url: (raw && raw.maps_url) || '', status: fields.status, notes: fields.notes,
-            description: fields.description, jornada_type: fields.jornadaType, specialties: fields.specialties,
-            collaborating_orgs: fields.collaboratingOrgs, participo_fundacion_ingenia: fields.participatesIngenia
+            jornada_type: fields.jornadaType, specialties: fields.specialties,
+            collaborating_orgs: fields.collaboratingOrgs, participants: fields.participants,
+            participo_fundacion_ingenia: fields.participatesIngenia
           }
         })
       });
@@ -1503,10 +1561,10 @@
     const next = upsertById(current, existing, function (base) {
       return Object.assign({}, base, {
         id: existing ? existing.rawId : uid(), title: fields.title, event_date: fields.event_date,
-        start_time: fields.start_time, end_time: fields.end_time, venue: fields.venue,
-        location: fields.location, status: fields.status, description: fields.description, notes: fields.notes,
+        start_time: fields.start_time, end_time: fields.end_time,
+        location: fields.location, status: fields.status, notes: fields.notes,
         participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
-        specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs
+        specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants
       });
     });
     return writeBoardKey('florangel_board_state', 'florangel-events-v1', next);
@@ -1528,20 +1586,20 @@
         if (idx > -1) dates[idx] = fields.event_date; else dates.push(fields.event_date);
         return Object.assign({}, j, {
           title: fields.title, dates: dates, time: fields.start_time || '', endTime: fields.end_time,
-          venue: fields.venue, location: fields.location, status: sharedStatus, description: fields.description,
+          location: fields.location, status: sharedStatus,
           notes: fields.notes, participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
-          specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs
+          specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants
         });
       });
       return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
     }
     const next = current.concat({
       id: uid(), title: fields.title, dates: [fields.event_date], time: fields.start_time || '',
-      endTime: fields.end_time, venue: fields.venue, location: fields.location, status: sharedStatus,
-      description: fields.description, eventType: 'other',
+      endTime: fields.end_time, location: fields.location, status: sharedStatus,
+      eventType: 'other',
       owner: '', doctors: '', students: '', assignedVolunteers: [], checks: {}, notes: fields.notes,
       participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
-      specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs
+      specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants
     });
     return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
   }
@@ -1551,10 +1609,10 @@
     const next = upsertById(current, existing, function (base) {
       return Object.assign({}, base, {
         id: existing ? existing.rawId : uid(), title: fields.title, event_date: fields.event_date,
-        start_time: fields.start_time, end_time: fields.end_time, venue: fields.venue,
-        location: fields.location, status: fields.status, description: fields.description, notes: fields.notes,
+        start_time: fields.start_time, end_time: fields.end_time,
+        location: fields.location, status: fields.status, notes: fields.notes,
         participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
-        specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs
+        specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants
       });
     });
     return writeBoardKey('ingenia_board_state', key, next);

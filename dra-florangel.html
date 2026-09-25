@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
   <link rel="stylesheet" href="./dra-florangel.css?v=11">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./dra-florangel.js?v=11" defer></script>
+  <script src="./dra-florangel.js?v=12" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -223,13 +223,9 @@
             <option value="si">Sí</option>
           </select>
         </div>
-        <div class="field">
-          <label for="field-event-venue">Lugar</label>
-          <input id="field-event-venue" class="input" name="venue" type="text" placeholder="Ej. Oficinas Fundación Ingenia">
-        </div>
-        <div class="field">
-          <label for="field-event-location">Dirección</label>
-          <input id="field-event-location" class="input" name="location" type="text" placeholder="Ej. Calle Real de Mare Abajo">
+        <div class="field field-full">
+          <label for="field-event-location">Ubicación</label>
+          <input id="field-event-location" class="input" name="location" type="text" placeholder="Ej. Oficinas Fundación Ingenia, Calle Real de Mare Abajo">
         </div>
         <div class="field">
           <label for="field-event-status">Estado</label>
@@ -238,11 +234,12 @@
             <option value="confirmed">Confirmado</option>
             <option value="in_progress">En Ejecución</option>
             <option value="completed">Completado</option>
+            <option value="cancelled">Cancelada</option>
           </select>
         </div>
         <div class="field field-full">
-          <label for="field-event-description">Descripción</label>
-          <textarea id="field-event-description" class="input" name="description"></textarea>
+          <label>Participantes (opcional)</label>
+          <div id="event-participants-list" class="checkbox-list"></div>
         </div>
         <div class="field field-full">
           <label for="field-event-notes">Notas y Requerimientos</label>
