@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=19">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=20">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=20" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=21" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -26,11 +26,21 @@
     </header>
 
     <nav id="tab-nav" class="tab-nav" aria-label="Secciones">
+      <button class="tab-button" type="button" data-view="resumen" onclick="window.ingeniaAction(event)">📊 Resumen</button>
       <button class="tab-button" type="button" data-view="calendar" aria-current="page" onclick="window.ingeniaAction(event)">🗓️ Calendario</button>
       <button class="tab-button" type="button" data-view="tasks" onclick="window.ingeniaAction(event)">📋 Tareas de Equipo</button>
       <button class="tab-button" type="button" data-view="organizations" onclick="window.ingeniaAction(event)">🏢 Organizaciones</button>
       <button class="tab-button" type="button" data-view="leaders" onclick="window.ingeniaAction(event)">🧑‍🤝‍🧑 Líderes de Comunidades</button>
     </nav>
+
+    <div id="kpi-strip" class="kpi-strip" hidden>
+      <span class="kpi-strip-item">🗓️ <strong id="kpi-strip-jornadas">0</strong> jornadas este mes</span>
+      <span class="kpi-strip-divider" aria-hidden="true"></span>
+      <span class="kpi-strip-item">🤝 <strong id="kpi-strip-participacion">0%</strong> participación Ingenia</span>
+      <span class="kpi-strip-divider" aria-hidden="true"></span>
+      <span class="kpi-strip-item">❌ <strong id="kpi-strip-canceladas">0%</strong> canceladas</span>
+      <button type="button" class="kpi-strip-link" data-view="resumen" onclick="window.ingeniaAction(event)">📊 Ver informe completo →</button>
+    </div>
 
     <div id="connectivity-banner" class="notice notice-warning page-notice" role="status" hidden>
       No pudimos traer alguno de los calendarios. Conservamos lo que sí cargó. <button id="retry-load" type="button" onclick="window.ingeniaAction(event)">Reintentar</button>
@@ -39,6 +49,34 @@
     <section id="loading-state" class="loading-state" aria-live="polite">
       <span class="loader" aria-hidden="true"></span>
       <p>Cargando los calendarios…</p>
+    </section>
+
+    <section id="resumen-view" class="view" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">📊 Indicadores</p>
+          <h2>Resumen y KPIs</h2>
+        </div>
+        <div class="resumen-filters">
+          <div class="calendar-view-switcher" id="resumen-period-switcher">
+            <button type="button" class="calendar-view-btn" data-kpi-period="month" aria-current="page" onclick="window.ingeniaAction(event)">Este mes</button>
+            <button type="button" class="calendar-view-btn" data-kpi-period="quarter" onclick="window.ingeniaAction(event)">Trimestre</button>
+            <button type="button" class="calendar-view-btn" data-kpi-period="year" onclick="window.ingeniaAction(event)">Año</button>
+          </div>
+          <select id="resumen-org-filter" class="input"></select>
+        </div>
+      </div>
+      <div id="resumen-kpi-grid" class="resumen-kpi-grid"></div>
+      <div class="resumen-columns">
+        <section class="panel">
+          <div class="panel-heading"><h3>Jornadas por organización</h3></div>
+          <div id="resumen-org-breakdown"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-heading"><h3>Próximas jornadas</h3></div>
+          <div id="resumen-upcoming" class="agenda-list"></div>
+        </section>
+      </div>
     </section>
 
     <section id="calendar-view" class="view" hidden>

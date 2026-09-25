@@ -100,10 +100,11 @@
     tasksTitle: 'Tareas de Equipo',
     organizationsTitle: 'Organizaciones',
     leadersTitle: 'Líderes de Comunidades',
-    tabOrder: ['calendar', 'tasks', 'organizations', 'leaders'],
+    tabOrder: ['resumen', 'calendar', 'tasks', 'organizations', 'leaders'],
     boardOrder: ['kpis', 'board']
   };
   const NAV_ITEMS = {
+    resumen: { emoji: '📊', label: 'Resumen' },
     calendar: { emoji: '🗓️', label: 'Calendario' },
     tasks: { emoji: '📋', label: 'Tareas de Equipo' },
     organizations: { emoji: '🏢', label: 'Organizaciones' },
@@ -148,6 +149,8 @@
     dragTaskId: null,
     taskOrgFilter: '',
     taskResponsableFilter: '',
+    kpiPeriod: 'month',
+    kpiOrgFilter: '',
     editingResponsableId: null,
     ui: cloneUI(DEFAULT_UI),
     customizeForm: cloneUI(DEFAULT_UI)
@@ -161,6 +164,7 @@
     if (!target) return;
     if (target.dataset.view) return setView(target.dataset.view);
     if (target.dataset.calendarView) return setCalendarViewMode(target.dataset.calendarView);
+    if (target.dataset.kpiPeriod) return setKpiPeriod(target.dataset.kpiPeriod);
     const actionsById = {
       'retry-load': loadAll,
       'calendar-prev': function () { changePeriod(-1); },
@@ -285,6 +289,10 @@
       state.taskResponsableFilter = dom.tasksResponsableFilter.value;
       refreshTaskBoards();
     });
+    dom.resumenOrgFilter.addEventListener('change', function () {
+      state.kpiOrgFilter = dom.resumenOrgFilter.value;
+      renderResumenView();
+    });
     dom.responsableChecklist.addEventListener('change', onResponsableChecklistChange);
     dom.taskStatusSelect.addEventListener('change', onTaskStatusChange);
     dom.orgForm.addEventListener('submit', onOrgSubmit);
@@ -372,6 +380,14 @@
     dom.customLeadersTitle = document.getElementById('field-custom-leaders-title');
     dom.customizeTabsList = document.getElementById('customize-tabs-list');
     dom.customizeSectionsList = document.getElementById('customize-sections-list');
+    dom.kpiStrip = document.getElementById('kpi-strip');
+    dom.kpiStripJornadas = document.getElementById('kpi-strip-jornadas');
+    dom.kpiStripParticipacion = document.getElementById('kpi-strip-participacion');
+    dom.kpiStripCanceladas = document.getElementById('kpi-strip-canceladas');
+    dom.resumenOrgFilter = document.getElementById('resumen-org-filter');
+    dom.resumenKpiGrid = document.getElementById('resumen-kpi-grid');
+    dom.resumenOrgBreakdown = document.getElementById('resumen-org-breakdown');
+    dom.resumenUpcoming = document.getElementById('resumen-upcoming');
   }
 
   function toast(message, tone) {
@@ -489,6 +505,9 @@
     populateTasksResponsableFilter();
     refreshTaskBoards();
     renderOrganizations();
+    populateResumenOrgFilter();
+    renderKpiStrip();
+    renderResumenView();
     setView(state.view);
     renderCalendar();
   }
@@ -1358,6 +1377,163 @@
     const stillExists = state.teamMembers.some(function (m) { return m.id === current; });
     dom.tasksResponsableFilter.value = stillExists ? current : '';
     state.taskResponsableFilter = dom.tasksResponsableFilter.value;
+  }
+
+  // ---------- Resumen / KPIs ----------
+
+  function periodRange(period) {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    if (period === 'year') return { start: y + '-01-01', end: y + '-12-31' };
+    if (period === 'quarter') {
+      const qStartMonth = Math.floor(m / 3) * 3;
+      const start = new Date(Date.UTC(y, qStartMonth, 1));
+      const end = new Date(Date.UTC(y, qStartMonth + 3, 0));
+      return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+    }
+    const start = new Date(Date.UTC(y, m, 1));
+    const end = new Date(Date.UTC(y, m + 1, 0));
+    return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+  }
+
+  // Solo cuenta jornadas (insumos/médica) — las reuniones quedan fuera de
+  // estos indicadores a propósito, son un tipo de evento distinto.
+  function computeJornadaStats(events) {
+    const stats = { total: 0, ingenia: 0, insumos: 0, medica: 0, cancelled: 0, collab: 0, specialtiesCount: {}, byOrg: {} };
+    events.forEach(function (e) {
+      const extra = readEventExtra(e.source, e.raw);
+      if (extra.jornadaType !== 'insumos' && extra.jornadaType !== 'medica') return;
+      stats.total += 1;
+      if (readParticipatesIngenia(e.raw) === 'si') stats.ingenia += 1;
+      if (extra.jornadaType === 'insumos') stats.insumos += 1;
+      if (extra.jornadaType === 'medica') stats.medica += 1;
+      if (extra.status === 'cancelled') stats.cancelled += 1;
+      if (extra.collaboratingOrgs.length > 0) stats.collab += 1;
+      extra.specialties.forEach(function (s) { stats.specialtiesCount[s] = (stats.specialtiesCount[s] || 0) + 1; });
+      stats.byOrg[e.source] = (stats.byOrg[e.source] || 0) + 1;
+    });
+    return stats;
+  }
+
+  // Franja persistente: siempre "este mes", todas las organizaciones —
+  // igual sin importar qué filtro tenga abierto la pestaña Resumen.
+  function renderKpiStrip() {
+    const range = periodRange('month');
+    const events = state.events.filter(function (e) { return e.date >= range.start && e.date <= range.end; });
+    const stats = computeJornadaStats(events);
+    const participacionPct = stats.total ? Math.round((stats.ingenia / stats.total) * 100) : 0;
+    const canceladasPct = stats.total ? Math.round((stats.cancelled / stats.total) * 100) : 0;
+    dom.kpiStripJornadas.textContent = String(stats.total);
+    dom.kpiStripParticipacion.textContent = participacionPct + '%';
+    dom.kpiStripCanceladas.textContent = canceladasPct + '%';
+    dom.kpiStrip.hidden = false;
+  }
+
+  function setKpiPeriod(period) {
+    state.kpiPeriod = period;
+    document.querySelectorAll('#resumen-period-switcher [data-kpi-period]').forEach(function (btn) {
+      if (btn.dataset.kpiPeriod === period) btn.setAttribute('aria-current', 'page');
+      else btn.removeAttribute('aria-current');
+    });
+    renderResumenView();
+  }
+
+  function populateResumenOrgFilter() {
+    const current = dom.resumenOrgFilter.value;
+    const options = REAL_ORGS.map(function (key) {
+      return '<option value="' + key + '">' + FIXED_SOURCE_EMOJI[key] + ' ' + safe(SOURCE_LABELS[key]) + '</option>';
+    }).concat(state.customCalendars.map(function (c) {
+      return '<option value="' + safe(c.id) + '">🏷️ ' + safe(c.name) + '</option>';
+    }));
+    renderMarkup(dom.resumenOrgFilter, ['<option value="">Todas las organizaciones</option>'].concat(options).join(''));
+    const stillExists = current === '' || REAL_ORGS.indexOf(current) > -1 || state.customCalendars.some(function (c) { return c.id === current; });
+    dom.resumenOrgFilter.value = stillExists ? current : '';
+    state.kpiOrgFilter = dom.resumenOrgFilter.value;
+  }
+
+  function renderResumenView() {
+    const range = periodRange(state.kpiPeriod);
+    const orgFilter = state.kpiOrgFilter || null;
+    const events = state.events.filter(function (e) {
+      return e.date >= range.start && e.date <= range.end && (!orgFilter || e.source === orgFilter);
+    });
+    const stats = computeJornadaStats(events);
+    const participacionPct = stats.total ? Math.round((stats.ingenia / stats.total) * 100) : 0;
+    const canceladasPct = stats.total ? Math.round((stats.cancelled / stats.total) * 100) : 0;
+    const insumosPct = stats.total ? Math.round((stats.insumos / stats.total) * 100) : 0;
+    const medicaPct = stats.total ? 100 - insumosPct : 0;
+    const topSpecialty = Object.keys(stats.specialtiesCount).sort(function (a, b) {
+      return stats.specialtiesCount[b] - stats.specialtiesCount[a];
+    })[0] || null;
+
+    const simpleCards = [
+      { icon: '🗓️', value: stats.total, label: 'Jornadas realizadas', cls: 'kpi-primary' },
+      { icon: '🤝', value: participacionPct + '%', label: 'Participación de Ingenia', cls: 'kpi-sky' },
+      { icon: '❌', value: canceladasPct + '%', label: 'Tasa de cancelación', cls: stats.cancelled ? 'kpi-danger' : 'kpi-neutral' }
+    ];
+    let kpiMarkup = simpleCards.map(function (c) {
+      return '<article class="kpi-card ' + c.cls + '"><span class="kpi-icon" aria-hidden="true">' + c.icon + '</span><strong>' + c.value + '</strong><span class="kpi-label">' + safe(c.label) + '</span></article>';
+    }).join('');
+    kpiMarkup += '<article class="kpi-card kpi-neutral">' +
+      '<span class="kpi-label">💊 Insumos vs. 🩺 Médica</span>' +
+      '<div class="resumen-split-bar"><span style="width:' + insumosPct + '%;background:var(--source-networking)"></span><span style="width:' + medicaPct + '%;background:var(--color-accent-300)"></span></div>' +
+      '<span class="kpi-label" style="text-transform:none">Insumos · ' + stats.insumos + ' &nbsp; Médica · ' + stats.medica + '</span>' +
+    '</article>';
+    kpiMarkup += '<article class="kpi-card kpi-neutral">' +
+      '<span class="kpi-icon" aria-hidden="true">🩺</span>' +
+      '<strong style="font-size:20px">' + (topSpecialty ? safe(topSpecialty) : 'Sin datos') + '</strong>' +
+      '<span class="kpi-label">Especialidad más cubierta</span>' +
+      (topSpecialty ? '<span class="kpi-label" style="text-transform:none">' + stats.specialtiesCount[topSpecialty] + ' jornadas médicas</span>' : '') +
+    '</article>';
+    kpiMarkup += '<article class="kpi-card kpi-primary">' +
+      '<span class="kpi-icon" aria-hidden="true">🔗</span>' +
+      '<strong>' + stats.collab + '</strong>' +
+      '<span class="kpi-label">Jornadas co-organizadas</span>' +
+      '<span class="kpi-label" style="text-transform:none">con 2 o más organizaciones</span>' +
+    '</article>';
+    renderMarkup(dom.resumenKpiGrid, kpiMarkup);
+
+    const orgEntries = Object.keys(stats.byOrg).map(function (key) {
+      return { key: key, label: sourceInfo(key).label, color: sourceInfo(key).color, count: stats.byOrg[key] };
+    }).sort(function (a, b) { return b.count - a.count; });
+    const maxCount = orgEntries.length ? orgEntries[0].count : 0;
+    if (!orgEntries.length) {
+      renderMarkup(dom.resumenOrgBreakdown, '<div class="empty-state"><strong>Sin datos</strong><span>No hay jornadas registradas en este período.</span></div>');
+    } else {
+      renderMarkup(dom.resumenOrgBreakdown, orgEntries.map(function (o) {
+        const pct = maxCount ? Math.round((o.count / maxCount) * 100) : 0;
+        return '<div class="resumen-org-row">' +
+          '<span class="resumen-org-name">' + safe(o.label) + '</span>' +
+          '<span class="resumen-org-bar-track"><span class="resumen-org-bar-fill" style="width:' + pct + '%;background:' + safe(o.color) + '"></span></span>' +
+          '<span class="resumen-org-count">' + o.count + '</span>' +
+        '</div>';
+      }).join(''));
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const upcoming = events.filter(function (e) {
+      const extra = readEventExtra(e.source, e.raw);
+      return e.date >= today && (extra.jornadaType === 'insumos' || extra.jornadaType === 'medica');
+    }).sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); }).slice(0, 8);
+    if (!upcoming.length) {
+      renderMarkup(dom.resumenUpcoming, '<div class="empty-state"><strong>Sin próximas jornadas</strong><span>No hay jornadas de insumos o médicas programadas en este período.</span></div>');
+    } else {
+      renderMarkup(dom.resumenUpcoming, upcoming.map(function (e) {
+        const info = sourceInfo(e.source);
+        const cs = sourceClassStyle(e.source);
+        const extra = readEventExtra(e.source, e.raw);
+        const typeLabel = JORNADA_TYPES[extra.jornadaType] || '';
+        return '<button type="button" class="agenda-row" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
+          sourceDotHtml(e.source) +
+          '<div>' +
+            '<p class="agenda-row-title">' + safe(e.title) + (typeLabel ? ' — ' + safe(typeLabel) : '') + '</p>' +
+            '<p class="agenda-row-meta">' + safe(formatDate(e.date)) + '</p>' +
+            '<span class="agenda-row-source ' + cs.cls + '" ' + cs.style + '>' + safe(info.label) + '</span>' +
+          '</div>' +
+        '</button>';
+      }).join(''));
+    }
   }
 
   function taskDetailText(task) { return task.detail != null ? task.detail : (task.notes || ''); }
