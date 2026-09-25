@@ -750,6 +750,11 @@
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px; grid-column: 1 / -1">Nombre del evento
             <input type="text" placeholder="Ej. Evento de salud integral" value="{{ journeyForm.title }}" onChange="{{ onJourneyTitle }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
+          <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Tipo de Jornada / Reunión
+            <select value="{{ journeyForm.jornadaType }}" onChange="{{ onJourneyJornadaType }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+              <sc-for list="{{ jornadaTypeOptions }}" as="t" hint-placeholder-count="4"><option value="{{ t.id }}">{{ t.label }}</option></sc-for>
+            </select>
+          </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Fecha
             <input type="date" value="{{ journeyFormDateValue }}" onChange="{{ onJourneyDate }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
@@ -788,6 +793,23 @@
             </sc-for>
           </div>
         </div>
+
+        <sc-if value="{{ journeyIsMedica }}" hint-placeholder-val="{{ false }}">
+          <div style="background: var(--color-accent-2-100); border: 1px solid var(--color-accent-2-300); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+            <div>
+              <div style="font-family: var(--font-heading); font-size: 16px">Especialidades</div>
+              <div style="font-size: 11.5px; color: var(--color-neutral-700)">Selección múltiple.</div>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px">
+              <sc-for list="{{ journeySpecialtiesChecklist }}" as="o" hint-placeholder-count="4">
+                <label style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--color-neutral-300); border-radius: 999px; background: #fff; font-size: 12px; font-weight: 600; cursor: pointer">
+                  <input type="checkbox" checked="{{ o.checked }}" onChange="{{ o.toggle }}" />
+                  {{ o.label }}
+                </label>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
 
         <div style="background: var(--color-accent-2-100); border: 1px solid var(--color-accent-2-300); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
           <div>
@@ -1470,6 +1492,22 @@ const EVENT_TYPES = [
   { id: 'other', label: 'Otro tipo de evento' }
 ];
 
+// Campo compartido con el resto de los calendarios (Networking, Organización,
+// Dra Florangel, CMDLT, Coalición) — no confundir con EVENT_TYPES de arriba,
+// que es propio de UCV y no se muestra en el formulario.
+const JORNADA_TYPES = [
+  { id: '', label: 'Sin especificar' },
+  { id: 'insumos', label: 'Insumos' },
+  { id: 'medica', label: 'Médica' },
+  { id: 'reunion', label: 'Reunión' }
+];
+const MEDICAL_SPECIALTIES = [
+  'Medicina General', 'Medicina Interna', 'Pediatría', 'Ginecología y Obstetricia',
+  'Cardiología', 'Dermatología', 'Oftalmología', 'Otorrinolaringología', 'Psiquiatría',
+  'Psicología', 'Nutrición y Dietética', 'Odontología', 'Fisioterapia', 'Endocrinología',
+  'Urología', 'Traumatología', 'Gastroenterología', 'Neurología'
+];
+
 const APP_STATUS = {
   developing: { label: 'En desarrollo', color: '#315a9d', soft: '#eaf1fc' },
   resolved: { label: 'Desarrollo de la app resuelto', color: '#14584f', soft: '#e6f6f3' },
@@ -1600,7 +1638,7 @@ function writeStore(key, value) {
 
 function normalizeJourney(j) {
   const withDates = (Array.isArray(j.dates) && j.dates.length) ? j : Object.assign({}, j, { dates: j.date ? [j.date] : [] });
-  return Object.assign({ specialtyUnit: '', doctors: '', students: '', endTime: '', participants: [] }, withDates, { status: migrateJourneyStatus(withDates.status) });
+  return Object.assign({ specialtyUnit: '', doctors: '', students: '', endTime: '', participants: [], jornadaType: '', specialties: [] }, withDates, { status: migrateJourneyStatus(withDates.status) });
 }
 
 function timeInput(value) {
@@ -1667,7 +1705,7 @@ class Component extends DCLogic {
     },
     ui: cloneUI(SAVED_UI), customizeOpen: false, customizeForm: cloneUI(SAVED_UI),
     calendarMonth: TODAY.slice(0, 7), dayModal: null, journeyModal: null,
-    journeyForm: { title: '', eventType: 'health', dates: [TODAY], time: '', endTime: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, specialtyUnit: '', doctors: '', students: '', participatesIngenia: false, participants: [] },
+    journeyForm: { title: '', eventType: 'health', dates: [TODAY], time: '', endTime: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, specialtyUnit: '', doctors: '', students: '', participatesIngenia: false, participants: [], jornadaType: '', specialties: [] },
     modal: null, type: 'meeting', notes: '', date: TODAY, follow: '',
     taskModal: null,
     taskForm: { title: '', responsable: '', newResponsableName: '', status: 'pendiente', followupStatus: '', priority: 'media', detail: '', nextAction: '', dueDate: '' },
@@ -2105,7 +2143,7 @@ class Component extends DCLogic {
   };
 
   blankJourney(date) {
-    return { title: '', eventType: 'health', dates: date ? [date] : [], time: '', endTime: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, assignedVolunteers: [], specialtyUnit: '', doctors: '', students: '', participatesIngenia: false, participants: [] };
+    return { title: '', eventType: 'health', dates: date ? [date] : [], time: '', endTime: '', location: '', area: '', owner: '', status: 'planned', notes: '', checks: {}, assignedVolunteers: [], specialtyUnit: '', doctors: '', students: '', participatesIngenia: false, participants: [], jornadaType: '', specialties: [] };
   }
 
   blankVolunteer() {
@@ -2219,6 +2257,13 @@ class Component extends DCLogic {
     const current = s.journeyForm.participants || [];
     const next = current.indexOf(key) > -1 ? current.filter(x => x !== key) : current.concat([key]);
     this.setState({ journeyForm: Object.assign({}, s.journeyForm, { participants: next }) });
+  }
+
+  toggleJourneySpecialty(label) {
+    const s = this.state;
+    const current = s.journeyForm.specialties || [];
+    const next = current.indexOf(label) > -1 ? current.filter(x => x !== label) : current.concat([label]);
+    this.setState({ journeyForm: Object.assign({}, s.journeyForm, { specialties: next }) });
   }
 
   saveJourney = () => {
@@ -2556,6 +2601,13 @@ class Component extends DCLogic {
       checked: (s.journeyForm.participants || []).indexOf('contact:' + c.id) > -1,
       toggle: () => this.toggleJourneyParticipant('contact:' + c.id)
     })));
+
+    const journeyIsMedica = s.journeyForm.jornadaType === 'medica';
+    const journeySpecialtiesChecklist = MEDICAL_SPECIALTIES.map(label => ({
+      key: label, label: label,
+      checked: (s.journeyForm.specialties || []).indexOf(label) > -1,
+      toggle: () => this.toggleJourneySpecialty(label)
+    }));
 
     const volunteerAvailChips = (s.volunteerForm.availability || []).map(d => ({
       label: fmt(d),
@@ -2995,6 +3047,7 @@ class Component extends DCLogic {
       journeyParticipatesIngeniaValue: s.journeyForm.participatesIngenia ? 'si' : 'no',
       journeyFormDateValue: journeyFormDateValue, journeyFormTimeValue: journeyFormTimeValue,
       journeyFormEndTimeValue: journeyFormEndTimeValue, journeyParticipantsChecklist: journeyParticipantsChecklist,
+      jornadaTypeOptions: JORNADA_TYPES, journeyIsMedica: journeyIsMedica, journeySpecialtiesChecklist: journeySpecialtiesChecklist,
       journeyReadiness: JOURNEY_QUESTIONS.filter(q => !!formChecks[q.key]).length + '/' + JOURNEY_QUESTIONS.length,
       customizeOpen: s.customizeOpen, customizeForm: draftUI, customizeTabs: customizeTabs, customizeSections: customizeSections,
       timelineEmpty: timeline.length === 0,
@@ -3104,6 +3157,7 @@ class Component extends DCLogic {
       calendarCellHover: { background: 'var(--color-neutral-100)', borderColor: 'var(--color-accent-300)' },
       onJourneyTitle: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { title: e.target.value }) }),
       onJourneyDate: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { dates: e.target.value ? [e.target.value] : [] }) }),
+      onJourneyJornadaType: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { jornadaType: e.target.value }) }),
       onJourneyTime: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { time: e.target.value }) }),
       onJourneyEndTime: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { endTime: e.target.value }) }),
       onJourneyLocation: e => this.setState({ journeyForm: Object.assign({}, s.journeyForm, { location: e.target.value }) }),

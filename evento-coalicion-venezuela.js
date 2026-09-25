@@ -378,7 +378,7 @@
     cancelled: 'Cancelada'
   };
   const PARTICIPATES_INGENIA_OPTIONS = { no: 'No', si: 'Sí' };
-  const JORNADA_TYPE_OPTIONS = { '': 'Sin especificar', insumos: 'Insumos', medica: 'Médica' };
+  const JORNADA_TYPE_OPTIONS = { '': 'Sin especificar', insumos: 'Insumos', medica: 'Médica', reunion: 'Reunión' };
   const MEDICAL_SPECIALTIES = [
     'Medicina General', 'Medicina Interna', 'Pediatría', 'Ginecología y Obstetricia',
     'Cardiología', 'Dermatología', 'Oftalmología', 'Otorrinolaringología', 'Psiquiatría',
@@ -1696,7 +1696,7 @@
     const options = Object.keys(JORNADA_TYPE_OPTIONS).map(function (key) {
       return '<option value="' + safe(key) + '"' + (current === key ? ' selected' : '') + '>' + safe(JORNADA_TYPE_OPTIONS[key]) + '</option>';
     }).join('');
-    return '<div class="field"><label for="field-jornada_type">Tipo de Jornada</label>' +
+    return '<div class="field"><label for="field-jornada_type">Tipo de Jornada / Reunión</label>' +
       '<select id="field-jornada_type" class="input" name="jornada_type" data-action="jornada-type-change" onchange="window.coalicionAction(event)">' + options + '</select></div>';
   }
 
