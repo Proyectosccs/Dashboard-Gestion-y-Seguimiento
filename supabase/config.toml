@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.lite-resultados]
 verify_jwt = false
+
+[functions.networking-calendar-feed]
+verify_jwt = false
