@@ -100,12 +100,13 @@
     tasksTitle: 'Tareas de Equipo',
     organizationsTitle: 'Organizaciones',
     leadersTitle: 'Líderes de Comunidades',
-    tabOrder: ['resumen', 'calendar', 'tasks', 'organizations', 'leaders'],
+    tabOrder: ['resumen', 'calendar', 'reuniones', 'tasks', 'organizations', 'leaders'],
     boardOrder: ['kpis', 'board']
   };
   const NAV_ITEMS = {
     resumen: { emoji: '📊', label: 'Resumen' },
     calendar: { emoji: '🗓️', label: 'Calendario' },
+    reuniones: { emoji: '🗒️', label: 'Reuniones' },
     tasks: { emoji: '📋', label: 'Tareas de Equipo' },
     organizations: { emoji: '🏢', label: 'Organizaciones' },
     leaders: { emoji: '🧑‍🤝‍🧑', label: 'Líderes de Comunidades' }
@@ -151,6 +152,8 @@
     taskResponsableFilter: '',
     kpiPeriod: 'month',
     kpiOrgFilter: '',
+    reunionOrgFilter: '',
+    pendientesDraft: [],
     editingResponsableId: null,
     ui: cloneUI(DEFAULT_UI),
     customizeForm: cloneUI(DEFAULT_UI)
@@ -178,11 +181,13 @@
         renderCalendar();
       },
       'new-event-btn': openEventDialog,
+      'new-reunion-btn': function () { openEventDialog(null, { presetJornadaType: 'reunion' }); },
       'event-dialog-close': closeEventDialog,
       'event-dialog-cancel': closeEventDialog,
       'event-delete': deleteEditingEvent,
       'field-event-jornada-type': onJornadaTypeChange,
       'field-event-specialty-other': onSpecialtyOtherChange,
+      'event-pendiente-add': addPendiente,
       'new-task-btn': openTaskDialog,
       'task-dialog-close': closeTaskDialog,
       'task-dialog-cancel': closeTaskDialog,
@@ -293,6 +298,10 @@
       state.kpiOrgFilter = dom.resumenOrgFilter.value;
       renderResumenView();
     });
+    dom.reunionesOrgFilter.addEventListener('change', function () {
+      state.reunionOrgFilter = dom.reunionesOrgFilter.value;
+      renderReunionesView();
+    });
     dom.responsableChecklist.addEventListener('change', onResponsableChecklistChange);
     dom.taskStatusSelect.addEventListener('change', onTaskStatusChange);
     dom.orgForm.addEventListener('submit', onOrgSubmit);
@@ -388,6 +397,10 @@
     dom.resumenKpiGrid = document.getElementById('resumen-kpi-grid');
     dom.resumenOrgBreakdown = document.getElementById('resumen-org-breakdown');
     dom.resumenUpcoming = document.getElementById('resumen-upcoming');
+    dom.eventMeetingField = document.getElementById('event-meeting-field');
+    dom.eventPendientesList = document.getElementById('event-pendientes-list');
+    dom.reunionesOrgFilter = document.getElementById('reuniones-org-filter');
+    dom.reunionesList = document.getElementById('reuniones-list');
   }
 
   function toast(message, tone) {
@@ -420,6 +433,7 @@
     if (isNew) dom.eventForm.elements.new_calendar_name.focus();
     populateCollaboratorsList();
     refreshParticipantsList();
+    renderPendientesList();
   }
 
   async function loadAll() {
@@ -427,7 +441,7 @@
     dom.connectivityBanner.hidden = true;
 
     const [coalicionRes, florangelRes, ucvRes, ingeniaRes] = await Promise.all([
-      state.client.from('coalicion_events').select('id,title,event_date,start_time,end_time,location,maps_url,notes,status,jornada_type,specialties,collaborating_orgs,participants,participo_fundacion_ingenia').is('archived_at', null),
+      state.client.from('coalicion_events').select('id,title,event_date,start_time,end_time,location,maps_url,notes,status,jornada_type,specialties,collaborating_orgs,participants,participo_fundacion_ingenia,minuta,pendientes').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
       state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
@@ -508,6 +522,8 @@
     populateResumenOrgFilter();
     renderKpiStrip();
     renderResumenView();
+    populateReunionesOrgFilter();
+    renderReunionesView();
     setView(state.view);
     renderCalendar();
   }
@@ -1018,7 +1034,9 @@
     const specialties = Array.isArray(raw.specialties) ? raw.specialties : [];
     const collaboratingOrgs = Array.isArray(raw.collaboratingOrgs) ? raw.collaboratingOrgs : (Array.isArray(raw.collaborating_orgs) ? raw.collaborating_orgs : []);
     const participants = Array.isArray(raw.participants) ? raw.participants : [];
-    return { status: status, endTime: endTime, jornadaType: jornadaType, specialties: specialties, collaboratingOrgs: collaboratingOrgs, participants: participants };
+    const minuta = raw.minuta || '';
+    const pendientes = Array.isArray(raw.pendientes) ? raw.pendientes : [];
+    return { status: status, endTime: endTime, jornadaType: jornadaType, specialties: specialties, collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, pendientes: pendientes };
   }
 
   // Fuentes que tienen su propia lista de contactos, para ofrecerlos en
@@ -1116,6 +1134,7 @@
     const isMedica = dom.eventJornadaTypeSelect.value === 'medica';
     dom.eventSpecialtiesField.hidden = !isMedica;
     if (isMedica) populateSpecialtiesList();
+    dom.eventMeetingField.hidden = dom.eventJornadaTypeSelect.value !== 'reunion';
   }
 
   function onSpecialtyOtherChange() {
@@ -1123,7 +1142,7 @@
     dom.eventCustomSpecialtyField.hidden = !(other && other.checked);
   }
 
-  function openEventDialog(existing) {
+  function openEventDialog(existing, options) {
     hideError(dom.eventError);
     dom.eventForm.reset();
     state.editingEvent = existing || null;
@@ -1147,6 +1166,10 @@
       if (extra.jornadaType === 'medica') populateSpecialtiesList(extra.specialties); else populateSpecialtiesList([]);
       populateCollaboratorsList(extra.collaboratingOrgs);
       refreshParticipantsList(extra.participants);
+      dom.eventForm.elements.minuta.value = extra.minuta;
+      dom.eventMeetingField.hidden = extra.jornadaType !== 'reunion';
+      state.pendientesDraft = extra.pendientes.map(function (p) { return Object.assign({}, p); });
+      renderPendientesList();
     } else {
       dom.eventForm.elements.event_date.value = state.selectedDay || new Date().toISOString().slice(0, 10);
       dom.eventForm.elements.participates_ingenia.value = 'no';
@@ -1155,6 +1178,11 @@
       populateSpecialtiesList([]);
       populateCollaboratorsList([]);
       refreshParticipantsList([]);
+      const presetJornadaType = options && options.presetJornadaType;
+      if (presetJornadaType) dom.eventForm.elements.jornada_type.value = presetJornadaType;
+      dom.eventMeetingField.hidden = presetJornadaType !== 'reunion';
+      state.pendientesDraft = [];
+      renderPendientesList();
     }
     dom.eventDialog.showModal();
     dom.eventForm.elements.title.focus();
@@ -1180,6 +1208,93 @@
     return Array.from(dom.eventCollaboratorsList.querySelectorAll('.event-collaborator-checkbox:checked')).map(function (cb) { return cb.value; });
   }
 
+  // Sincroniza el texto de cada fila con el borrador antes de guardar —
+  // el texto se lee en vivo del input (ver attachPendientesListeners) para
+  // no perder lo escrito si la lista se re-renderiza mientras se edita.
+  function readPendientes() {
+    return state.pendientesDraft.filter(function (p) { return p.text && p.text.trim(); }).map(function (p) {
+      return { id: p.id, text: p.text.trim(), done: !!p.done, taskId: p.taskId || null };
+    });
+  }
+
+  function renderPendientesList() {
+    const source = dom.eventForm.elements.source.value;
+    const allowTasks = source && source !== NEW_CALENDAR_VALUE;
+    if (!state.pendientesDraft.length) {
+      renderMarkup(dom.eventPendientesList, '<p style="font-size:12px;color:var(--color-neutral-600)">Sin pendientes todavía.</p>');
+      return;
+    }
+    renderMarkup(dom.eventPendientesList, state.pendientesDraft.map(function (p) {
+      return '<div class="pendiente-row" data-pendiente-id="' + safe(p.id) + '">' +
+        '<input type="checkbox" class="pendiente-done" data-id="' + safe(p.id) + '"' + (p.done ? ' checked' : '') + ' aria-label="Resuelto">' +
+        '<input type="text" class="input pendiente-text" data-id="' + safe(p.id) + '" value="' + safe(p.text) + '" placeholder="Pendiente o acuerdo…">' +
+        (p.taskId ? '<span class="pendiente-task-badge">✅ Tarea creada</span>' : (allowTasks ? '<button type="button" class="pendiente-create-task" data-id="' + safe(p.id) + '">+ Tarea</button>' : '')) +
+        '<button type="button" class="pendiente-remove" data-id="' + safe(p.id) + '" aria-label="Eliminar pendiente">🗑️</button>' +
+      '</div>';
+    }).join(''));
+    attachPendientesListeners();
+  }
+
+  function attachPendientesListeners() {
+    dom.eventPendientesList.querySelectorAll('.pendiente-text').forEach(function (input) {
+      input.addEventListener('input', function () {
+        const item = state.pendientesDraft.find(function (p) { return p.id === input.dataset.id; });
+        if (item) item.text = input.value;
+      });
+    });
+    dom.eventPendientesList.querySelectorAll('.pendiente-done').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        const item = state.pendientesDraft.find(function (p) { return p.id === cb.dataset.id; });
+        if (item) item.done = cb.checked;
+      });
+    });
+    dom.eventPendientesList.querySelectorAll('.pendiente-create-task').forEach(function (btn) {
+      btn.addEventListener('click', function () { createTaskFromPendiente(btn.dataset.id); });
+    });
+    dom.eventPendientesList.querySelectorAll('.pendiente-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        state.pendientesDraft = state.pendientesDraft.filter(function (p) { return p.id !== btn.dataset.id; });
+        renderPendientesList();
+      });
+    });
+  }
+
+  function addPendiente() {
+    state.pendientesDraft.push({ id: uid(), text: '', done: false, taskId: null });
+    renderPendientesList();
+    const inputs = dom.eventPendientesList.querySelectorAll('.pendiente-text');
+    const last = inputs[inputs.length - 1];
+    if (last) last.focus();
+  }
+
+  // Crea una tarea de equipo a partir de un pendiente de la minuta, sin
+  // cerrar el diálogo del evento — el pendiente queda enlazado a esa tarea
+  // (taskId) para no volver a crearla dos veces.
+  async function createTaskFromPendiente(pendienteId) {
+    const item = state.pendientesDraft.find(function (p) { return p.id === pendienteId; });
+    if (!item) return;
+    const textInput = dom.eventPendientesList.querySelector('.pendiente-text[data-id="' + pendienteId + '"]');
+    const text = textInput ? textInput.value.trim() : (item.text || '').trim();
+    if (!text) { toast('Escribe el pendiente antes de crear la tarea.', 'error'); return; }
+    const source = dom.eventForm.elements.source.value;
+    if (!source || source === NEW_CALENDAR_VALUE) return;
+    const payload = {
+      id: uid(), org: source, title: text,
+      detail: 'Pendiente de la reunión: ' + (dom.eventForm.elements.title.value.trim() || 'Sin título'),
+      status: 'pendiente', followupStatus: '', priority: 'media', responsable: [],
+      dueDate: '', nextAction: '', created_at: new Date().toISOString()
+    };
+    const next = state.tasks.concat(payload);
+    const ok = await writeBoardKey('ingenia_board_state', TEAM_TASKS_KEY, next);
+    if (!ok) { toast('No se pudo crear la tarea — revisa tu conexión.', 'error'); return; }
+    state.tasks = next;
+    item.text = text;
+    item.taskId = payload.id;
+    renderPendientesList();
+    refreshTaskBoards();
+    toast('Tarea creada.', 'success');
+  }
+
   async function onEventSubmit(e) {
     e.preventDefault();
     hideError(dom.eventError);
@@ -1196,6 +1311,8 @@
     const specialties = jornadaType === 'medica' ? readSpecialties() : [];
     const collaboratingOrgs = readCollaboratingOrgs();
     const participants = readParticipants();
+    const minuta = jornadaType === 'reunion' ? dom.eventForm.elements.minuta.value.trim() : '';
+    const pendientes = jornadaType === 'reunion' ? readPendientes() : [];
     if (!title || !eventDate) { showError(dom.eventError, 'Nombre del evento y fecha son obligatorios.'); return; }
     if (source === 'coalicion' && !location) { showError(dom.eventError, 'Coalición Venezuela necesita una ubicación.'); return; }
 
@@ -1212,7 +1329,7 @@
       title: title, event_date: eventDate, start_time: startTime, end_time: endTime,
       location: location, status: status, notes: notes,
       participatesIngenia: participatesIngenia, jornadaType: jornadaType, specialties: specialties,
-      collaboratingOrgs: collaboratingOrgs, participants: participants
+      collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, pendientes: pendientes
     };
     let existing = state.editingEvent;
 
@@ -1536,6 +1653,52 @@
     }
   }
 
+  // ---------- Reuniones (minutas + pendientes) ----------
+
+  function populateReunionesOrgFilter() {
+    const current = dom.reunionesOrgFilter.value;
+    const options = REAL_ORGS.map(function (key) {
+      return '<option value="' + key + '">' + FIXED_SOURCE_EMOJI[key] + ' ' + safe(SOURCE_LABELS[key]) + '</option>';
+    }).concat(state.customCalendars.map(function (c) {
+      return '<option value="' + safe(c.id) + '">🏷️ ' + safe(c.name) + '</option>';
+    }));
+    renderMarkup(dom.reunionesOrgFilter, ['<option value="">Todas las organizaciones</option>'].concat(options).join(''));
+    const stillExists = current === '' || REAL_ORGS.indexOf(current) > -1 || state.customCalendars.some(function (c) { return c.id === current; });
+    dom.reunionesOrgFilter.value = stillExists ? current : '';
+    state.reunionOrgFilter = dom.reunionesOrgFilter.value;
+  }
+
+  function reunionCardHtml(e) {
+    const extra = readEventExtra(e.source, e.raw);
+    const info = sourceInfo(e.source);
+    const cs = sourceClassStyle(e.source);
+    const pendientesTotal = extra.pendientes.length;
+    const pendientesDone = extra.pendientes.filter(function (p) { return p.done; }).length;
+    const minutaPreview = extra.minuta ? (extra.minuta.length > 140 ? extra.minuta.slice(0, 140) + '…' : extra.minuta) : '';
+    return '<button type="button" class="reunion-card" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)">' +
+      '<div class="reunion-card-head">' +
+        '<span class="agenda-row-source ' + cs.cls + '" ' + cs.style + '>' + safe(info.label) + '</span>' +
+        '<span class="reunion-card-date">' + safe(formatDate(e.date)) + '</span>' +
+      '</div>' +
+      '<p class="reunion-card-title">' + safe(e.title) + '</p>' +
+      (minutaPreview ? '<p class="reunion-card-minuta">' + safe(minutaPreview) + '</p>' : '<p class="reunion-card-minuta reunion-card-empty">Sin minuta todavía</p>') +
+      (pendientesTotal ? '<span class="reunion-card-pendientes">📋 ' + pendientesDone + '/' + pendientesTotal + ' pendientes resueltos</span>' : '') +
+    '</button>';
+  }
+
+  function renderReunionesView() {
+    const orgFilter = state.reunionOrgFilter || null;
+    const reuniones = state.events.filter(function (e) {
+      const extra = readEventExtra(e.source, e.raw);
+      return extra.jornadaType === 'reunion' && (!orgFilter || e.source === orgFilter);
+    }).sort(function (a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+    if (!reuniones.length) {
+      renderMarkup(dom.reunionesList, '<div class="empty-state"><strong>Sin reuniones</strong><span>No hay reuniones registradas todavía — agrega una con el botón de arriba.</span></div>');
+      return;
+    }
+    renderMarkup(dom.reunionesList, reuniones.map(reunionCardHtml).join(''));
+  }
+
   function taskDetailText(task) { return task.detail != null ? task.detail : (task.notes || ''); }
 
   function taskFollowupLabel(task) {
@@ -1713,7 +1876,8 @@
             maps_url: (raw && raw.maps_url) || '', status: fields.status, notes: fields.notes,
             jornada_type: fields.jornadaType, specialties: fields.specialties,
             collaborating_orgs: fields.collaboratingOrgs, participants: fields.participants,
-            participo_fundacion_ingenia: fields.participatesIngenia
+            participo_fundacion_ingenia: fields.participatesIngenia,
+            minuta: fields.minuta, pendientes: fields.pendientes
           }
         })
       });
@@ -1740,7 +1904,8 @@
         start_time: fields.start_time, end_time: fields.end_time,
         location: fields.location, status: fields.status, notes: fields.notes,
         participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
-        specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants
+        specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
+        minuta: fields.minuta, pendientes: fields.pendientes
       });
     });
     return writeBoardKey('florangel_board_state', 'florangel-events-v1', next);
@@ -1764,7 +1929,8 @@
           title: fields.title, dates: dates, time: fields.start_time || '', endTime: fields.end_time,
           location: fields.location, status: sharedStatus,
           notes: fields.notes, participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
-          specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants
+          specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
+          minuta: fields.minuta, pendientes: fields.pendientes
         });
       });
       return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
@@ -1775,7 +1941,8 @@
       eventType: 'other',
       owner: '', doctors: '', students: '', assignedVolunteers: [], checks: {}, notes: fields.notes,
       participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
-      specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants
+      specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
+      minuta: fields.minuta, pendientes: fields.pendientes
     });
     return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
   }
@@ -1788,7 +1955,8 @@
         start_time: fields.start_time, end_time: fields.end_time,
         location: fields.location, status: fields.status, notes: fields.notes,
         participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
-        specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants
+        specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
+        minuta: fields.minuta, pendientes: fields.pendientes
       });
     });
     return writeBoardKey('ingenia_board_state', key, next);

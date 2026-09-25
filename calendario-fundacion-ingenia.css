@@ -330,6 +330,24 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .resumen-org-count { width: 26px; text-align: right; font-size: 12px; font-weight: 700; color: var(--color-neutral-900); }
 @media (max-width: 900px) { .resumen-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .resumen-columns { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .resumen-kpi-grid { grid-template-columns: 1fr; } }
+
+/* Pestaña Reuniones (minutas + pendientes) */
+.reuniones-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.reunion-card { text-align: left; font: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 20px; border: 1px solid var(--color-neutral-300); background: rgba(255,255,255,.9); }
+.reunion-card:hover { border-color: var(--color-accent-400); }
+.reunion-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.reunion-card-date { font-size: 11.5px; color: var(--color-neutral-600); font-weight: 600; }
+.reunion-card-title { font-weight: 700; font-size: 14px; color: var(--color-text); margin: 0; }
+.reunion-card-minuta { font-size: 12.5px; color: var(--color-neutral-700); margin: 0; }
+.reunion-card-empty { font-style: italic; color: var(--color-neutral-500); }
+.reunion-card-pendientes { font-size: 11px; font-weight: 700; color: var(--color-accent-700); }
+
+.pendientes-list { display: flex; flex-direction: column; gap: 8px; }
+.pendiente-row { display: flex; align-items: center; gap: 8px; }
+.pendiente-row .pendiente-text { flex: 1; }
+.pendiente-task-badge { font-size: 11px; font-weight: 700; color: var(--coalition-good); white-space: nowrap; }
+.pendiente-create-task, .pendiente-remove { border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 6px 10px; font-size: 11.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.pendiente-remove { padding: 6px 9px; }
 @media (max-width: 1180px) { .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 

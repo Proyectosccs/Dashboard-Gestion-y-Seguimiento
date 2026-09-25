@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=20">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=21">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=21" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=22" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -28,6 +28,7 @@
     <nav id="tab-nav" class="tab-nav" aria-label="Secciones">
       <button class="tab-button" type="button" data-view="resumen" onclick="window.ingeniaAction(event)">📊 Resumen</button>
       <button class="tab-button" type="button" data-view="calendar" aria-current="page" onclick="window.ingeniaAction(event)">🗓️ Calendario</button>
+      <button class="tab-button" type="button" data-view="reuniones" onclick="window.ingeniaAction(event)">🗒️ Reuniones</button>
       <button class="tab-button" type="button" data-view="tasks" onclick="window.ingeniaAction(event)">📋 Tareas de Equipo</button>
       <button class="tab-button" type="button" data-view="organizations" onclick="window.ingeniaAction(event)">🏢 Organizaciones</button>
       <button class="tab-button" type="button" data-view="leaders" onclick="window.ingeniaAction(event)">🧑‍🤝‍🧑 Líderes de Comunidades</button>
@@ -77,6 +78,20 @@
           <div id="resumen-upcoming" class="agenda-list"></div>
         </section>
       </div>
+    </section>
+
+    <section id="reuniones-view" class="view" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">🗒️ Minutas</p>
+          <h2>Reuniones</h2>
+        </div>
+        <div class="resumen-filters">
+          <select id="reuniones-org-filter" class="input"></select>
+          <button class="btn btn-primary" type="button" id="new-reunion-btn" onclick="window.ingeniaAction(event)">➕ Agregar reunión</button>
+        </div>
+      </div>
+      <div id="reuniones-list" class="reuniones-list"></div>
     </section>
 
     <section id="calendar-view" class="view" hidden>
@@ -233,6 +248,13 @@
             <label for="field-event-custom-specialty">Otras especialidades (separadas por coma)</label>
             <input id="field-event-custom-specialty" class="input" name="custom_specialties" type="text" placeholder="Ej. Alergología, Reumatología">
           </div>
+        </div>
+        <div class="field field-full" id="event-meeting-field" hidden>
+          <label for="field-event-minuta">Minuta</label>
+          <textarea id="field-event-minuta" class="input" name="minuta" placeholder="Resumen de lo conversado…"></textarea>
+          <label style="margin-top: 10px">Pendientes / Acuerdos</label>
+          <div id="event-pendientes-list" class="pendientes-list"></div>
+          <button type="button" id="event-pendiente-add" class="btn btn-secondary" style="margin-top: 8px" onclick="window.ingeniaAction(event)">➕ Agregar pendiente</button>
         </div>
         <div class="field">
           <label for="field-event-date">Fecha</label>
