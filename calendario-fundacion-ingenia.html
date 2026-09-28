@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=21">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=22">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=22" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=23" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -29,6 +29,7 @@
       <button class="tab-button" type="button" data-view="resumen" onclick="window.ingeniaAction(event)">📊 Resumen</button>
       <button class="tab-button" type="button" data-view="calendar" aria-current="page" onclick="window.ingeniaAction(event)">🗓️ Calendario</button>
       <button class="tab-button" type="button" data-view="reuniones" onclick="window.ingeniaAction(event)">🗒️ Reuniones</button>
+      <button class="tab-button" type="button" data-view="contacts" onclick="window.ingeniaAction(event)">🤝 Contactos</button>
       <button class="tab-button" type="button" data-view="tasks" onclick="window.ingeniaAction(event)">📋 Tareas de Equipo</button>
       <button class="tab-button" type="button" data-view="organizations" onclick="window.ingeniaAction(event)">🏢 Organizaciones</button>
       <button class="tab-button" type="button" data-view="leaders" onclick="window.ingeniaAction(event)">🧑‍🤝‍🧑 Líderes de Comunidades</button>
@@ -92,6 +93,28 @@
         </div>
       </div>
       <div id="reuniones-list" class="reuniones-list"></div>
+    </section>
+
+    <section id="contacts-view" class="view" aria-labelledby="contacts-view-title" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">🤝 Equipo</p>
+          <h2 id="contacts-view-title">Contactos</h2>
+          <p class="view-description">Contactos de las organizaciones aliadas — editar aquí actualiza también el tablero propio de cada una.</p>
+        </div>
+        <button class="btn btn-primary" type="button" id="new-contact-btn" onclick="window.ingeniaAction(event)">➕ Agregar contacto</button>
+      </div>
+      <div class="list-toolbar panel">
+        <div class="search-field">
+          <label class="sr-only" for="contact-search">Buscar contactos</label>
+          <span aria-hidden="true">⌕</span>
+          <input id="contact-search" type="text" placeholder="Buscar por nombre o rol…" autocomplete="off">
+          <button id="contact-search-clear" class="search-clear" type="button" aria-label="Limpiar búsqueda" onclick="window.ingeniaAction(event)" hidden>×</button>
+        </div>
+        <select id="contact-org-filter" class="toolbar-select"></select>
+        <p id="contact-result-count" class="result-count" aria-live="polite"></p>
+      </div>
+      <div id="contacts-list" class="contact-grid"></div>
     </section>
 
     <section id="calendar-view" class="view" hidden>
@@ -204,6 +227,61 @@
       <iframe id="leaders-frame" class="embedded-frame panel" src="./lideres-comunidades.html" title="Líderes de Comunidades" loading="lazy"></iframe>
     </section>
   </div>
+
+  <dialog id="contact-dialog" class="editor-dialog" aria-labelledby="contact-dialog-title">
+    <form id="contact-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">🤝 Equipo</p>
+          <h2 id="contact-dialog-title">Agregar contacto</h2>
+        </div>
+        <button id="contact-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.ingeniaAction(event)">×</button>
+      </div>
+      <div id="contact-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-fields">
+        <div class="field field-full">
+          <label for="field-contact-org">¿A cuál organización pertenece?</label>
+          <select id="field-contact-org" class="input" name="org" onchange="window.ingeniaAction(event)" required></select>
+        </div>
+        <div class="field field-full">
+          <label for="field-contact-name">Nombre completo</label>
+          <input id="field-contact-name" class="input" name="name" type="text" required>
+        </div>
+        <div class="field">
+          <label for="field-contact-role">Rol o cargo</label>
+          <input id="field-contact-role" class="input" name="role" type="text" placeholder="Ej. Coordinador de logística">
+        </div>
+        <div class="field">
+          <label for="field-contact-phone">Teléfono</label>
+          <input id="field-contact-phone" class="input" name="phone" type="tel">
+        </div>
+        <div class="field field-full" id="contact-coalicion-fields" hidden>
+          <label for="field-contact-belongs-to">Pertenece a (dentro de Coalición)</label>
+          <select id="field-contact-belongs-to" class="input" name="belongs_to">
+            <option value="Coalicion con amor a Venezuela">Coalición con Amor a Venezuela</option>
+            <option value="Fundacion Ingenia">Fundación Ingenia</option>
+            <option value="Voluntariado AVAA">Voluntariado AVAA</option>
+            <option value="Voluntario Particular">Voluntario Particular</option>
+          </select>
+          <label for="field-contact-national-id" style="margin-top: 8px">Cédula</label>
+          <input id="field-contact-national-id" class="input" name="national_id" type="text">
+        </div>
+        <div class="field field-full">
+          <label for="field-contact-email">Correo electrónico</label>
+          <input id="field-contact-email" class="input" name="email" type="email">
+        </div>
+        <div class="field field-full">
+          <label for="field-contact-notes">Notas</label>
+          <textarea id="field-contact-notes" class="input" name="notes"></textarea>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="contact-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)">Cancelar</button>
+        <button id="contact-delete" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)" hidden>🗑️ Eliminar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="event-dialog" class="editor-dialog" aria-labelledby="event-dialog-title">
     <form id="event-form" class="dialog-form" novalidate>

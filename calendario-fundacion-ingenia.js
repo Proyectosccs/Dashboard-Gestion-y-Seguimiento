@@ -51,6 +51,14 @@
   // queda fuera a propósito — es el cajón genérico legado, ya no se ofrece
   // para datos nuevos, solo se sigue mostrando si ya hay eventos viejos ahí.
   const REAL_ORGS = ['coalicion', 'florangel', 'ucv', 'cmdlt', 'networking'];
+  // Organizaciones cuyos contactos se pueden agregar/editar desde este
+  // tablero — UCV y Networking quedan fuera: UCV tiene su propio directorio
+  // dentro de su plantilla de Jerarquía (framework distinto) y Networking
+  // no es una organización aliada con contactos propios.
+  const CONTACT_ORGS = ['coalicion', 'florangel', 'cmdlt'];
+  // Coalición exige esta afiliación exacta (coalicion_update_contact_public
+  // la valida en el servidor) — son las únicas 4 opciones válidas.
+  const COALICION_AFFILIATIONS = ['Coalicion con amor a Venezuela', 'Fundacion Ingenia', 'Voluntariado AVAA', 'Voluntario Particular'];
   const ORG_LINKS = {
     ucv: './Directorio y Agenda Relaciones UCV.dc.html',
     coalicion: './evento-coalicion-venezuela.html',
@@ -100,13 +108,14 @@
     tasksTitle: 'Tareas de Equipo',
     organizationsTitle: 'Organizaciones',
     leadersTitle: 'Líderes de Comunidades',
-    tabOrder: ['resumen', 'calendar', 'reuniones', 'tasks', 'organizations', 'leaders'],
+    tabOrder: ['resumen', 'calendar', 'reuniones', 'contacts', 'tasks', 'organizations', 'leaders'],
     boardOrder: ['kpis', 'board']
   };
   const NAV_ITEMS = {
     resumen: { emoji: '📊', label: 'Resumen' },
     calendar: { emoji: '🗓️', label: 'Calendario' },
     reuniones: { emoji: '🗒️', label: 'Reuniones' },
+    contacts: { emoji: '🤝', label: 'Contactos' },
     tasks: { emoji: '📋', label: 'Tareas de Equipo' },
     organizations: { emoji: '🏢', label: 'Organizaciones' },
     leaders: { emoji: '🧑‍🤝‍🧑', label: 'Líderes de Comunidades' }
@@ -136,6 +145,10 @@
     client: null,
     view: 'calendar',
     events: [],
+    contacts: [],
+    contactQuery: '',
+    contactOrgFilter: '',
+    editingContact: null,
     customCalendars: [],
     tasks: [],
     teamMembers: [],
@@ -188,6 +201,12 @@
       'field-event-jornada-type': onJornadaTypeChange,
       'field-event-specialty-other': onSpecialtyOtherChange,
       'event-pendiente-add': addPendiente,
+      'new-contact-btn': openContactDialog,
+      'contact-dialog-close': closeContactDialog,
+      'contact-dialog-cancel': closeContactDialog,
+      'contact-delete': deleteEditingContact,
+      'contact-search-clear': clearContactSearch,
+      'field-contact-org': onContactOrgChange,
       'new-task-btn': openTaskDialog,
       'task-dialog-close': closeTaskDialog,
       'task-dialog-cancel': closeTaskDialog,
@@ -228,6 +247,9 @@
     }
     if (target.dataset.eventId) {
       openEventDialog(findById(state.events, target.dataset.eventId));
+    }
+    if (target.dataset.contactId) {
+      openContactDialog(findById(state.contacts, target.dataset.contactId));
     }
     if (target.dataset.taskId) {
       openTaskDialog(findById(state.tasks, target.dataset.taskId));
@@ -284,6 +306,13 @@
     dom.eventForm.addEventListener('submit', onEventSubmit);
     dom.eventDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeEventDialog(); });
     dom.eventSourceSelect.addEventListener('change', onSourceChange);
+    dom.contactForm.addEventListener('submit', onContactSubmit);
+    dom.contactDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeContactDialog(); });
+    dom.contactSearch.addEventListener('input', handleContactSearch);
+    dom.contactOrgFilter.addEventListener('change', function () {
+      state.contactOrgFilter = dom.contactOrgFilter.value;
+      renderContacts();
+    });
     dom.taskForm.addEventListener('submit', onTaskSubmit);
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
     dom.tasksOrgFilter.addEventListener('change', function () {
@@ -401,6 +430,18 @@
     dom.eventPendientesList = document.getElementById('event-pendientes-list');
     dom.reunionesOrgFilter = document.getElementById('reuniones-org-filter');
     dom.reunionesList = document.getElementById('reuniones-list');
+    dom.contactSearch = document.getElementById('contact-search');
+    dom.contactSearchClear = document.getElementById('contact-search-clear');
+    dom.contactOrgFilter = document.getElementById('contact-org-filter');
+    dom.contactResultCount = document.getElementById('contact-result-count');
+    dom.contactsList = document.getElementById('contacts-list');
+    dom.contactDialog = document.getElementById('contact-dialog');
+    dom.contactDialogTitle = document.getElementById('contact-dialog-title');
+    dom.contactForm = document.getElementById('contact-form');
+    dom.contactError = document.getElementById('contact-error');
+    dom.contactOrgSelect = document.getElementById('field-contact-org');
+    dom.contactCoalicionFields = document.getElementById('contact-coalicion-fields');
+    dom.contactDelete = document.getElementById('contact-delete');
   }
 
   function toast(message, tone) {
@@ -440,11 +481,13 @@
     dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
 
-    const [coalicionRes, florangelRes, ucvRes, ingeniaRes] = await Promise.all([
+    const [coalicionRes, coalicionContactsRes, florangelRes, florangelContactsRes, ucvRes, ingeniaRes] = await Promise.all([
       state.client.from('coalicion_events').select('id,title,event_date,start_time,end_time,location,maps_url,notes,status,jornada_type,specialties,collaborating_orgs,participants,participo_fundacion_ingenia,minuta,pendientes').is('archived_at', null),
+      state.client.from('coalicion_contacts').select('id,name,role,belongs_to,national_id,phone,email,notes').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
+      state.client.from('florangel_board_state').select('value').eq('key', 'florangel-contacts-v1').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
-      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
+      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', 'cmdlt-contacts-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
     ]);
 
     const anyFailed = coalicionRes.error && florangelRes.error && ucvRes.error && ingeniaRes.error;
@@ -468,15 +511,22 @@
     applyUI();
 
     let customEvents = [];
+    let customContacts = [];
     if (state.customCalendars.length) {
-      const customKeys = state.customCalendars.map(function (c) { return 'ingenia-custom-' + c.id + '-events-v1'; });
-      const customRes = await state.client.from('ingenia_board_state').select('key,value').in('key', customKeys);
+      const customEventKeys = state.customCalendars.map(function (c) { return 'ingenia-custom-' + c.id + '-events-v1'; });
+      const customContactKeys = state.customCalendars.map(function (c) { return 'ingenia-custom-' + c.id + '-contacts-v1'; });
+      const customRes = await state.client.from('ingenia_board_state').select('key,value').in('key', customEventKeys.concat(customContactKeys));
       const customRows = customRes.data || [];
       state.customCalendars.forEach(function (c) {
         const row = customRows.find(function (r) { return r.key === 'ingenia-custom-' + c.id + '-events-v1'; });
         const items = Array.isArray(row && row.value) ? row.value : [];
         items.forEach(function (e) {
           customEvents.push({ id: c.id + '-' + e.id, rawId: e.id, source: c.id, title: e.title, date: e.event_date, time: e.start_time, location: e.location, notes: e.notes || '', raw: e });
+        });
+        const contactsRow = customRows.find(function (r) { return r.key === 'ingenia-custom-' + c.id + '-contacts-v1'; });
+        const contactItems = Array.isArray(contactsRow && contactsRow.value) ? contactsRow.value : [];
+        contactItems.forEach(function (contact) {
+          customContacts.push({ id: c.id + '-' + contact.id, rawId: contact.id, source: c.id, name: contact.name, role: contact.role, phone: contact.phone, email: contact.email, notes: contact.notes, raw: contact });
         });
       });
     }
@@ -512,6 +562,19 @@
     });
 
     state.events = coalicionEvents.concat(florangelEvents, ucvEvents, networkingEvents, otrosEvents, cmdltEvents, customEvents).filter(function (e) { return !!e.date; });
+
+    const coalicionContacts = (coalicionContactsRes.data || []).map(function (c) {
+      return { id: 'coalicion-' + c.id, rawId: c.id, source: 'coalicion', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, raw: c };
+    });
+    const florangelContacts = (Array.isArray(florangelContactsRes.data && florangelContactsRes.data.value) ? florangelContactsRes.data.value : []).map(function (c) {
+      return { id: 'florangel-' + c.id, rawId: c.id, source: 'florangel', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, raw: c };
+    });
+    const cmdltContactsRaw = ingeniaRowsEarly.find(function (r) { return r.key === 'cmdlt-contacts-v1'; });
+    const cmdltContacts = (Array.isArray(cmdltContactsRaw && cmdltContactsRaw.value) ? cmdltContactsRaw.value : []).map(function (c) {
+      return { id: 'cmdlt-' + c.id, rawId: c.id, source: 'cmdlt', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, raw: c };
+    });
+    state.contacts = coalicionContacts.concat(florangelContacts, cmdltContacts, customContacts).filter(function (c) { return !!c.name; });
+
     dom.loadingState.hidden = true;
     renderLegend();
     populateSourceSelect();
@@ -524,6 +587,9 @@
     renderResumenView();
     populateReunionesOrgFilter();
     renderReunionesView();
+    populateContactOrgFilter();
+    populateContactOrgSelect();
+    renderContacts();
     setView(state.view);
     renderCalendar();
   }
@@ -1697,6 +1763,215 @@
       return;
     }
     renderMarkup(dom.reunionesList, reuniones.map(reunionCardHtml).join(''));
+  }
+
+  // ---------- Contactos ----------
+
+  function normalizeText(text) {
+    return String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  }
+
+  function initials(name) {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '·';
+    return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+  }
+
+  function contactOrgOptions() {
+    return CONTACT_ORGS.map(function (key) {
+      return { id: key, label: SOURCE_LABELS[key], emoji: FIXED_SOURCE_EMOJI[key] };
+    }).concat(state.customCalendars.map(function (c) {
+      return { id: c.id, label: c.name, emoji: '🏷️' };
+    }));
+  }
+
+  function populateContactOrgFilter() {
+    const current = dom.contactOrgFilter.value;
+    const options = contactOrgOptions().map(function (o) {
+      return '<option value="' + safe(o.id) + '">' + o.emoji + ' ' + safe(o.label) + '</option>';
+    });
+    renderMarkup(dom.contactOrgFilter, ['<option value="">Todas las organizaciones</option>'].concat(options).join(''));
+    const stillExists = current === '' || contactOrgOptions().some(function (o) { return o.id === current; });
+    dom.contactOrgFilter.value = stillExists ? current : '';
+    state.contactOrgFilter = dom.contactOrgFilter.value;
+  }
+
+  function populateContactOrgSelect() {
+    const current = dom.contactOrgSelect.value;
+    renderMarkup(dom.contactOrgSelect, contactOrgOptions().map(function (o) {
+      return '<option value="' + safe(o.id) + '">' + o.emoji + ' ' + safe(o.label) + '</option>';
+    }).join(''));
+    if (current) dom.contactOrgSelect.value = current;
+  }
+
+  function onContactOrgChange() {
+    dom.contactCoalicionFields.hidden = dom.contactOrgSelect.value !== 'coalicion';
+  }
+
+  function handleContactSearch(e) {
+    state.contactQuery = e.target.value;
+    renderContacts();
+  }
+
+  function clearContactSearch() {
+    state.contactQuery = '';
+    dom.contactSearch.value = '';
+    renderContacts();
+    dom.contactSearch.focus();
+  }
+
+  function renderContacts() {
+    const query = normalizeText(state.contactQuery);
+    const orgFilter = state.contactOrgFilter || null;
+    const contacts = state.contacts.filter(function (c) {
+      return (!orgFilter || c.source === orgFilter) && (!query || normalizeText([c.name, c.role].join(' ')).indexOf(query) > -1);
+    });
+    dom.contactResultCount.textContent = contacts.length + ' de ' + state.contacts.length + ' contactos';
+    dom.contactSearchClear.hidden = !state.contactQuery;
+    if (!contacts.length) {
+      renderMarkup(dom.contactsList, '<div class="empty-state"><strong>' + safe(state.contacts.length ? '🔎 Sin coincidencias' : '🤝 Directorio vacío') + '</strong><span>' + safe(state.contacts.length ? 'Prueba otra búsqueda o limpia el filtro.' : 'Agrega los contactos de las organizaciones aliadas.') + '</span></div>');
+      return;
+    }
+    renderMarkup(dom.contactsList, contacts.map(function (c) {
+      const info = sourceInfo(c.source);
+      const phone = c.phone ? '<a href="tel:' + safe(c.phone) + '">' + safe(c.phone) + '</a>' : 'Por confirmar';
+      const email = c.email ? '<a href="mailto:' + safe(c.email) + '">' + safe(c.email) + '</a>' : 'Por confirmar';
+      return '<article class="contact-card" style="--affiliation-color:' + safe(info.color) + '">' +
+        '<div class="contact-card-header"><div class="contact-avatar" aria-hidden="true">' + safe(initials(c.name)) + '</div><div><h3>' + safe(c.name) + '</h3><div class="contact-role">' + safe(c.role || 'Contacto') + '</div></div></div>' +
+        '<div class="contact-chips"><span class="org-tag" style="--source-color:' + safe(info.color) + '">' + safe(info.label) + '</span></div>' +
+        '<div class="contact-details">' +
+          '<div class="contact-row"><span class="contact-row-label">◉ Teléfono</span><span class="contact-row-value">' + phone + '</span></div>' +
+          '<div class="contact-row"><span class="contact-row-label">✉ Correo</span><span class="contact-row-value">' + email + '</span></div>' +
+          (c.notes ? '<div class="contact-row"><span class="contact-row-label">↳ Notas</span><span class="contact-row-value">' + safe(c.notes) + '</span></div>' : '') +
+        '</div>' +
+        '<div class="contact-card-actions">' +
+          '<button class="btn btn-secondary" type="button" data-contact-id="' + safe(c.id) + '" onclick="window.ingeniaAction(event)">Editar contacto</button>' +
+        '</div>' +
+      '</article>';
+    }).join(''));
+  }
+
+  function openContactDialog(existing) {
+    hideError(dom.contactError);
+    dom.contactForm.reset();
+    state.editingContact = existing || null;
+    populateContactOrgSelect();
+    dom.contactDialogTitle.textContent = existing ? 'Editar contacto' : 'Agregar contacto';
+    // Coalición no ofrece eliminar contactos en su propio tablero (no hay
+    // acción de archivar para esa entidad) — se mantiene la misma regla acá.
+    dom.contactDelete.hidden = !existing || existing.source === 'coalicion';
+    if (existing) {
+      dom.contactOrgSelect.value = existing.source;
+      dom.contactForm.elements.name.value = existing.name || '';
+      dom.contactForm.elements.role.value = existing.role || '';
+      dom.contactForm.elements.phone.value = existing.phone || '';
+      dom.contactForm.elements.email.value = existing.email || '';
+      dom.contactForm.elements.notes.value = existing.notes || '';
+      if (existing.source === 'coalicion') {
+        dom.contactForm.elements.belongs_to.value = (existing.raw && existing.raw.belongs_to) || COALICION_AFFILIATIONS[0];
+        dom.contactForm.elements.national_id.value = (existing.raw && existing.raw.national_id) || '';
+      }
+    }
+    onContactOrgChange();
+    dom.contactDialog.showModal();
+    dom.contactForm.elements.name.focus();
+  }
+
+  function closeContactDialog() { dom.contactDialog.close(); state.editingContact = null; }
+
+  async function onContactSubmit(e) {
+    e.preventDefault();
+    hideError(dom.contactError);
+    const org = dom.contactOrgSelect.value;
+    const name = dom.contactForm.elements.name.value.trim();
+    if (!name) { showError(dom.contactError, 'El nombre es obligatorio.'); return; }
+    const isCoalicion = org === 'coalicion';
+    const phone = dom.contactForm.elements.phone.value.trim();
+    if (isCoalicion && !phone) { showError(dom.contactError, 'Coalición requiere un teléfono.'); return; }
+    const fields = {
+      name: name,
+      role: dom.contactForm.elements.role.value.trim(),
+      phone: phone,
+      email: dom.contactForm.elements.email.value.trim(),
+      notes: dom.contactForm.elements.notes.value.trim(),
+      belongsTo: dom.contactForm.elements.belongs_to.value,
+      nationalId: dom.contactForm.elements.national_id.value.trim()
+    };
+    const existing = state.editingContact;
+    if (existing && existing.source === 'coalicion' && org !== 'coalicion') {
+      showError(dom.contactError, 'Un contacto de Coalición no se puede mover a otra organización.');
+      return;
+    }
+    const submitBtn = dom.contactForm.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    let ok = false;
+    if (existing && org !== existing.source) {
+      const moved = await deleteContactFromSource(existing);
+      if (!moved) { submitBtn.disabled = false; showError(dom.contactError, 'No se pudo mover el contacto de organización — revisa tu conexión.'); return; }
+      ok = await saveContact(org, fields, null);
+    } else {
+      ok = await saveContact(org, fields, existing);
+    }
+    submitBtn.disabled = false;
+    if (!ok) { showError(dom.contactError, 'No se pudo guardar — revisa tu conexión e intenta de nuevo.'); return; }
+    closeContactDialog();
+    await loadAll();
+    toast('Contacto guardado.', 'success');
+  }
+
+  async function saveContact(org, fields, existing) {
+    if (org === 'coalicion') return saveCoalicionContact(fields, existing);
+    if (org === 'florangel') return saveIngeniaLikeContact('florangel_board_state', 'florangel-contacts-v1', fields, existing);
+    if (org === 'cmdlt') return saveIngeniaLikeContact('ingenia_board_state', 'cmdlt-contacts-v1', fields, existing);
+    return saveIngeniaLikeContact('ingenia_board_state', 'ingenia-custom-' + org + '-contacts-v1', fields, existing);
+  }
+
+  async function saveCoalicionContact(fields, existing) {
+    try {
+      const res = await fetch(COALICION_EDITOR_URL, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save', entity: 'contact', id: existing ? existing.rawId : null,
+          payload: {
+            name: fields.name, role: fields.role, phone: fields.phone, email: fields.email,
+            notes: fields.notes, belongs_to: fields.belongsTo, national_id: fields.nationalId
+          }
+        })
+      });
+      return res.ok;
+    } catch (_err) { return false; }
+  }
+
+  async function saveIngeniaLikeContact(table, key, fields, existing) {
+    const current = await readBoardKey(table, key, []);
+    const next = upsertById(current, existing, function (base) {
+      return Object.assign({}, base, {
+        id: existing ? existing.rawId : uid(), name: fields.name, role: fields.role,
+        phone: fields.phone, email: fields.email, notes: fields.notes
+      });
+    });
+    return writeBoardKey(table, key, next);
+  }
+
+  async function deleteContactFromSource(existing) {
+    if (existing.source === 'coalicion') return false;
+    if (existing.source === 'florangel') return deleteFromArrayKey('florangel_board_state', 'florangel-contacts-v1', existing.rawId);
+    if (existing.source === 'cmdlt') return deleteFromArrayKey('ingenia_board_state', 'cmdlt-contacts-v1', existing.rawId);
+    return deleteFromArrayKey('ingenia_board_state', 'ingenia-custom-' + existing.source + '-contacts-v1', existing.rawId);
+  }
+
+  async function deleteEditingContact() {
+    const existing = state.editingContact;
+    if (!existing || existing.source === 'coalicion') return;
+    const submitBtn = dom.contactForm.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    const ok = await deleteContactFromSource(existing);
+    submitBtn.disabled = false;
+    if (!ok) { showError(dom.contactError, 'No se pudo eliminar — revisa tu conexión.'); return; }
+    closeContactDialog();
+    await loadAll();
+    toast('Contacto eliminado.', 'success');
   }
 
   function taskDetailText(task) { return task.detail != null ? task.detail : (task.notes || ''); }
