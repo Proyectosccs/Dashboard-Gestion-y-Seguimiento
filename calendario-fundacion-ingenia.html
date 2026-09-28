@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
   <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=22">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=23" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=24" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -247,7 +247,7 @@
           <label for="field-contact-name">Nombre completo</label>
           <input id="field-contact-name" class="input" name="name" type="text" required>
         </div>
-        <div class="field">
+        <div class="field" id="contact-role-field">
           <label for="field-contact-role">Rol o cargo</label>
           <input id="field-contact-role" class="input" name="role" type="text" placeholder="Ej. Coordinador de logística">
         </div>
@@ -266,11 +266,17 @@
           <label for="field-contact-national-id" style="margin-top: 8px">Cédula</label>
           <input id="field-contact-national-id" class="input" name="national_id" type="text">
         </div>
+        <div class="field field-full" id="contact-ucv-fields" hidden>
+          <label for="field-contact-ucv-role">Rol</label>
+          <select id="field-contact-ucv-role" class="input" name="ucv_role"></select>
+          <label for="field-contact-unit" style="margin-top: 8px">Unidad dentro de la UCV</label>
+          <select id="field-contact-unit" class="input" name="unit"></select>
+        </div>
         <div class="field field-full">
           <label for="field-contact-email">Correo electrónico</label>
           <input id="field-contact-email" class="input" name="email" type="email">
         </div>
-        <div class="field field-full">
+        <div class="field field-full" id="contact-notes-field">
           <label for="field-contact-notes">Notas</label>
           <textarea id="field-contact-notes" class="input" name="notes"></textarea>
         </div>

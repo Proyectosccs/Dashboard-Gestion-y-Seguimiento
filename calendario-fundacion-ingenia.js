@@ -52,13 +52,60 @@
   // para datos nuevos, solo se sigue mostrando si ya hay eventos viejos ahí.
   const REAL_ORGS = ['coalicion', 'florangel', 'ucv', 'cmdlt', 'networking'];
   // Organizaciones cuyos contactos se pueden agregar/editar desde este
-  // tablero — UCV y Networking quedan fuera: UCV tiene su propio directorio
-  // dentro de su plantilla de Jerarquía (framework distinto) y Networking
-  // no es una organización aliada con contactos propios.
-  const CONTACT_ORGS = ['coalicion', 'florangel', 'cmdlt'];
+  // tablero — Networking queda fuera: no es una organización aliada con
+  // contactos propios.
+  const CONTACT_ORGS = ['coalicion', 'florangel', 'cmdlt', 'ucv'];
   // Coalición exige esta afiliación exacta (coalicion_update_contact_public
   // la valida en el servidor) — son las únicas 4 opciones válidas.
   const COALICION_AFFILIATIONS = ['Coalicion con amor a Venezuela', 'Fundacion Ingenia', 'Voluntariado AVAA', 'Voluntario Particular'];
+  // UCV usa "Rol" como catálogo fijo (no texto libre) — copiado de ROLE en
+  // Directorio y Agenda Relaciones UCV.dc.html; si ese catálogo cambia allá,
+  // hay que actualizarlo acá también.
+  const UCV_ROLES = [
+    { id: 'Coordinador', label: '🧭 Coordinador' },
+    { id: 'Enlace', label: '🔗 Enlace' },
+    { id: 'Profesional del Área', label: '🩺 Profesional del Área' },
+    { id: 'Estudiante', label: '🎓 Estudiante' },
+    { id: 'Por confirmar', label: '❔ Rol por confirmar' }
+  ];
+  // Lista plana de unidades administrativas (ADMIN) + escuelas por facultad
+  // (FACULTIES), copiada de unitOptionsList() en el mismo archivo de UCV —
+  // un contacto de UCV siempre pertenece a una de estas unidades.
+  const UCV_UNITS = [
+    { id: 'vac', label: '🎓 Vicerrectorado Académico' },
+    { id: 'sc', label: '🤝 Servicios Comunitarios · bajo Vicerrectorado' },
+    { id: 'op', label: '🧩 Coordinación operativa UCV' },
+    { id: 'vad', label: '💼 Vicerrectorado Administrativo' },
+    { id: 'sg', label: '🗂️ Secretaría General' },
+    { id: 'sp-mg', label: 'Facultad de Medicina · Medicina general' },
+    { id: 'sp-mi', label: 'Facultad de Medicina · Medicina interna' },
+    { id: 'sp-ped', label: 'Facultad de Medicina · Pediatría' },
+    { id: 'sp-tra', label: 'Facultad de Medicina · Traumatología' },
+    { id: 'sp-psi', label: 'Facultad de Medicina · Psiquiatría' },
+    { id: 'sp-oto', label: 'Facultad de Medicina · Otorrinolaringología' },
+    { id: 'sp-neu', label: 'Facultad de Medicina · Neurología' },
+    { id: 'sp-gas', label: 'Facultad de Medicina · Gastroenterología' },
+    { id: 'sp-car', label: 'Facultad de Medicina · Cardiología' },
+    { id: 'sp-gin', label: 'Facultad de Medicina · Ginecología y Obstetricia' },
+    { id: 'sp-end', label: 'Facultad de Medicina · Endocrinología' },
+    { id: 'sp-der', label: 'Facultad de Medicina · Dermatología' },
+    { id: 'sp-oft', label: 'Facultad de Medicina · Oftalmología' },
+    { id: 'sp-uro', label: 'Facultad de Medicina · Urología' },
+    { id: 'bio', label: 'Facultad de Medicina · Escuela de Bioanálisis' },
+    { id: 'nut', label: 'Facultad de Medicina · Escuela de Nutrición y Dietética' },
+    { id: 'sal-fis', label: 'Facultad de Medicina · Escuela de Salud Pública · Fisioterapia' },
+    { id: 'sal-to', label: 'Facultad de Medicina · Escuela de Salud Pública · Terapia ocupacional' },
+    { id: 'enf', label: 'Facultad de Medicina · Escuela de Enfermería' },
+    { id: 'odo-e', label: 'Facultad de Odontología · Escuela de Odontología' },
+    { id: 'far-e', label: 'Facultad de Farmacia · Escuela de Farmacia' },
+    { id: 'psi', label: 'Facultad de Humanidades y Educación · Escuela de Psicología' },
+    { id: 'edu', label: 'Facultad de Humanidades y Educación · Escuela de Educación' },
+    { id: 'com', label: 'Facultad de Humanidades y Educación · Escuela de Comunicación Social' },
+    { id: 'ts', label: 'Facultad de Ciencias Económicas y Sociales · Escuela de Trabajo Social' },
+    { id: 'soc', label: 'Facultad de Ciencias Económicas y Sociales · Escuela de Sociología' },
+    { id: 'arq-e', label: 'Facultad de Arquitectura y Urbanismo · Escuela de Arquitectura' },
+    { id: 'civ', label: 'Facultad de Ingeniería · Escuela de Ingeniería Civil' }
+  ];
   const ORG_LINKS = {
     ucv: './Directorio y Agenda Relaciones UCV.dc.html',
     coalicion: './evento-coalicion-venezuela.html',
@@ -441,6 +488,11 @@
     dom.contactError = document.getElementById('contact-error');
     dom.contactOrgSelect = document.getElementById('field-contact-org');
     dom.contactCoalicionFields = document.getElementById('contact-coalicion-fields');
+    dom.contactUcvFields = document.getElementById('contact-ucv-fields');
+    dom.contactUcvRoleSelect = document.getElementById('field-contact-ucv-role');
+    dom.contactUnitSelect = document.getElementById('field-contact-unit');
+    dom.contactRoleField = document.getElementById('contact-role-field');
+    dom.contactNotesField = document.getElementById('contact-notes-field');
     dom.contactDelete = document.getElementById('contact-delete');
   }
 
@@ -481,12 +533,13 @@
     dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
 
-    const [coalicionRes, coalicionContactsRes, florangelRes, florangelContactsRes, ucvRes, ingeniaRes] = await Promise.all([
+    const [coalicionRes, coalicionContactsRes, florangelRes, florangelContactsRes, ucvRes, ucvContactsRes, ingeniaRes] = await Promise.all([
       state.client.from('coalicion_events').select('id,title,event_date,start_time,end_time,location,maps_url,notes,status,jornada_type,specialties,collaborating_orgs,participants,participo_fundacion_ingenia,minuta,pendientes').is('archived_at', null),
       state.client.from('coalicion_contacts').select('id,name,role,belongs_to,national_id,phone,email,notes').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-contacts-v1').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
+      state.client.from('ucv_board_state').select('value').eq('key', 'ucv-contacts-v1').maybeSingle(),
       state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', 'cmdlt-contacts-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
     ]);
 
@@ -573,7 +626,10 @@
     const cmdltContacts = (Array.isArray(cmdltContactsRaw && cmdltContactsRaw.value) ? cmdltContactsRaw.value : []).map(function (c) {
       return { id: 'cmdlt-' + c.id, rawId: c.id, source: 'cmdlt', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, raw: c };
     });
-    state.contacts = coalicionContacts.concat(florangelContacts, cmdltContacts, customContacts).filter(function (c) { return !!c.name; });
+    const ucvContacts = (Array.isArray(ucvContactsRes.data && ucvContactsRes.data.value) ? ucvContactsRes.data.value : []).map(function (c) {
+      return { id: 'ucv-' + c.id, rawId: c.id, source: 'ucv', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: '', raw: c };
+    });
+    state.contacts = coalicionContacts.concat(florangelContacts, cmdltContacts, ucvContacts, customContacts).filter(function (c) { return !!c.name; });
 
     dom.loadingState.hidden = true;
     renderLegend();
@@ -1805,7 +1861,11 @@
   }
 
   function onContactOrgChange() {
-    dom.contactCoalicionFields.hidden = dom.contactOrgSelect.value !== 'coalicion';
+    const org = dom.contactOrgSelect.value;
+    dom.contactCoalicionFields.hidden = org !== 'coalicion';
+    dom.contactUcvFields.hidden = org !== 'ucv';
+    dom.contactRoleField.hidden = org === 'ucv';
+    dom.contactNotesField.hidden = org === 'ucv';
   }
 
   function handleContactSearch(e) {
@@ -1856,6 +1916,8 @@
     dom.contactForm.reset();
     state.editingContact = existing || null;
     populateContactOrgSelect();
+    renderMarkup(dom.contactUcvRoleSelect, UCV_ROLES.map(function (r) { return '<option value="' + safe(r.id) + '">' + r.label + '</option>'; }).join(''));
+    renderMarkup(dom.contactUnitSelect, UCV_UNITS.map(function (u) { return '<option value="' + safe(u.id) + '">' + safe(u.label) + '</option>'; }).join(''));
     dom.contactDialogTitle.textContent = existing ? 'Editar contacto' : 'Agregar contacto';
     // Coalición no ofrece eliminar contactos en su propio tablero (no hay
     // acción de archivar para esa entidad) — se mantiene la misma regla acá.
@@ -1870,6 +1932,10 @@
       if (existing.source === 'coalicion') {
         dom.contactForm.elements.belongs_to.value = (existing.raw && existing.raw.belongs_to) || COALICION_AFFILIATIONS[0];
         dom.contactForm.elements.national_id.value = (existing.raw && existing.raw.national_id) || '';
+      }
+      if (existing.source === 'ucv') {
+        dom.contactUcvRoleSelect.value = (existing.raw && existing.raw.role) || UCV_ROLES[0].id;
+        dom.contactUnitSelect.value = (existing.raw && existing.raw.unit) || UCV_UNITS[0].id;
       }
     }
     onContactOrgChange();
@@ -1895,7 +1961,9 @@
       email: dom.contactForm.elements.email.value.trim(),
       notes: dom.contactForm.elements.notes.value.trim(),
       belongsTo: dom.contactForm.elements.belongs_to.value,
-      nationalId: dom.contactForm.elements.national_id.value.trim()
+      nationalId: dom.contactForm.elements.national_id.value.trim(),
+      ucvRole: dom.contactForm.elements.ucv_role.value,
+      unit: dom.contactForm.elements.unit.value
     };
     const existing = state.editingContact;
     if (existing && existing.source === 'coalicion' && org !== 'coalicion') {
@@ -1923,7 +1991,29 @@
     if (org === 'coalicion') return saveCoalicionContact(fields, existing);
     if (org === 'florangel') return saveIngeniaLikeContact('florangel_board_state', 'florangel-contacts-v1', fields, existing);
     if (org === 'cmdlt') return saveIngeniaLikeContact('ingenia_board_state', 'cmdlt-contacts-v1', fields, existing);
+    if (org === 'ucv') return saveUcvContact(fields, existing);
     return saveIngeniaLikeContact('ingenia_board_state', 'ingenia-custom-' + org + '-contacts-v1', fields, existing);
+  }
+
+  // UCV guarda mucho más que lo que este diálogo genérico edita (unit,
+  // extraUnits, status, action, function) — se preserva todo lo que ya
+  // tenía el contacto y solo se tocan los campos que sí ofrece este
+  // formulario, igual que saveUcvEvent hace con las jornadas.
+  async function saveUcvContact(fields, existing) {
+    const current = await readBoardKey('ucv_board_state', 'ucv-contacts-v1', []);
+    const base = existing ? (current.find(function (c) { return c.id === existing.rawId; }) || {}) : {};
+    const payload = Object.assign({}, base, {
+      id: existing ? existing.rawId : 'c' + Date.now(),
+      name: fields.name, role: fields.ucvRole || base.role || UCV_ROLES[UCV_ROLES.length - 1].id,
+      unit: fields.unit || base.unit || UCV_UNITS[0].id,
+      email: fields.email || 'Por confirmar', phone: fields.phone || 'Por confirmar',
+      status: base.status || 'Por confirmar', action: base.action || 'Por confirmar',
+      function: base.function || '', extraUnits: Array.isArray(base.extraUnits) ? base.extraUnits : []
+    });
+    const next = existing
+      ? current.map(function (c) { return c.id === existing.rawId ? payload : c; })
+      : current.concat(payload);
+    return writeBoardKey('ucv_board_state', 'ucv-contacts-v1', next);
   }
 
   async function saveCoalicionContact(fields, existing) {
@@ -1958,7 +2048,20 @@
     if (existing.source === 'coalicion') return false;
     if (existing.source === 'florangel') return deleteFromArrayKey('florangel_board_state', 'florangel-contacts-v1', existing.rawId);
     if (existing.source === 'cmdlt') return deleteFromArrayKey('ingenia_board_state', 'cmdlt-contacts-v1', existing.rawId);
+    if (existing.source === 'ucv') return deleteUcvContact(existing);
     return deleteFromArrayKey('ingenia_board_state', 'ingenia-custom-' + existing.source + '-contacts-v1', existing.rawId);
+  }
+
+  // Igual que deleteContact en Directorio y Agenda Relaciones UCV.dc.html:
+  // también limpia las interacciones registradas para ese contacto, para
+  // no dejar historial huérfano.
+  async function deleteUcvContact(existing) {
+    const ok = await deleteFromArrayKey('ucv_board_state', 'ucv-contacts-v1', existing.rawId);
+    if (!ok) return false;
+    const interactions = await readBoardKey('ucv_board_state', 'ucv-interactions-v2', []);
+    const nextInteractions = interactions.filter(function (i) { return i.contact !== existing.rawId; });
+    await writeBoardKey('ucv_board_state', 'ucv-interactions-v2', nextInteractions);
+    return true;
   }
 
   async function deleteEditingContact() {
