@@ -30,6 +30,7 @@
 
   const ORG_ID = new URLSearchParams(window.location.search).get('org') || '';
   const EVENTS_KEY = 'ingenia-custom-' + ORG_ID + '-events-v1';
+  const CONTACTS_KEY = 'ingenia-custom-' + ORG_ID + '-contacts-v1';
   const UI_KEY = 'ingenia-custom-' + ORG_ID + '-ui-v1';
 
   // Modo edición: textos y orden personalizables, igual que en el tablero
@@ -38,12 +39,14 @@
   const DEFAULT_UI = {
     pageSubtitle: 'Calendario y tareas propias de esta organización.',
     calendarTitle: 'Calendario',
+    contactsTitle: 'Contactos',
     tasksTitle: 'Tareas de Equipo',
-    tabOrder: ['calendar', 'tasks'],
+    tabOrder: ['calendar', 'contacts', 'tasks'],
     boardOrder: ['kpis', 'board']
   };
   const NAV_ITEMS = {
     calendar: { emoji: '🗓️', label: 'Calendario' },
+    contacts: { emoji: '🤝', label: 'Contactos' },
     tasks: { emoji: '📋', label: 'Tareas de Equipo' }
   };
   const BOARD_ITEMS = {
@@ -86,6 +89,9 @@
     view: 'calendar',
     org: null,
     events: [],
+    contacts: [],
+    query: '',
+    editingContact: null,
     allTasks: [],
     teamMembers: [],
     taskResponsableFilter: '',
@@ -127,6 +133,11 @@
       'event-delete': deleteEditingEvent,
       'field-event-jornada-type': onJornadaTypeChange,
       'field-event-specialty-other': onSpecialtyOtherChange,
+      'new-contact-btn': openContactDialog,
+      'contact-dialog-close': closeContactDialog,
+      'contact-dialog-cancel': closeContactDialog,
+      'contact-delete': deleteEditingContact,
+      'contact-search-clear': clearContactSearch,
       'new-task-btn': openTaskDialog,
       'task-dialog-close': closeTaskDialog,
       'task-dialog-cancel': closeTaskDialog,
@@ -159,6 +170,7 @@
     }
     if (target.dataset.eventId) openEventDialog(findById(state.events, target.dataset.eventId));
     if (target.dataset.taskId) openTaskDialog(findById(state.allTasks, target.dataset.taskId));
+    if (target.dataset.contactId) openContactDialog(findById(state.contacts, target.dataset.contactId));
     if (target.dataset.action === 'move-task-status') moveTaskStatus(target.dataset.id, target.dataset.status);
   };
 
@@ -171,6 +183,9 @@
     if (!ORG_ID) return showNotFound();
     dom.eventForm.addEventListener('submit', onEventSubmit);
     dom.eventDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeEventDialog(); });
+    dom.contactForm.addEventListener('submit', onContactSubmit);
+    dom.contactDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeContactDialog(); });
+    dom.contactSearch.addEventListener('input', handleContactSearch);
     dom.taskForm.addEventListener('submit', onTaskSubmit);
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
     dom.customizeForm.addEventListener('submit', onCustomizeSubmit);
@@ -216,6 +231,16 @@
     dom.eventCustomSpecialtyField = document.getElementById('event-custom-specialty-field');
     dom.eventParticipantsList = document.getElementById('event-participants-list');
     dom.eventDelete = document.getElementById('event-delete');
+    dom.contactsViewTitle = document.getElementById('contacts-view-title');
+    dom.contactSearch = document.getElementById('contact-search');
+    dom.contactSearchClear = document.getElementById('contact-search-clear');
+    dom.contactResultCount = document.getElementById('contact-result-count');
+    dom.contactsList = document.getElementById('contacts-list');
+    dom.contactDialog = document.getElementById('contact-dialog');
+    dom.contactDialogTitle = document.getElementById('contact-dialog-title');
+    dom.contactForm = document.getElementById('contact-form');
+    dom.contactError = document.getElementById('contact-error');
+    dom.contactDelete = document.getElementById('contact-delete');
     dom.tasksKpiGrid = document.getElementById('tasks-kpi-grid');
     dom.tasksResponsableFilter = document.getElementById('tasks-responsable-filter');
     dom.tasksBoard = document.getElementById('tasks-board');
@@ -242,6 +267,7 @@
     dom.customizeForm = document.getElementById('customize-form');
     dom.customSubtitle = document.getElementById('field-custom-subtitle');
     dom.customCalendarTitle = document.getElementById('field-custom-calendar-title');
+    dom.customContactsTitle = document.getElementById('field-custom-contacts-title');
     dom.customTasksTitle = document.getElementById('field-custom-tasks-title');
     dom.customizeTabsList = document.getElementById('customize-tabs-list');
     dom.customizeSectionsList = document.getElementById('customize-sections-list');
@@ -286,10 +312,11 @@
     if (showSpinner !== false) dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
 
-    const [registryRes, tasksRes, eventsRes, membersRes, uiRes] = await Promise.all([
+    const [registryRes, tasksRes, eventsRes, contactsRes, membersRes, uiRes] = await Promise.all([
       state.client.from(TABLE).select('value').eq('key', CUSTOM_CALENDARS_KEY).maybeSingle(),
       state.client.from(TABLE).select('value').eq('key', TEAM_TASKS_KEY).maybeSingle(),
       state.client.from(TABLE).select('value').eq('key', EVENTS_KEY).maybeSingle(),
+      state.client.from(TABLE).select('value').eq('key', CONTACTS_KEY).maybeSingle(),
       state.client.from(TABLE).select('value').eq('key', TEAM_MEMBERS_KEY).maybeSingle(),
       state.client.from(TABLE).select('value').eq('key', UI_KEY).maybeSingle()
     ]);
@@ -305,6 +332,7 @@
       return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) });
     });
     state.events = (Array.isArray(eventsRes.data && eventsRes.data.value) ? eventsRes.data.value : []).filter(function (e) { return !!e.event_date; });
+    state.contacts = Array.isArray(contactsRes.data && contactsRes.data.value) ? contactsRes.data.value : [];
     state.teamMembers = Array.isArray(membersRes.data && membersRes.data.value) ? membersRes.data.value : [];
     state.ui = cloneUI(uiRes.data && uiRes.data.value);
 
@@ -315,6 +343,7 @@
     populateTasksResponsableFilter();
     renderTasksBoard();
     renderKpis();
+    renderContacts();
     setView(state.view);
     renderCalendar();
   }
@@ -330,6 +359,7 @@
     const ui = state.ui;
     dom.pageSubtitle.textContent = ui.pageSubtitle;
     dom.calendarViewTitle.textContent = ui.calendarTitle;
+    dom.contactsViewTitle.textContent = ui.contactsTitle;
     dom.tasksViewTitle.textContent = ui.tasksTitle;
     reorderChildren(dom.tabNav, ui.tabOrder, function (id) { return dom.tabNav.querySelector('[data-view="' + id + '"]'); });
     reorderChildren(dom.tasksBlocks, ui.boardOrder, function (id) { return document.getElementById('tasks-block-' + id); });
@@ -346,6 +376,7 @@
     state.customizeForm = cloneUI(state.ui);
     dom.customSubtitle.value = state.customizeForm.pageSubtitle;
     dom.customCalendarTitle.value = state.customizeForm.calendarTitle;
+    dom.customContactsTitle.value = state.customizeForm.contactsTitle;
     dom.customTasksTitle.value = state.customizeForm.tasksTitle;
     renderCustomizeLists();
     dom.customizeDialog.showModal();
@@ -357,6 +388,7 @@
     state.customizeForm = cloneUI(DEFAULT_UI);
     dom.customSubtitle.value = state.customizeForm.pageSubtitle;
     dom.customCalendarTitle.value = state.customizeForm.calendarTitle;
+    dom.customContactsTitle.value = state.customizeForm.contactsTitle;
     dom.customTasksTitle.value = state.customizeForm.tasksTitle;
     renderCustomizeLists();
   }
@@ -405,6 +437,7 @@
     const next = {
       pageSubtitle: dom.customSubtitle.value.trim() || DEFAULT_UI.pageSubtitle,
       calendarTitle: dom.customCalendarTitle.value.trim() || DEFAULT_UI.calendarTitle,
+      contactsTitle: dom.customContactsTitle.value.trim() || DEFAULT_UI.contactsTitle,
       tasksTitle: dom.customTasksTitle.value.trim() || DEFAULT_UI.tasksTitle,
       tabOrder: state.customizeForm.tabOrder,
       boardOrder: state.customizeForm.boardOrder
@@ -735,6 +768,114 @@
     closeEventDialog();
     renderCalendar();
     toast('Evento eliminado.', 'success');
+  }
+
+  // ---------- Contactos ----------
+
+  function normalize(text) {
+    return String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  }
+
+  function initials(name) {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '·';
+    return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+  }
+
+  function handleContactSearch(e) {
+    state.query = e.target.value;
+    renderContacts();
+  }
+
+  function clearContactSearch() {
+    state.query = '';
+    dom.contactSearch.value = '';
+    renderContacts();
+    dom.contactSearch.focus();
+  }
+
+  function renderContacts() {
+    const query = normalize(state.query);
+    const contacts = state.contacts.filter(function (c) {
+      return !query || normalize([c.name, c.role].join(' ')).indexOf(query) > -1;
+    });
+    dom.contactResultCount.textContent = contacts.length + ' de ' + state.contacts.length + ' contactos';
+    dom.contactSearchClear.hidden = !state.query;
+    if (!contacts.length) {
+      renderMarkup(dom.contactsList, '<div class="empty-state"><strong>' + safe(state.contacts.length ? '🔎 Sin coincidencias' : '🤝 Directorio vacío') + '</strong><span>' + safe(state.contacts.length ? 'Prueba otra búsqueda o limpia el filtro.' : 'Agrega los contactos de esta organización.') + '</span></div>');
+      return;
+    }
+    renderMarkup(dom.contactsList, contacts.map(function (c) {
+      const phone = c.phone ? '<a href="tel:' + safe(c.phone) + '">' + safe(c.phone) + '</a>' : 'Por confirmar';
+      const email = c.email ? '<a href="mailto:' + safe(c.email) + '">' + safe(c.email) + '</a>' : 'Por confirmar';
+      return '<article class="contact-card">' +
+        '<div class="contact-card-header"><div class="contact-avatar" aria-hidden="true">' + safe(initials(c.name)) + '</div><div><h3>' + safe(c.name) + '</h3><div class="contact-role">' + safe(c.role || 'Contacto') + '</div></div></div>' +
+        '<div class="contact-details">' +
+          '<div class="contact-row"><span class="contact-row-label">◉ Teléfono</span><span class="contact-row-value">' + phone + '</span></div>' +
+          '<div class="contact-row"><span class="contact-row-label">✉ Correo</span><span class="contact-row-value">' + email + '</span></div>' +
+          (c.notes ? '<div class="contact-row"><span class="contact-row-label">↳ Notas</span><span class="contact-row-value">' + safe(c.notes) + '</span></div>' : '') +
+        '</div>' +
+        '<div class="contact-card-actions">' +
+          '<button class="btn btn-secondary" type="button" data-contact-id="' + safe(c.id) + '" onclick="window.orgAction(event)">Editar contacto</button>' +
+        '</div>' +
+      '</article>';
+    }).join(''));
+  }
+
+  function openContactDialog(existing) {
+    hideError(dom.contactError);
+    dom.contactForm.reset();
+    state.editingContact = existing || null;
+    dom.contactDialogTitle.textContent = existing ? 'Editar contacto' : 'Agregar contacto';
+    dom.contactDelete.hidden = !existing;
+    if (existing) {
+      dom.contactForm.elements.name.value = existing.name || '';
+      dom.contactForm.elements.role.value = existing.role || '';
+      dom.contactForm.elements.phone.value = existing.phone || '';
+      dom.contactForm.elements.email.value = existing.email || '';
+      dom.contactForm.elements.notes.value = existing.notes || '';
+    }
+    dom.contactDialog.showModal();
+    dom.contactForm.elements.name.focus();
+  }
+
+  function closeContactDialog() { dom.contactDialog.close(); state.editingContact = null; }
+
+  async function onContactSubmit(e) {
+    e.preventDefault();
+    hideError(dom.contactError);
+    const name = dom.contactForm.elements.name.value.trim();
+    if (!name) { showError(dom.contactError, 'El nombre es obligatorio.'); return; }
+    const existing = state.editingContact;
+    const payload = {
+      id: existing ? existing.id : uid(),
+      name: name,
+      role: dom.contactForm.elements.role.value.trim(),
+      phone: dom.contactForm.elements.phone.value.trim(),
+      email: dom.contactForm.elements.email.value.trim(),
+      notes: dom.contactForm.elements.notes.value.trim(),
+      created_at: existing ? existing.created_at : new Date().toISOString()
+    };
+    const next = existing
+      ? state.contacts.map(function (c) { return c.id === existing.id ? payload : c; })
+      : state.contacts.concat(payload);
+    const ok = await writeBoardKey(CONTACTS_KEY, next);
+    if (!ok) { showError(dom.contactError, 'No se pudo guardar — revisa tu conexión.'); return; }
+    state.contacts = next;
+    renderContacts();
+    closeContactDialog();
+    toast('Contacto guardado.', 'success');
+  }
+
+  async function deleteEditingContact() {
+    if (!state.editingContact) return;
+    const next = state.contacts.filter(function (c) { return c.id !== state.editingContact.id; });
+    const ok = await writeBoardKey(CONTACTS_KEY, next);
+    if (!ok) { toast('No se pudo eliminar — revisa tu conexión.', 'error'); return; }
+    state.contacts = next;
+    renderContacts();
+    closeContactDialog();
+    toast('Contacto eliminado.', 'success');
   }
 
   // ---------- Tareas ----------

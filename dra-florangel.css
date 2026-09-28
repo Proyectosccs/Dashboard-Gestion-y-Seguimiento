@@ -391,6 +391,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .sensitive-label { color: var(--color-neutral-600); }
 .sensitive-value { min-width: 0; overflow-wrap: anywhere; text-align: right; }
 .masked-value { color: var(--color-neutral-500); letter-spacing: .11em; }
+.contact-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.contact-row-label { color: var(--color-neutral-600); }
+.contact-row-value { min-width: 0; overflow-wrap: anywhere; text-align: right; }
 .contact-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: auto; }
 .privacy-eye { min-width: 124px; }
 

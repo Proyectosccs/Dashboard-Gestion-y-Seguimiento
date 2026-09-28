@@ -6,9 +6,9 @@
   <meta name="description" content="Tareas y calendario de jornadas — Dra Florangel.">
   <title>Dra Florangel — Tareas y jornadas</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./dra-florangel.css?v=11">
+  <link rel="stylesheet" href="./dra-florangel.css?v=12">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./dra-florangel.js?v=12" defer></script>
+  <script src="./dra-florangel.js?v=13" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -28,6 +28,7 @@
     <nav id="tab-nav" class="tab-nav" aria-label="Secciones">
       <button class="tab-button" type="button" data-view="tasks" aria-current="page" onclick="window.florangelAction(event)">📋 Tareas de Equipo</button>
       <button class="tab-button" type="button" data-view="calendar" onclick="window.florangelAction(event)">🗓️ Calendario</button>
+      <button class="tab-button" type="button" data-view="contacts" onclick="window.florangelAction(event)">🤝 Contactos</button>
     </nav>
 
     <div id="connectivity-banner" class="notice notice-warning page-notice" role="status" hidden>
@@ -100,6 +101,26 @@
       <div id="calendar-agenda-view" class="panel" hidden>
         <div id="calendar-agenda-list" class="calendar-agenda-list"></div>
       </div>
+    </section>
+
+    <section id="contacts-view" class="view" aria-labelledby="contacts-view-title" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">🤝 Equipo</p>
+          <h2 id="contacts-view-title">Contactos</h2>
+        </div>
+        <button class="btn btn-primary" type="button" data-action="new-contact" onclick="window.florangelAction(event)">➕ Agregar contacto</button>
+      </div>
+      <div class="list-toolbar panel">
+        <div class="search-field">
+          <label class="sr-only" for="contact-search">Buscar contactos</label>
+          <span aria-hidden="true">⌕</span>
+          <input id="contact-search" type="text" placeholder="Buscar por nombre o rol…" autocomplete="off">
+          <button id="contact-search-clear" class="search-clear" type="button" aria-label="Limpiar búsqueda" onclick="window.florangelAction(event)" hidden>×</button>
+        </div>
+        <p id="contact-result-count" class="result-count" aria-live="polite"></p>
+      </div>
+      <div id="contacts-list" class="contact-grid"></div>
     </section>
   </div>
 
@@ -255,6 +276,46 @@
     </form>
   </dialog>
 
+  <dialog id="contact-dialog" class="editor-dialog" aria-labelledby="contact-dialog-title">
+    <form id="contact-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">🤝 Equipo</p>
+          <h2 id="contact-dialog-title">Agregar contacto</h2>
+        </div>
+        <button id="contact-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.florangelAction(event)">×</button>
+      </div>
+      <div id="contact-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-fields">
+        <div class="field field-full">
+          <label for="field-contact-name">Nombre completo</label>
+          <input id="field-contact-name" class="input" name="name" type="text" required>
+        </div>
+        <div class="field">
+          <label for="field-contact-role">Rol o cargo</label>
+          <input id="field-contact-role" class="input" name="role" type="text" placeholder="Ej. Enfermera coordinadora">
+        </div>
+        <div class="field">
+          <label for="field-contact-phone">Teléfono</label>
+          <input id="field-contact-phone" class="input" name="phone" type="tel">
+        </div>
+        <div class="field field-full">
+          <label for="field-contact-email">Correo electrónico</label>
+          <input id="field-contact-email" class="input" name="email" type="email">
+        </div>
+        <div class="field field-full">
+          <label for="field-contact-notes">Notas</label>
+          <textarea id="field-contact-notes" class="input" name="notes"></textarea>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="contact-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.florangelAction(event)">Cancelar</button>
+        <button id="contact-delete" class="btn btn-secondary" type="button" onclick="window.florangelAction(event)" hidden>🗑️ Eliminar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="customize-dialog" class="editor-dialog" aria-labelledby="customize-dialog-title">
     <form id="customize-form" class="dialog-form" novalidate>
       <div class="dialog-header">
@@ -280,6 +341,10 @@
         <div class="field">
           <label for="field-custom-calendar-title">Título del calendario</label>
           <input id="field-custom-calendar-title" class="input" name="calendarTitle" type="text">
+        </div>
+        <div class="field">
+          <label for="field-custom-contacts-title">Título de contactos</label>
+          <input id="field-custom-contacts-title" class="input" name="contactsTitle" type="text">
         </div>
       </div>
       <div class="customize-grid">

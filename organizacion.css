@@ -148,6 +148,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .link-button { border: 0; background: transparent; padding: 0 2px; color: var(--org-color); font-size: 13px; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .result-count { min-width: max-content; margin: 0 0 0 auto; color: var(--color-neutral-600); font-size: 12px; }
 
+.search-field { min-height: 44px; flex: 1; display: flex; align-items: center; gap: 8px; padding: 0 13px; border: 1px solid var(--color-neutral-300); border-radius: 999px; background: var(--color-neutral-100); }
+.search-field input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; }
+.search-clear { width: 30px; height: 30px; border: 0; border-radius: 50%; background: var(--color-neutral-300); color: var(--color-neutral-800); cursor: pointer; }
+.search-clear:hover { background: var(--color-neutral-400); }
+.contact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.contact-card { min-height: 200px; position: relative; display: flex; flex-direction: column; gap: 12px; overflow: hidden; padding: 18px; border: 1px solid var(--color-neutral-300); border-left: 7px solid var(--org-color); border-radius: 26px; background: rgba(255,255,255,.88); box-shadow: var(--shadow-sm); }
+.contact-card::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(135deg, color-mix(in srgb, var(--org-color) 11%, transparent), transparent 48%); }
+.contact-card > * { position: relative; z-index: 1; }
+.contact-card-header { display: flex; align-items: center; gap: 11px; }
+.contact-avatar { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 17px 17px 17px 5px; background: color-mix(in srgb, var(--org-color) 16%, white); color: var(--org-color); font-family: var(--font-heading); font-size: 17px; }
+.contact-card h3 { margin: 0; font-size: 20px; }
+.contact-role { color: var(--color-neutral-600); font-size: 12px; }
+.contact-details { display: grid; gap: 8px; font-size: 13px; }
+.contact-details a { overflow-wrap: anywhere; }
+.contact-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.contact-row-label { color: var(--color-neutral-600); }
+.contact-row-value { min-width: 0; overflow-wrap: anywhere; text-align: right; }
+.contact-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: auto; }
+
 .kanban-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; align-items: start; }
 .kanban-column { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 24px; background: rgba(255,255,255,.6); border: 1px solid var(--color-neutral-300); min-height: 120px; }
 .kanban-column.drag-over { border-color: var(--org-color); background: color-mix(in srgb, var(--org-color) 10%, white); }
