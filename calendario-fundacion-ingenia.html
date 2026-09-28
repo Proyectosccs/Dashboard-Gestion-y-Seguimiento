@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=22">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=23">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=24" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=25" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -252,8 +252,11 @@
           <input id="field-contact-role" class="input" name="role" type="text" placeholder="Ej. Coordinador de logística">
         </div>
         <div class="field">
-          <label for="field-contact-phone">Teléfono</label>
-          <input id="field-contact-phone" class="input" name="phone" type="tel">
+          <label for="field-contact-phone-number">Teléfono</label>
+          <div class="phone-field">
+            <select id="field-contact-phone-code" class="input phone-code" aria-label="Código de país"></select>
+            <input id="field-contact-phone-number" class="input phone-number" name="phone_number" type="tel" placeholder="4141234567">
+          </div>
         </div>
         <div class="field field-full" id="contact-coalicion-fields" hidden>
           <label for="field-contact-belongs-to">Pertenece a (dentro de Coalición)</label>

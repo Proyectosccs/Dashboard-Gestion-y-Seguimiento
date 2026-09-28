@@ -51,6 +51,50 @@
   // queda fuera a propósito — es el cajón genérico legado, ya no se ofrece
   // para datos nuevos, solo se sigue mostrando si ya hay eventos viejos ahí.
   const REAL_ORGS = ['coalicion', 'florangel', 'ucv', 'cmdlt', 'networking'];
+  // Código de país + número, en vez de un solo campo de texto libre — así
+  // todos los teléfonos quedan en el mismo formato ("+58" + dígitos, sin
+  // espacios) sin importar quién los cargue. Mismo catálogo copiado en
+  // cada dashboard del sitio (organizacion.js, dra-florangel.js, cmdlt.js,
+  // lideres-comunidades.js, evento-coalicion-venezuela.js — y su
+  // equivalente en Directorio y Agenda Relaciones UCV.dc.html).
+  const PHONE_COUNTRIES = [
+    { code: '+58', label: '🇻🇪 +58 Venezuela' },
+    { code: '+57', label: '🇨🇴 +57 Colombia' },
+    { code: '+1', label: '🇺🇸 +1 EE. UU. / Canadá' },
+    { code: '+34', label: '🇪🇸 +34 España' },
+    { code: '+51', label: '🇵🇪 +51 Perú' },
+    { code: '+52', label: '🇲🇽 +52 México' },
+    { code: '+54', label: '🇦🇷 +54 Argentina' },
+    { code: '+56', label: '🇨🇱 +56 Chile' },
+    { code: '+593', label: '🇪🇨 +593 Ecuador' },
+    { code: '+507', label: '🇵🇦 +507 Panamá' }
+  ];
+  const DEFAULT_PHONE_CODE = PHONE_COUNTRIES[0].code;
+
+  function populatePhoneCodeSelect(selectEl, currentCode) {
+    renderMarkup(selectEl, PHONE_COUNTRIES.map(function (c) { return '<option value="' + c.code + '">' + c.label + '</option>'; }).join(''));
+    selectEl.value = currentCode || DEFAULT_PHONE_CODE;
+  }
+
+  // Separa un teléfono ya guardado ("+584141234567", pero también formatos
+  // viejos sin "+" o con "Por confirmar") en código + número, para
+  // precargar el selector al editar un contacto existente. Compara contra
+  // el catálogo de códigos empezando por los más largos (p. ej. "+593"
+  // antes que "+58") para no confundir prefijos que se solapan.
+  function splitPhone(value) {
+    const raw = String(value || '').trim();
+    if (!raw || raw === 'Por confirmar' || raw.charAt(0) !== '+') return { code: DEFAULT_PHONE_CODE, number: raw && raw !== 'Por confirmar' ? raw : '' };
+    const sorted = PHONE_COUNTRIES.slice().sort(function (a, b) { return b.code.length - a.code.length; });
+    const found = sorted.find(function (c) { return raw.indexOf(c.code) === 0; });
+    if (found) return { code: found.code, number: raw.slice(found.code.length).trim() };
+    return { code: DEFAULT_PHONE_CODE, number: raw };
+  }
+
+  function combinePhone(code, number) {
+    const digits = number.trim();
+    return digits ? code + digits : '';
+  }
+
   // Organizaciones cuyos contactos se pueden agregar/editar desde este
   // tablero — Networking queda fuera: no es una organización aliada con
   // contactos propios.
@@ -486,6 +530,7 @@
     dom.contactDialogTitle = document.getElementById('contact-dialog-title');
     dom.contactForm = document.getElementById('contact-form');
     dom.contactError = document.getElementById('contact-error');
+    dom.contactPhoneCode = document.getElementById('field-contact-phone-code');
     dom.contactOrgSelect = document.getElementById('field-contact-org');
     dom.contactCoalicionFields = document.getElementById('contact-coalicion-fields');
     dom.contactUcvFields = document.getElementById('contact-ucv-fields');
@@ -1922,11 +1967,13 @@
     // Coalición no ofrece eliminar contactos en su propio tablero (no hay
     // acción de archivar para esa entidad) — se mantiene la misma regla acá.
     dom.contactDelete.hidden = !existing || existing.source === 'coalicion';
+    const parsedPhone = splitPhone(existing ? existing.phone : '');
+    populatePhoneCodeSelect(dom.contactPhoneCode, parsedPhone.code);
+    dom.contactForm.elements.phone_number.value = parsedPhone.number;
     if (existing) {
       dom.contactOrgSelect.value = existing.source;
       dom.contactForm.elements.name.value = existing.name || '';
       dom.contactForm.elements.role.value = existing.role || '';
-      dom.contactForm.elements.phone.value = existing.phone || '';
       dom.contactForm.elements.email.value = existing.email || '';
       dom.contactForm.elements.notes.value = existing.notes || '';
       if (existing.source === 'coalicion') {
@@ -1952,7 +1999,7 @@
     const name = dom.contactForm.elements.name.value.trim();
     if (!name) { showError(dom.contactError, 'El nombre es obligatorio.'); return; }
     const isCoalicion = org === 'coalicion';
-    const phone = dom.contactForm.elements.phone.value.trim();
+    const phone = combinePhone(dom.contactPhoneCode.value, dom.contactForm.elements.phone_number.value);
     if (isCoalicion && !phone) { showError(dom.contactError, 'Coalición requiere un teléfono.'); return; }
     const fields = {
       name: name,

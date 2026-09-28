@@ -274,6 +274,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .contact-status-box { display: grid; gap: 5px; padding: 10px 12px; border-radius: 14px; background: var(--coalition-good-soft); font-size: 12.5px; color: var(--color-neutral-800); }
 .contact-status-box strong { color: var(--color-text); }
 .contact-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: auto; }
+.phone-field { display: flex; gap: 6px; }
+.phone-field .phone-code { flex: 0 0 96px; padding-left: 8px; padding-right: 4px; }
+.phone-field .phone-number { flex: 1; min-width: 0; }
 
 /* ---------- Tablero operativo (estado de seguimiento) ---------- */
 .kanban-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; align-items: start; }

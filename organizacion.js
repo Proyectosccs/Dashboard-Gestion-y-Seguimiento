@@ -28,6 +28,41 @@
   ];
   const OTHER_SPECIALTY_VALUE = '__otros__';
 
+  // Código de país + número, en vez de un solo campo de texto libre — mismo
+  // catálogo copiado en cada dashboard del sitio que tiene contactos.
+  const PHONE_COUNTRIES = [
+    { code: '+58', label: '🇻🇪 +58 Venezuela' },
+    { code: '+57', label: '🇨🇴 +57 Colombia' },
+    { code: '+1', label: '🇺🇸 +1 EE. UU. / Canadá' },
+    { code: '+34', label: '🇪🇸 +34 España' },
+    { code: '+51', label: '🇵🇪 +51 Perú' },
+    { code: '+52', label: '🇲🇽 +52 México' },
+    { code: '+54', label: '🇦🇷 +54 Argentina' },
+    { code: '+56', label: '🇨🇱 +56 Chile' },
+    { code: '+593', label: '🇪🇨 +593 Ecuador' },
+    { code: '+507', label: '🇵🇦 +507 Panamá' }
+  ];
+  const DEFAULT_PHONE_CODE = PHONE_COUNTRIES[0].code;
+
+  function populatePhoneCodeSelect(selectEl, currentCode) {
+    renderMarkup(selectEl, PHONE_COUNTRIES.map(function (c) { return '<option value="' + c.code + '">' + c.label + '</option>'; }).join(''));
+    selectEl.value = currentCode || DEFAULT_PHONE_CODE;
+  }
+
+  function splitPhone(value) {
+    const raw = String(value || '').trim();
+    if (!raw || raw === 'Por confirmar' || raw.charAt(0) !== '+') return { code: DEFAULT_PHONE_CODE, number: raw && raw !== 'Por confirmar' ? raw : '' };
+    const sorted = PHONE_COUNTRIES.slice().sort(function (a, b) { return b.code.length - a.code.length; });
+    const found = sorted.find(function (c) { return raw.indexOf(c.code) === 0; });
+    if (found) return { code: found.code, number: raw.slice(found.code.length).trim() };
+    return { code: DEFAULT_PHONE_CODE, number: raw };
+  }
+
+  function combinePhone(code, number) {
+    const digits = number.trim();
+    return digits ? code + digits : '';
+  }
+
   const ORG_ID = new URLSearchParams(window.location.search).get('org') || '';
   const EVENTS_KEY = 'ingenia-custom-' + ORG_ID + '-events-v1';
   const CONTACTS_KEY = 'ingenia-custom-' + ORG_ID + '-contacts-v1';
@@ -241,6 +276,7 @@
     dom.contactForm = document.getElementById('contact-form');
     dom.contactError = document.getElementById('contact-error');
     dom.contactDelete = document.getElementById('contact-delete');
+    dom.contactPhoneCode = document.getElementById('field-contact-phone-code');
     dom.tasksKpiGrid = document.getElementById('tasks-kpi-grid');
     dom.tasksResponsableFilter = document.getElementById('tasks-responsable-filter');
     dom.tasksBoard = document.getElementById('tasks-board');
@@ -828,10 +864,12 @@
     state.editingContact = existing || null;
     dom.contactDialogTitle.textContent = existing ? 'Editar contacto' : 'Agregar contacto';
     dom.contactDelete.hidden = !existing;
+    const parsedPhone = splitPhone(existing ? existing.phone : '');
+    populatePhoneCodeSelect(dom.contactPhoneCode, parsedPhone.code);
+    dom.contactForm.elements.phone_number.value = parsedPhone.number;
     if (existing) {
       dom.contactForm.elements.name.value = existing.name || '';
       dom.contactForm.elements.role.value = existing.role || '';
-      dom.contactForm.elements.phone.value = existing.phone || '';
       dom.contactForm.elements.email.value = existing.email || '';
       dom.contactForm.elements.notes.value = existing.notes || '';
     }
@@ -851,7 +889,7 @@
       id: existing ? existing.id : uid(),
       name: name,
       role: dom.contactForm.elements.role.value.trim(),
-      phone: dom.contactForm.elements.phone.value.trim(),
+      phone: combinePhone(dom.contactPhoneCode.value, dom.contactForm.elements.phone_number.value),
       email: dom.contactForm.elements.email.value.trim(),
       notes: dom.contactForm.elements.notes.value.trim(),
       created_at: existing ? existing.created_at : new Date().toISOString()

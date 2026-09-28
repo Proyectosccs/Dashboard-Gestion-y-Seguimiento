@@ -422,6 +422,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .sensitive-label { color: var(--color-neutral-600); }
 .sensitive-value { min-width: 0; overflow-wrap: anywhere; text-align: right; }
 .contact-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: auto; }
+.phone-field { display: flex; gap: 6px; }
+.phone-field .phone-code { flex: 0 0 96px; padding-left: 8px; padding-right: 4px; }
+.phone-field .phone-number { flex: 1; min-width: 0; }
 
 .status-pill { width: fit-content; padding: 5px 9px; border-radius: 999px; background: var(--coalition-indigo-soft); color: var(--coalition-indigo); font-size: 10.5px; font-weight: 700; }
 .status-pill.status-completed { background: var(--coalition-teal-soft); color: var(--coalition-teal); }

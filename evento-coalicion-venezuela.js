@@ -386,6 +386,35 @@
     'Urología', 'Traumatología', 'Gastroenterología', 'Neurología'
   ];
   const OTHER_SPECIALTY_VALUE = '__otros__';
+  // Código de país + número, en vez de un solo campo de texto libre — mismo
+  // catálogo copiado en cada dashboard del sitio que tiene contactos.
+  const PHONE_COUNTRIES = [
+    { code: '+58', label: '🇻🇪 +58 Venezuela' },
+    { code: '+57', label: '🇨🇴 +57 Colombia' },
+    { code: '+1', label: '🇺🇸 +1 EE. UU. / Canadá' },
+    { code: '+34', label: '🇪🇸 +34 España' },
+    { code: '+51', label: '🇵🇪 +51 Perú' },
+    { code: '+52', label: '🇲🇽 +52 México' },
+    { code: '+54', label: '🇦🇷 +54 Argentina' },
+    { code: '+56', label: '🇨🇱 +56 Chile' },
+    { code: '+593', label: '🇪🇨 +593 Ecuador' },
+    { code: '+507', label: '🇵🇦 +507 Panamá' }
+  ];
+  const DEFAULT_PHONE_CODE = PHONE_COUNTRIES[0].code;
+
+  function splitPhone(value) {
+    const raw = String(value || '').trim();
+    if (!raw || raw === 'Por confirmar' || raw.charAt(0) !== '+') return { code: DEFAULT_PHONE_CODE, number: raw && raw !== 'Por confirmar' ? raw : '' };
+    const sorted = PHONE_COUNTRIES.slice().sort(function (a, b) { return b.code.length - a.code.length; });
+    const found = sorted.find(function (c) { return raw.indexOf(c.code) === 0; });
+    if (found) return { code: found.code, number: raw.slice(found.code.length).trim() };
+    return { code: DEFAULT_PHONE_CODE, number: raw };
+  }
+
+  function combinePhone(code, number) {
+    const digits = String(number || '').trim();
+    return digits ? code + digits : '';
+  }
   const AFFILIATIONS = {
     '': 'Selecciona una opción',
     'Coalicion con amor a Venezuela': 'Coalicion con amor a Venezuela',
@@ -1686,7 +1715,7 @@
       field('Rol en el evento', 'role', item.role || 'Responsable', 'text', true) +
       selectField('Pertenece a:', 'belongs_to', item.belongs_to || '', AFFILIATIONS, 'field-full') +
       field('Cédula', 'national_id', item.national_id, 'text', false, 'numeric') +
-      field('Teléfono', 'phone', item.phone, 'tel', true, 'tel') +
+      phoneField('Teléfono', 'phone', item.phone) +
       field('Correo electrónico', 'email', item.email, 'email', false, 'email') +
       textareaField('Notas operativas', 'notes', item.notes, 'field-full');
   }
@@ -1787,6 +1816,11 @@
       data.specialties = data.jornada_type === 'medica' ? readEventSpecialties() : [];
       data.participants = readEventParticipants();
       delete data.custom_specialties;
+    }
+    if (state.editor.type === 'contact') {
+      data.phone = combinePhone(data.phone_code, data.phone_number);
+      delete data.phone_code;
+      delete data.phone_number;
     }
     const validation = validateEditor(state.editor.type, data);
     if (validation) {
@@ -1926,6 +1960,19 @@
     const helpId = help ? 'field-' + safe(name) + '-help' : '';
     return '<div class="field ' + safe(extraClass || '') + '"><label for="field-' + safe(name) + '">' + safe(label) + '</label>' +
       '<input id="field-' + safe(name) + '" class="input" name="' + safe(name) + '" type="' + safe(type || 'text') + '" value="' + safe(value == null ? '' : value) + '"' + (required ? ' required' : '') + (inputmode ? ' inputmode="' + safe(inputmode) + '"' : '') + (placeholder ? ' placeholder="' + safe(placeholder) + '"' : '') + (help ? ' aria-describedby="' + helpId + '"' : '') + '>' + (help ? '<small id="' + helpId + '" class="field-help">' + safe(help) + '</small>' : '') + '</div>';
+  }
+
+  function phoneField(label, namePrefix, value) {
+    const parsed = splitPhone(value);
+    const options = PHONE_COUNTRIES.map(function (c) {
+      return '<option value="' + safe(c.code) + '"' + (c.code === parsed.code ? ' selected' : '') + '>' + c.label + '</option>';
+    }).join('');
+    return '<div class="field"><label for="field-' + safe(namePrefix) + '_number">' + safe(label) + '</label>' +
+      '<div class="phone-field">' +
+        '<select id="field-' + safe(namePrefix) + '_code" class="input phone-code" name="' + safe(namePrefix) + '_code" aria-label="Código de país">' + options + '</select>' +
+        '<input id="field-' + safe(namePrefix) + '_number" class="input phone-number" name="' + safe(namePrefix) + '_number" type="tel" value="' + safe(parsed.number) + '" placeholder="4141234567">' +
+      '</div>' +
+    '</div>';
   }
 
   function renderEventLocation(event) {

@@ -1005,7 +1005,12 @@
           <div style="font-family: var(--font-heading); font-size: 15px">Especialista responsable</div>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px">
             <input type="text" placeholder="Nombre" value="{{ unitForm.responsibleName }}" onChange="{{ onUnitResponsibleName }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
-            <input type="text" placeholder="Teléfono" value="{{ unitForm.responsiblePhone }}" onChange="{{ onUnitResponsiblePhone }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+            <span style="display: flex; gap: 4px; min-width: 0">
+              <select value="{{ unitForm.responsiblePhoneCode }}" onChange="{{ onUnitResponsiblePhoneCode }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 4px; background: #fff; color: var(--color-text); flex: 0 0 74px">
+                <sc-for list="{{ phoneCodeOptions }}" as="o" hint-placeholder-count="10"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+              </select>
+              <input type="text" placeholder="Teléfono" value="{{ unitForm.responsiblePhone }}" onChange="{{ onUnitResponsiblePhone }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text); flex: 1; min-width: 0" />
+            </span>
             <input type="text" placeholder="Correo" value="{{ unitForm.responsibleEmail }}" onChange="{{ onUnitResponsibleEmail }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </div>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px">
@@ -1029,7 +1034,12 @@
           <div style="font-family: var(--font-heading); font-size: 15px">Estudiante o voluntario que registra los datos</div>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px">
             <input type="text" placeholder="Nombre" value="{{ unitForm.supportName }}" onChange="{{ onUnitSupportName }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
-            <input type="text" placeholder="Teléfono" value="{{ unitForm.supportPhone }}" onChange="{{ onUnitSupportPhone }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+            <span style="display: flex; gap: 4px; min-width: 0">
+              <select value="{{ unitForm.supportPhoneCode }}" onChange="{{ onUnitSupportPhoneCode }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 4px; background: #fff; color: var(--color-text); flex: 0 0 74px">
+                <sc-for list="{{ phoneCodeOptions }}" as="o" hint-placeholder-count="10"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+              </select>
+              <input type="text" placeholder="Teléfono" value="{{ unitForm.supportPhone }}" onChange="{{ onUnitSupportPhone }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text); flex: 1; min-width: 0" />
+            </span>
             <input type="text" placeholder="Correo" value="{{ unitForm.supportEmail }}" onChange="{{ onUnitSupportEmail }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </div>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px">
@@ -1139,7 +1149,12 @@
             <input type="text" placeholder="Por confirmar" value="{{ contactForm.email }}" onChange="{{ onContactEmail }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
           </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Teléfono
-            <input type="text" placeholder="Por confirmar" value="{{ contactForm.phone }}" onChange="{{ onContactPhone }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
+            <span style="display: flex; gap: 6px">
+              <select value="{{ contactForm.phoneCode }}" onChange="{{ onContactPhoneCode }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 6px; background: #fff; color: var(--color-text); flex: 0 0 86px">
+                <sc-for list="{{ phoneCodeOptions }}" as="o" hint-placeholder-count="10"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
+              </select>
+              <input type="text" placeholder="4141234567" value="{{ contactForm.phone }}" onChange="{{ onContactPhone }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text); flex: 1; min-width: 0" />
+            </span>
           </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Estado actual
             <input type="text" placeholder="Por confirmar" value="{{ contactForm.status }}" onChange="{{ onContactStatus }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
@@ -1419,6 +1434,36 @@ const TYPES = {
   whatsapp: { emoji: '💬', label: 'Contacto (WhatsApp)' },
   mail: { emoji: '✉️', label: 'Correo electrónico' }
 };
+
+// Código de país + número, en vez de un solo campo de texto libre — mismo
+// catálogo copiado en cada dashboard del sitio que tiene contactos.
+const PHONE_COUNTRIES = [
+  { id: '+58', label: '🇻🇪 +58' },
+  { id: '+57', label: '🇨🇴 +57' },
+  { id: '+1', label: '🇺🇸 +1' },
+  { id: '+34', label: '🇪🇸 +34' },
+  { id: '+51', label: '🇵🇪 +51' },
+  { id: '+52', label: '🇲🇽 +52' },
+  { id: '+54', label: '🇦🇷 +54' },
+  { id: '+56', label: '🇨🇱 +56' },
+  { id: '+593', label: '🇪🇨 +593' },
+  { id: '+507', label: '🇵🇦 +507' }
+];
+const DEFAULT_PHONE_CODE = PHONE_COUNTRIES[0].id;
+
+function splitPhone(value) {
+  const raw = String(value || '').trim();
+  if (!raw || raw === 'Por confirmar' || raw.charAt(0) !== '+') return { code: DEFAULT_PHONE_CODE, number: raw && raw !== 'Por confirmar' ? raw : '' };
+  const sorted = PHONE_COUNTRIES.slice().sort((a, b) => b.id.length - a.id.length);
+  const found = sorted.find(c => raw.indexOf(c.id) === 0);
+  if (found) return { code: found.id, number: raw.slice(found.id.length).trim() };
+  return { code: DEFAULT_PHONE_CODE, number: raw };
+}
+
+function combinePhone(code, number) {
+  const digits = String(number || '').trim();
+  return digits ? code + digits : '';
+}
 
 const ADMIN = [
   { id: 'vac', name: 'Vicerrectorado Académico', emoji: '🎓', color: '#2fa89b' },
@@ -1784,8 +1829,8 @@ class Component extends DCLogic {
     teamMembers: readStore(TEAM_MEMBERS_KEY, []),
     unitModal: null,
     unitForm: {
-      responsibleName: '', responsiblePhone: '', responsibleEmail: '', responsibleRole: 'Responsable', responsibleFunction: '', responsibleAccount: '', responsibleAffiliation: '',
-      supportName: '', supportPhone: '', supportEmail: '', supportRole: 'Estudiante', supportFunction: '', supportAccount: '', supportAffiliation: '',
+      responsibleName: '', responsiblePhone: '', responsiblePhoneCode: DEFAULT_PHONE_CODE, responsibleEmail: '', responsibleRole: 'Responsable', responsibleFunction: '', responsibleAccount: '', responsibleAffiliation: '',
+      supportName: '', supportPhone: '', supportPhoneCode: DEFAULT_PHONE_CODE, supportEmail: '', supportRole: 'Estudiante', supportFunction: '', supportAccount: '', supportAffiliation: '',
       specialtyStatus: 'not_contacted', involved: 'yes',
       triageStatus: 'pending', attachmentName: '', attachmentData: '', attachmentText: ''
     },
@@ -2072,7 +2117,7 @@ class Component extends DCLogic {
   }
 
   blankContact() {
-    return { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar', function: '', extraUnits: [] };
+    return { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: '', phoneCode: DEFAULT_PHONE_CODE, status: 'Por confirmar', action: 'Por confirmar', function: '', extraUnits: [] };
   }
 
   newContact = () => this.setState({ contactModal: 'new', contactForm: this.blankContact() });
@@ -2082,7 +2127,8 @@ class Component extends DCLogic {
   openContactEdit(id) {
     const c = this.state.contacts.find(x => x.id === id);
     if (!c) return;
-    this.setState({ modal: null, contactModal: id, contactForm: Object.assign(this.blankContact(), c) });
+    const parsedPhone = splitPhone(c.phone);
+    this.setState({ modal: null, contactModal: id, contactForm: Object.assign(this.blankContact(), c, { phone: parsedPhone.number, phoneCode: parsedPhone.code }) });
   }
 
   closeContactModal = () => this.setState({ contactModal: null });
@@ -2092,11 +2138,12 @@ class Component extends DCLogic {
     const clean = Object.assign({}, s.contactForm, {
       name: s.contactForm.name.trim() || 'Contacto sin nombre',
       email: s.contactForm.email.trim() || 'Por confirmar',
-      phone: s.contactForm.phone.trim() || 'Por confirmar',
+      phone: combinePhone(s.contactForm.phoneCode, s.contactForm.phone) || 'Por confirmar',
       status: s.contactForm.status.trim() || 'Por confirmar',
       action: s.contactForm.action.trim() || 'Por confirmar',
       extraUnits: (Array.isArray(s.contactForm.extraUnits) ? s.contactForm.extraUnits : []).filter(id => id !== s.contactForm.unit)
     });
+    delete clean.phoneCode;
     let list;
     if (s.contactModal === 'new') list = s.contacts.concat([Object.assign({}, clean, { id: 'c' + Date.now() })]);
     else list = s.contacts.map(c => c.id === s.contactModal ? Object.assign({}, clean, { id: c.id }) : c);
@@ -2426,13 +2473,15 @@ class Component extends DCLogic {
 
   openUnitModal(unitId, unitName) {
     const info = this.state.unitInfo[unitId] || {};
+    const parsedResponsiblePhone = splitPhone(info.responsiblePhone);
+    const parsedSupportPhone = splitPhone(info.supportPhone);
     this.setState({
       unitModal: unitId,
       unitModalName: unitName,
       unitForm: {
-        responsibleName: info.responsibleName || '', responsiblePhone: info.responsiblePhone || '', responsibleEmail: info.responsibleEmail || '',
+        responsibleName: info.responsibleName || '', responsiblePhone: parsedResponsiblePhone.number, responsiblePhoneCode: parsedResponsiblePhone.code, responsibleEmail: info.responsibleEmail || '',
         responsibleRole: info.responsibleRole || 'Responsable', responsibleFunction: info.responsibleFunction || '', responsibleAccount: info.responsibleAccount || '', responsibleAffiliation: info.responsibleAffiliation || '',
-        supportName: info.supportName || '', supportPhone: info.supportPhone || '', supportEmail: info.supportEmail || '',
+        supportName: info.supportName || '', supportPhone: parsedSupportPhone.number, supportPhoneCode: parsedSupportPhone.code, supportEmail: info.supportEmail || '',
         supportRole: info.supportRole || 'Estudiante', supportFunction: info.supportFunction || '', supportAccount: info.supportAccount || '', supportAffiliation: info.supportAffiliation || '',
         specialtyStatus: info.specialtyStatus || 'not_contacted',
         involved: info.involved === 'no' ? 'no' : 'yes',
@@ -2451,9 +2500,9 @@ class Component extends DCLogic {
     if (!s.unitModal) return;
     const info = Object.assign({}, s.unitInfo, {
       [s.unitModal]: {
-        responsibleName: s.unitForm.responsibleName.trim(), responsiblePhone: s.unitForm.responsiblePhone.trim(), responsibleEmail: s.unitForm.responsibleEmail.trim(),
+        responsibleName: s.unitForm.responsibleName.trim(), responsiblePhone: combinePhone(s.unitForm.responsiblePhoneCode, s.unitForm.responsiblePhone), responsibleEmail: s.unitForm.responsibleEmail.trim(),
         responsibleRole: s.unitForm.responsibleRole, responsibleFunction: s.unitForm.responsibleFunction.trim(), responsibleAccount: s.unitForm.responsibleAccount.trim(), responsibleAffiliation: s.unitForm.responsibleAffiliation.trim(),
-        supportName: s.unitForm.supportName.trim(), supportPhone: s.unitForm.supportPhone.trim(), supportEmail: s.unitForm.supportEmail.trim(),
+        supportName: s.unitForm.supportName.trim(), supportPhone: combinePhone(s.unitForm.supportPhoneCode, s.unitForm.supportPhone), supportEmail: s.unitForm.supportEmail.trim(),
         supportRole: s.unitForm.supportRole, supportFunction: s.unitForm.supportFunction.trim(), supportAccount: s.unitForm.supportAccount.trim(), supportAffiliation: s.unitForm.supportAffiliation.trim(),
         specialtyStatus: SPECIALTY_STATUS[s.unitForm.specialtyStatus] ? s.unitForm.specialtyStatus : 'not_contacted',
         involved: s.unitForm.involved === 'no' ? 'no' : 'yes',
@@ -3302,7 +3351,7 @@ class Component extends DCLogic {
       contactModalOpen: !!s.contactModal, contactModalTitle: s.contactModal === 'new' ? 'Nuevo contacto' : 'Editar contacto',
       isEditingContact: !!s.contactModal && s.contactModal !== 'new',
       contactForm: s.contactForm, roleOptions: Object.keys(ROLE).map(k => ({ id: k, label: ROLE[k].emoji + ' ' + ROLE[k].short })),
-      unitOptions: this.unitOptionsList(),
+      unitOptions: this.unitOptionsList(), phoneCodeOptions: PHONE_COUNTRIES,
       typeStyles: { meeting: tstyle('meeting'), call: tstyle('call'), whatsapp: tstyle('whatsapp'), mail: tstyle('mail') },
       openCustomize: this.openCustomize,
       closeCustomize: this.closeCustomize,
@@ -3372,6 +3421,7 @@ class Component extends DCLogic {
       onContactUnit: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { unit: e.target.value }) }),
       onContactEmail: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { email: e.target.value }) }),
       onContactPhone: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { phone: e.target.value }) }),
+      onContactPhoneCode: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { phoneCode: e.target.value }) }),
       onContactStatus: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { status: e.target.value }) }),
       onContactAction: e => this.setState({ contactForm: Object.assign({}, s.contactForm, { action: e.target.value }) }),
       closeModal: this.closeModal, saveInteraction: this.saveInteraction,
@@ -3387,6 +3437,7 @@ class Component extends DCLogic {
       removeUnitAttachment: this.removeUnitAttachment,
       onUnitResponsibleName: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsibleName: e.target.value }) }),
       onUnitResponsiblePhone: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsiblePhone: e.target.value }) }),
+      onUnitResponsiblePhoneCode: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsiblePhoneCode: e.target.value }) }),
       onUnitResponsibleEmail: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsibleEmail: e.target.value }) }),
       onUnitResponsibleRole: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsibleRole: e.target.value }) }),
       onUnitResponsibleFunction: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsibleFunction: e.target.value }) }),
@@ -3394,6 +3445,7 @@ class Component extends DCLogic {
       onUnitResponsibleAffiliation: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { responsibleAffiliation: e.target.value }) }),
       onUnitSupportName: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportName: e.target.value }) }),
       onUnitSupportPhone: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportPhone: e.target.value }) }),
+      onUnitSupportPhoneCode: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportPhoneCode: e.target.value }) }),
       onUnitSupportEmail: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportEmail: e.target.value }) }),
       onUnitSupportRole: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportRole: e.target.value }) }),
       onUnitSupportFunction: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { supportFunction: e.target.value }) }),

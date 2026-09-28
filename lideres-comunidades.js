@@ -8,6 +8,41 @@
   const SUPABASE_KEY = 'sb_publishable_E-cV9DiNK9rctFCxzondvA_7OppBD7Y';
   const TABLE = 'lideres_contacts';
 
+  // Código de país + número, en vez de un solo campo de texto libre — mismo
+  // catálogo copiado en cada dashboard del sitio que tiene contactos.
+  const PHONE_COUNTRIES = [
+    { code: '+58', label: '🇻🇪 +58 Venezuela' },
+    { code: '+57', label: '🇨🇴 +57 Colombia' },
+    { code: '+1', label: '🇺🇸 +1 EE. UU. / Canadá' },
+    { code: '+34', label: '🇪🇸 +34 España' },
+    { code: '+51', label: '🇵🇪 +51 Perú' },
+    { code: '+52', label: '🇲🇽 +52 México' },
+    { code: '+54', label: '🇦🇷 +54 Argentina' },
+    { code: '+56', label: '🇨🇱 +56 Chile' },
+    { code: '+593', label: '🇪🇨 +593 Ecuador' },
+    { code: '+507', label: '🇵🇦 +507 Panamá' }
+  ];
+  const DEFAULT_PHONE_CODE = PHONE_COUNTRIES[0].code;
+
+  function populatePhoneCodeSelect(selectEl, currentCode) {
+    renderMarkup(selectEl, PHONE_COUNTRIES.map(function (c) { return '<option value="' + c.code + '">' + c.label + '</option>'; }).join(''));
+    selectEl.value = currentCode || DEFAULT_PHONE_CODE;
+  }
+
+  function splitPhone(value) {
+    const raw = String(value || '').trim();
+    if (!raw || raw === 'Por confirmar' || raw.charAt(0) !== '+') return { code: DEFAULT_PHONE_CODE, number: raw && raw !== 'Por confirmar' ? raw : '' };
+    const sorted = PHONE_COUNTRIES.slice().sort(function (a, b) { return b.code.length - a.code.length; });
+    const found = sorted.find(function (c) { return raw.indexOf(c.code) === 0; });
+    if (found) return { code: found.code, number: raw.slice(found.code.length).trim() };
+    return { code: DEFAULT_PHONE_CODE, number: raw };
+  }
+
+  function combinePhone(code, number) {
+    const digits = number.trim();
+    return digits ? code + digits : '';
+  }
+
   // Solo dos estados de seguimiento: pendiente por contactar y ya contactado.
   const STATUSES = [
     { key: 'pending', label: 'Pendiente', emoji: '○', color: '#82796a' },
@@ -85,6 +120,7 @@
     dom.contactDialogTitle = document.getElementById('contact-dialog-title');
     dom.contactError = document.getElementById('contact-error');
     dom.contactArchive = document.getElementById('contact-archive');
+    dom.contactPhoneCode = document.getElementById('field-contact-phone-code');
     dom.communitySuggestions = document.getElementById('community-suggestions');
     dom.statusSelect = document.getElementById('field-contact-status');
     dom.communityFilter = document.getElementById('community-filter');
@@ -357,7 +393,9 @@
     dom.contactForm.elements.name.value = contact ? contact.name : '';
     dom.contactForm.elements.community.value = contact ? (contact.community || '') : '';
     dom.contactForm.elements.role.value = contact ? (contact.role || '') : '';
-    dom.contactForm.elements.phone.value = contact ? (contact.phone || '') : '';
+    const parsedPhone = splitPhone(contact ? contact.phone : '');
+    populatePhoneCodeSelect(dom.contactPhoneCode, parsedPhone.code);
+    dom.contactForm.elements.phone_number.value = parsedPhone.number;
     dom.contactForm.elements.email.value = contact ? (contact.email || '') : '';
     dom.contactForm.elements.status.value = contact ? (contact.status || 'pending') : 'pending';
     dom.contactForm.elements.notes.value = contact ? (contact.notes || '') : '';
@@ -381,7 +419,7 @@
       name: name,
       community: dom.contactForm.elements.community.value.trim(),
       role: dom.contactForm.elements.role.value.trim(),
-      phone: dom.contactForm.elements.phone.value.trim(),
+      phone: combinePhone(dom.contactPhoneCode.value, dom.contactForm.elements.phone_number.value),
       email: dom.contactForm.elements.email.value.trim(),
       status: dom.contactForm.elements.status.value,
       notes: dom.contactForm.elements.notes.value.trim(),
