@@ -717,7 +717,7 @@
     dom.connectivityBanner.hidden = true;
 
     const contactsRequest = state.client.from(TABLES.contacts)
-      .select('id,name,role,belongs_to,national_id,phone,email,notes,created_at,updated_at')
+      .select('id,name,role,belongs_to,national_id,phone,email,notes,status,created_at,updated_at')
       .is('archived_at', null)
       .order('name');
     const eventsRequest = state.client.from(TABLES.events).select('*').is('archived_at', null).order('event_date');

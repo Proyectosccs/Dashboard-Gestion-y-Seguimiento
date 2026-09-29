@@ -654,7 +654,7 @@
 
     const [coalicionRes, coalicionContactsRes, florangelRes, florangelContactsRes, ucvRes, ucvContactsRes, ingeniaRes] = await Promise.all([
       state.client.from('coalicion_events').select('id,title,event_date,start_time,end_time,location,maps_url,notes,status,jornada_type,specialties,collaborating_orgs,participants,participo_fundacion_ingenia,minuta,pendientes').is('archived_at', null),
-      state.client.from('coalicion_contacts').select('id,name,role,belongs_to,national_id,phone,email,notes').is('archived_at', null),
+      state.client.from('coalicion_contacts').select('id,name,role,belongs_to,national_id,phone,email,notes,status').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-contacts-v1').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
