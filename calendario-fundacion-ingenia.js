@@ -9,7 +9,7 @@
 
   const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-  const SOURCE_LABELS = { coalicion: 'Coalición Venezuela', florangel: 'Dra Florangel', ucv: 'UCV', cmdlt: 'Centro Médico Docente de La Trinidad', networking: 'Networking Fund. Ingenia', otros: 'Otros' };
+  const SOURCE_LABELS = { coalicion: 'Coalición Venezuela', florangel: 'Dra Florangel', ucv: 'UCV', cmdlt: 'Centro Médico Docente de La Trinidad', networking: 'Fundación Ingenia', otros: 'Otros' };
   // Deben coincidir exactamente con --source-<clave> en
   // calendario-fundacion-ingenia.css (ahí pinta la leyenda y los eventos;
   // aquí solo se usa para la tarjeta de cada organización en "Organizaciones").
@@ -135,9 +135,13 @@
   }
 
   // Organizaciones cuyos contactos se pueden agregar/editar desde este
-  // tablero — Networking queda fuera: no es una organización aliada con
-  // contactos propios.
-  const CONTACT_ORGS = ['coalicion', 'florangel', 'cmdlt', 'ucv'];
+  // tablero. "networking" = Fundación Ingenia (equipo propio, sin
+  // dashboard dedicado) — sus contactos se guardan en
+  // 'ingenia-networking-contacts-v1' e incluyen la subdivisión interna
+  // (ver NETWORKING_SUBDIVISIONS).
+  const CONTACT_ORGS = ['coalicion', 'florangel', 'cmdlt', 'ucv', 'networking'];
+  // Subdivisión interna de un contacto de Fundación Ingenia.
+  const NETWORKING_SUBDIVISIONS = ['Voluntario', 'Taller y fabricación', 'Logística', 'Protección civil', 'Driver', 'Bomberos'];
   // Coalición exige esta afiliación exacta (coalicion_update_contact_public
   // la valida en el servidor) — son las únicas 4 opciones válidas.
   const COALICION_AFFILIATIONS = ['Coalicion con amor a Venezuela', 'Fundacion Ingenia', 'Voluntariado AVAA', 'Voluntario Particular'];
@@ -461,6 +465,7 @@
     });
     dom.contactDetailDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeContactDetail(); });
     dom.eventMinutaFileInput.addEventListener('change', onMinutaFileSelected);
+    renderMarkup(dom.contactSubdivisionSelect, NETWORKING_SUBDIVISIONS.map(function (s) { return '<option value="' + safe(s) + '">' + safe(s) + '</option>'; }).join(''));
     dom.taskForm.addEventListener('submit', onTaskSubmit);
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
     dom.tasksOrgFilter.addEventListener('change', function () {
@@ -594,6 +599,8 @@
     dom.contactOrgSelect = document.getElementById('field-contact-org');
     dom.contactCoalicionFields = document.getElementById('contact-coalicion-fields');
     dom.contactUcvFields = document.getElementById('contact-ucv-fields');
+    dom.contactNetworkingFields = document.getElementById('contact-networking-fields');
+    dom.contactSubdivisionSelect = document.getElementById('field-contact-subdivision');
     dom.contactUcvRoleSelect = document.getElementById('field-contact-ucv-role');
     dom.contactUnitSelect = document.getElementById('field-contact-unit');
     dom.contactRoleField = document.getElementById('contact-role-field');
@@ -651,7 +658,7 @@
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-contacts-v1').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-contacts-v1').maybeSingle(),
-      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', 'cmdlt-contacts-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
+      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', 'cmdlt-contacts-v1', 'ingenia-networking-contacts-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
     ]);
 
     const anyFailed = coalicionRes.error && florangelRes.error && ucvRes.error && ingeniaRes.error;
@@ -744,7 +751,11 @@
       // vacío) = pendiente, cualquier otro valor ya escrito = contactado.
       return { id: 'ucv-' + c.id, rawId: c.id, source: 'ucv', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: '', status: (c.status && c.status !== 'Por confirmar') ? 'contacted' : 'pending', raw: c };
     });
-    state.contacts = coalicionContacts.concat(florangelContacts, cmdltContacts, ucvContacts, customContacts).filter(function (c) { return !!c.name; });
+    const networkingContactsRaw = ingeniaRowsEarly.find(function (r) { return r.key === 'ingenia-networking-contacts-v1'; });
+    const networkingContacts = (Array.isArray(networkingContactsRaw && networkingContactsRaw.value) ? networkingContactsRaw.value : []).map(function (c) {
+      return { id: 'networking-' + c.id, rawId: c.id, source: 'networking', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, status: c.status || 'pending', raw: c };
+    });
+    state.contacts = coalicionContacts.concat(florangelContacts, cmdltContacts, ucvContacts, networkingContacts, customContacts).filter(function (c) { return !!c.name; });
 
     dom.loadingState.hidden = true;
     renderLegend();
@@ -2039,6 +2050,7 @@
     // UCV ya tiene su propio estado (texto libre, rico) en su dashboard —
     // este selector pending/contacted no aplica ahí, para no pisarlo.
     dom.contactStatusField.hidden = org === 'ucv';
+    dom.contactNetworkingFields.hidden = org !== 'networking';
   }
 
   function handleContactSearch(e) {
@@ -2109,6 +2121,11 @@
         dom.contactUcvRoleSelect.value = (existing.raw && existing.raw.role) || UCV_ROLES[0].id;
         dom.contactUnitSelect.value = (existing.raw && existing.raw.unit) || UCV_UNITS[0].id;
       }
+      if (existing.source === 'networking') {
+        dom.contactSubdivisionSelect.value = (existing.raw && existing.raw.subdivision) || NETWORKING_SUBDIVISIONS[0];
+      }
+    } else {
+      dom.contactSubdivisionSelect.value = NETWORKING_SUBDIVISIONS[0];
     }
     onContactOrgChange();
     dom.contactDialog.showModal();
@@ -2136,7 +2153,8 @@
       belongsTo: dom.contactForm.elements.belongs_to.value,
       nationalId: dom.contactForm.elements.national_id.value.trim(),
       ucvRole: dom.contactForm.elements.ucv_role.value,
-      unit: dom.contactForm.elements.unit.value
+      unit: dom.contactForm.elements.unit.value,
+      subdivision: dom.contactSubdivisionSelect.value
     };
     const existing = state.editingContact;
     if (existing && existing.source === 'coalicion' && org !== 'coalicion') {
@@ -2165,6 +2183,7 @@
     if (org === 'florangel') return saveIngeniaLikeContact('florangel_board_state', 'florangel-contacts-v1', fields, existing);
     if (org === 'cmdlt') return saveIngeniaLikeContact('ingenia_board_state', 'cmdlt-contacts-v1', fields, existing);
     if (org === 'ucv') return saveUcvContact(fields, existing);
+    if (org === 'networking') return saveIngeniaLikeContact('ingenia_board_state', 'ingenia-networking-contacts-v1', fields, existing);
     return saveIngeniaLikeContact('ingenia_board_state', 'ingenia-custom-' + org + '-contacts-v1', fields, existing);
   }
 
@@ -2211,7 +2230,8 @@
     const next = upsertById(current, existing, function (base) {
       return Object.assign({}, base, {
         id: existing ? existing.rawId : uid(), name: fields.name, role: fields.role,
-        phone: fields.phone, email: fields.email, notes: fields.notes, status: fields.status || 'pending'
+        phone: fields.phone, email: fields.email, notes: fields.notes, status: fields.status || 'pending',
+        subdivision: fields.subdivision || ''
       });
     });
     return writeBoardKey(table, key, next);
@@ -2221,6 +2241,7 @@
     if (existing.source === 'coalicion') return deleteCoalicionContact(existing);
     if (existing.source === 'florangel') return deleteFromArrayKey('florangel_board_state', 'florangel-contacts-v1', existing.rawId);
     if (existing.source === 'cmdlt') return deleteFromArrayKey('ingenia_board_state', 'cmdlt-contacts-v1', existing.rawId);
+    if (existing.source === 'networking') return deleteFromArrayKey('ingenia_board_state', 'ingenia-networking-contacts-v1', existing.rawId);
     if (existing.source === 'ucv') return deleteUcvContact(existing);
     return deleteFromArrayKey('ingenia_board_state', 'ingenia-custom-' + existing.source + '-contacts-v1', existing.rawId);
   }
@@ -2273,6 +2294,7 @@
       '<div class="contact-row"><span class="contact-row-label">◉ Teléfono</span><span class="contact-row-value">' + (c.phone ? '<a href="tel:' + safe(c.phone) + '">' + safe(c.phone) + '</a>' : 'Por confirmar') + '</span></div>' +
       '<div class="contact-row"><span class="contact-row-label">✉ Correo</span><span class="contact-row-value">' + (c.email ? '<a href="mailto:' + safe(c.email) + '">' + safe(c.email) + '</a>' : 'Por confirmar') + '</span></div>' +
       '<div class="contact-row"><span class="contact-row-label">Estado</span><span class="contact-row-value">' + safe(status.emoji) + ' ' + safe(status.label) + '</span></div>' +
+      (c.source === 'networking' && c.raw && c.raw.subdivision ? '<div class="contact-row"><span class="contact-row-label">🧩 Subdivisión</span><span class="contact-row-value">' + safe(c.raw.subdivision) + '</span></div>' : '') +
       (c.notes ? '<div class="contact-row"><span class="contact-row-label">↳ Notas</span><span class="contact-row-value">' + safe(c.notes) + '</span></div>' : '')
     );
     dom.contactDetailDialog.showModal();
