@@ -59,6 +59,42 @@
     return digits ? code + digits : '';
   }
 
+  // Estado de contacto (contactado o no) — mismo catálogo en todos los
+  // dashboards con contactos.
+  const CONTACT_STATUSES = [
+    { key: 'pending', label: 'Pendiente', emoji: '○' },
+    { key: 'contacted', label: 'Contactado', emoji: '📞' }
+  ];
+  const CONTACT_STATUS_MAP = {};
+  CONTACT_STATUSES.forEach(function (s) { CONTACT_STATUS_MAP[s.key] = s; });
+  function contactStatusInfo(c) { return CONTACT_STATUS_MAP[c && c.status] || CONTACT_STATUSES[0]; }
+  function populateContactStatusSelect(selectEl, current) {
+    renderMarkup(selectEl, CONTACT_STATUSES.map(function (s) { return '<option value="' + s.key + '">' + s.emoji + ' ' + s.label + '</option>'; }).join(''));
+    selectEl.value = current || CONTACT_STATUSES[0].key;
+  }
+  function populateContactStatusFilter(selectEl) {
+    renderMarkup(selectEl, '<option value="">Todos los estados</option>' + CONTACT_STATUSES.map(function (s) { return '<option value="' + s.key + '">' + s.emoji + ' ' + s.label + '</option>'; }).join(''));
+  }
+  function downloadVCard(c) {
+    if (!c) return;
+    const lines = ['BEGIN:VCARD', 'VERSION:3.0', 'FN:' + (c.name || 'Contacto')];
+    if (c.role) lines.push('TITLE:' + c.role);
+    if (c.org) lines.push('ORG:' + c.org);
+    if (c.phone) lines.push('TEL;TYPE=CELL:' + c.phone);
+    if (c.email) lines.push('EMAIL:' + c.email);
+    if (c.notes) lines.push('NOTE:' + String(c.notes).replace(/\r?\n/g, '\\n'));
+    lines.push('END:VCARD');
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/vcard' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (c.name || 'contacto').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') + '.vcf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   // Campos compartidos del formulario de eventos, iguales en todos los
   // calendarios (Networking, Organización, Dra Florangel, CMDLT, Coalición).
   const MEDICAL_SPECIALTIES = [
@@ -127,6 +163,8 @@
     events: [],
     contacts: [],
     query: '',
+    contactStatusFilter: '',
+    viewingContact: null,
     allTasks: [],
     teamMembers: [],
     taskResponsableFilter: '',
@@ -174,6 +212,10 @@
       'contact-dialog-close': closeContactDialog,
       'contact-dialog-cancel': closeContactDialog,
       'contact-delete': deleteEditingContact,
+      'contact-detail-close': closeContactDetail,
+      'contact-detail-edit': editFromContactDetail,
+      'contact-detail-delete': deleteFromContactDetail,
+      'contact-detail-vcard': function () { downloadVCard(state.viewingContact); },
       'task-dialog-close': closeTaskDialog,
       'task-dialog-cancel': closeTaskDialog,
       'task-delete': deleteEditingTask,
@@ -205,6 +247,7 @@
     }
     if (target.dataset.eventId) openEventDialog(findById(state.events, target.dataset.eventId));
     if (target.dataset.taskId) openTaskDialog(findById(state.allTasks, target.dataset.taskId));
+    if (target.dataset.contactDetailId) openContactDetail(findById(state.contacts, target.dataset.contactDetailId));
   };
 
   function handleAction(action, id) {
@@ -225,6 +268,12 @@
     dom.contactForm.addEventListener('submit', onContactSubmit);
     dom.contactDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeContactDialog(); });
     dom.contactSearch.addEventListener('input', handleContactSearch);
+    populateContactStatusFilter(dom.contactStatusFilter);
+    dom.contactStatusFilter.addEventListener('change', function () {
+      state.contactStatusFilter = dom.contactStatusFilter.value;
+      renderContacts();
+    });
+    dom.contactDetailDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeContactDetail(); });
     dom.taskForm.addEventListener('submit', onTaskSubmit);
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
     dom.customizeForm.addEventListener('submit', onCustomizeSubmit);
@@ -284,6 +333,11 @@
     dom.contactError = document.getElementById('contact-error');
     dom.contactDelete = document.getElementById('contact-delete');
     dom.contactPhoneCode = document.getElementById('field-contact-phone-code');
+    dom.contactStatusSelect = document.getElementById('field-contact-status');
+    dom.contactStatusFilter = document.getElementById('contact-status-filter');
+    dom.contactDetailDialog = document.getElementById('contact-detail-dialog');
+    dom.contactDetailTitle = document.getElementById('contact-detail-title');
+    dom.contactDetailBody = document.getElementById('contact-detail-body');
     dom.tasksKpiGrid = document.getElementById('tasks-kpi-grid');
     dom.tasksResponsableFilter = document.getElementById('tasks-responsable-filter');
     dom.tasksBoard = document.getElementById('tasks-board');
@@ -827,6 +881,7 @@
   function renderContacts() {
     const query = normalize(state.query);
     const contacts = state.contacts.filter(function (c) {
+      if (state.contactStatusFilter && (c.status || 'pending') !== state.contactStatusFilter) return false;
       return !query || normalize([c.name, c.role].join(' ')).indexOf(query) > -1;
     });
     dom.contactResultCount.textContent = contacts.length + ' de ' + state.contacts.length + ' contactos';
@@ -836,18 +891,13 @@
       return;
     }
     renderMarkup(dom.contactsList, contacts.map(function (c) {
-      const phone = c.phone ? '<a href="tel:' + safe(c.phone) + '">' + safe(c.phone) + '</a>' : 'Por confirmar';
-      const email = c.email ? '<a href="mailto:' + safe(c.email) + '">' + safe(c.email) + '</a>' : 'Por confirmar';
-      return '<article class="contact-card">' +
-        '<div class="contact-card-header"><div class="contact-avatar" aria-hidden="true">' + safe(initials(c.name)) + '</div><div><h3>' + safe(c.name) + '</h3><div class="contact-role">' + safe(c.role || 'Contacto') + '</div></div></div>' +
-        '<div class="contact-details">' +
-          '<div class="contact-row"><span class="contact-row-label">◉ Teléfono</span><span class="contact-row-value">' + phone + '</span></div>' +
-          '<div class="contact-row"><span class="contact-row-label">✉ Correo</span><span class="contact-row-value">' + email + '</span></div>' +
-          (c.notes ? '<div class="contact-row"><span class="contact-row-label">↳ Notas</span><span class="contact-row-value">' + safe(c.notes) + '</span></div>' : '') +
-        '</div>' +
-        '<div class="contact-card-actions">' +
-          '<button class="btn btn-secondary" type="button" data-action="edit-contact" data-id="' + safe(c.id) + '" onclick="window.cmdltAction(event)">Editar contacto</button>' +
-        '</div>' +
+      const phone = c.phone ? safe(c.phone) : 'Por confirmar';
+      const email = c.email ? safe(c.email) : 'Por confirmar';
+      const status = contactStatusInfo(c);
+      return '<article class="contact-card contact-card-compact" data-contact-detail-id="' + safe(c.id) + '" tabindex="0" role="button" aria-label="Ver detalle de ' + safe(c.name) + '" onclick="window.cmdltAction(event)">' +
+        '<div class="contact-card-header"><div class="contact-avatar" aria-hidden="true">' + safe(initials(c.name)) + '</div><div><h3>' + safe(c.name) + '</h3><span class="contact-status-pill status-' + status.key + '">' + status.emoji + ' ' + safe(status.label) + '</span></div></div>' +
+        '<div class="contact-mini-row">📱 ' + phone + '</div>' +
+        '<div class="contact-mini-row">✉ ' + email + '</div>' +
       '</article>';
     }).join(''));
   }
@@ -861,6 +911,7 @@
     const parsedPhone = splitPhone(existing ? existing.phone : '');
     populatePhoneCodeSelect(dom.contactPhoneCode, parsedPhone.code);
     dom.contactForm.elements.phone_number.value = parsedPhone.number;
+    populateContactStatusSelect(dom.contactStatusSelect, existing ? existing.status : '');
     if (existing) {
       dom.contactForm.elements.name.value = existing.name || '';
       dom.contactForm.elements.role.value = existing.role || '';
@@ -885,6 +936,7 @@
       role: dom.contactForm.elements.role.value.trim(),
       phone: combinePhone(dom.contactPhoneCode.value, dom.contactForm.elements.phone_number.value),
       email: dom.contactForm.elements.email.value.trim(),
+      status: dom.contactStatusSelect.value || 'pending',
       notes: dom.contactForm.elements.notes.value.trim(),
       created_at: existing ? existing.created_at : new Date().toISOString()
     };
@@ -899,15 +951,49 @@
     toast('Contacto guardado.', 'success');
   }
 
-  async function deleteEditingContact() {
-    if (!state.editingContact) return;
-    const next = state.contacts.filter(function (c) { return c.id !== state.editingContact.id; });
+  async function deleteContact(contact) {
+    if (!contact) return;
+    const next = state.contacts.filter(function (c) { return c.id !== contact.id; });
     const ok = await writeBoardKey(CONTACTS_KEY, next);
-    if (!ok) { showError(dom.contactError, 'No se pudo eliminar — revisa tu conexión.'); return; }
+    if (!ok) { toast('No se pudo eliminar — revisa tu conexión.', 'error'); return; }
     state.contacts = next;
-    closeContactDialog();
     renderContacts();
     toast('Contacto eliminado.', 'success');
+  }
+
+  async function deleteEditingContact() {
+    const contact = state.editingContact;
+    await deleteContact(contact);
+    closeContactDialog();
+  }
+
+  function openContactDetail(c) {
+    if (!c) return;
+    state.viewingContact = c;
+    const status = contactStatusInfo(c);
+    dom.contactDetailTitle.textContent = c.name || 'Contacto';
+    renderMarkup(dom.contactDetailBody,
+      '<div class="contact-row"><span class="contact-row-label">Rol</span><span class="contact-row-value">' + safe(c.role || 'Contacto') + '</span></div>' +
+      '<div class="contact-row"><span class="contact-row-label">◉ Teléfono</span><span class="contact-row-value">' + (c.phone ? '<a href="tel:' + safe(c.phone) + '">' + safe(c.phone) + '</a>' : 'Por confirmar') + '</span></div>' +
+      '<div class="contact-row"><span class="contact-row-label">✉ Correo</span><span class="contact-row-value">' + (c.email ? '<a href="mailto:' + safe(c.email) + '">' + safe(c.email) + '</a>' : 'Por confirmar') + '</span></div>' +
+      '<div class="contact-row"><span class="contact-row-label">Estado</span><span class="contact-row-value">' + status.emoji + ' ' + safe(status.label) + '</span></div>' +
+      '<div class="contact-row"><span class="contact-row-label">↳ Notas</span><span class="contact-row-value">' + (c.notes ? safe(c.notes) : 'Sin notas.') + '</span></div>'
+    );
+    dom.contactDetailDialog.showModal();
+  }
+
+  function closeContactDetail() { dom.contactDetailDialog.close(); state.viewingContact = null; }
+
+  function editFromContactDetail() {
+    const c = state.viewingContact;
+    closeContactDetail();
+    openContactDialog(c);
+  }
+
+  async function deleteFromContactDetail() {
+    const c = state.viewingContact;
+    closeContactDetail();
+    await deleteContact(c);
   }
 
   // ---------- Tareas ----------

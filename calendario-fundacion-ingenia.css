@@ -348,6 +348,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .pendiente-task-badge { font-size: 11px; font-weight: 700; color: var(--coalition-good); white-space: nowrap; }
 .pendiente-create-task, .pendiente-remove { border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 6px 10px; font-size: 11.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .pendiente-remove { padding: 6px 9px; }
+.minuta-files-list { display: flex; flex-direction: column; gap: 6px; }
+.minuta-file-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 12px; border: 1px solid var(--color-neutral-300); border-radius: 14px; background: #fff; font-size: 12.5px; }
+.minuta-file-row a { overflow-wrap: anywhere; color: inherit; }
+.minuta-file-remove { border: none; background: transparent; cursor: pointer; font-size: 13px; flex: none; }
 @media (max-width: 1180px) { .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
@@ -420,6 +424,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .contact-row-label { color: var(--color-neutral-600); }
 .contact-row-value { min-width: 0; overflow-wrap: anywhere; text-align: right; }
 .contact-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: auto; }
+.contact-card-compact { min-height: auto; padding: 14px 16px; gap: 8px; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; }
+.contact-card-compact:hover, .contact-card-compact:focus-visible { transform: translateY(-2px); box-shadow: var(--shadow-md); outline: none; }
+.contact-mini-row { font-size: 12.5px; color: var(--color-neutral-700); overflow-wrap: anywhere; }
+.contact-status-pill { display: inline-flex; align-items: center; gap: 4px; width: fit-content; padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; background: var(--color-neutral-200); color: var(--color-neutral-700); }
+.contact-status-pill.status-contacted { background: color-mix(in srgb, #2f9e63 20%, white); color: #1f7a4c; }
+.contact-detail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .phone-field { display: flex; gap: 6px; }
 .phone-field .phone-code { flex: 0 0 96px; padding-left: 8px; padding-right: 4px; }
 .phone-field .phone-number { flex: 1; min-width: 0; }

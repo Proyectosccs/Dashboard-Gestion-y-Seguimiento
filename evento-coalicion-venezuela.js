@@ -415,6 +415,36 @@
     const digits = String(number || '').trim();
     return digits ? code + digits : '';
   }
+
+  // Estado de contacto (contactado o no) — mismo catálogo en todos los
+  // dashboards con contactos.
+  const CONTACT_STATUSES = { pending: '○ Pendiente', contacted: '📞 Contactado' };
+  const CONTACT_STATUS_INFO = {
+    pending: { key: 'pending', label: 'Pendiente', emoji: '○' },
+    contacted: { key: 'contacted', label: 'Contactado', emoji: '📞' }
+  };
+  function contactStatusInfo(c) { return CONTACT_STATUS_INFO[c && c.status] || CONTACT_STATUS_INFO.pending; }
+
+  function downloadVCard(c) {
+    if (!c) return;
+    const lines = ['BEGIN:VCARD', 'VERSION:3.0', 'FN:' + (c.name || 'Contacto')];
+    if (c.role) lines.push('TITLE:' + c.role);
+    if (c.belongs_to) lines.push('ORG:' + c.belongs_to);
+    if (c.phone) lines.push('TEL;TYPE=CELL:' + c.phone);
+    if (c.email) lines.push('EMAIL:' + c.email);
+    if (c.notes) lines.push('NOTE:' + String(c.notes).replace(/\r?\n/g, '\\n'));
+    lines.push('END:VCARD');
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/vcard' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (c.name || 'contacto').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') + '.vcf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   const AFFILIATIONS = {
     '': 'Selecciona una opción',
     'Coalicion con amor a Venezuela': 'Coalicion con amor a Venezuela',
@@ -460,9 +490,11 @@
     contacts: [],
     events: [],
     query: '',
+    contactStatusFilter: '',
     editor: null,
     editorDirty: false,
     discardArmed: false,
+    viewingContact: null,
     realtime: null,
     loadId: 0,
     results: { loading: false, error: null, loaded: false, entregas: [], envios: [], semaforoFilter: null, needsData: [], openNeedCategory: null, selectedJornada: null, jornadaAnchored: false },
@@ -504,6 +536,10 @@
       'contact-search-clear': clearContactSearch,
       'dialog-close': requestCloseEditor,
       'dialog-cancel': requestCloseEditor,
+      'contact-detail-close': closeContactDetail,
+      'contact-detail-edit': editFromContactDetail,
+      'contact-detail-delete': deleteFromContactDetail,
+      'contact-detail-vcard': function () { downloadVCard(state.viewingContact); },
       'task-dialog-close': closeTaskDialog,
       'task-dialog-cancel': closeTaskDialog,
       'task-delete': deleteEditingTask,
@@ -559,6 +595,7 @@
     dom.contactSearchClear = document.getElementById('contact-search-clear');
     dom.contactResultCount = document.getElementById('contact-result-count');
     dom.contactsList = document.getElementById('contacts-list');
+    dom.contactStatusFilter = document.getElementById('contact-status-filter');
     dom.resultsStatus = document.getElementById('results-status');
     dom.resultsEmpty = document.getElementById('results-empty');
     dom.resultsBody = document.getElementById('results-body');
@@ -584,6 +621,9 @@
     dom.dialogSave = document.getElementById('dialog-save');
     dom.dialogCancel = document.getElementById('dialog-cancel');
     dom.dialogClose = document.getElementById('dialog-close');
+    dom.contactDetailDialog = document.getElementById('contact-detail-dialog');
+    dom.contactDetailTitle = document.getElementById('contact-detail-title');
+    dom.contactDetailBody = document.getElementById('contact-detail-body');
     dom.toastRegion = document.getElementById('toast-region');
     dom.tasksKpiGrid = document.getElementById('tasks-kpi-grid');
     dom.tasksResponsableFilter = document.getElementById('tasks-responsable-filter');
@@ -625,6 +665,11 @@
   function bindStaticEvents() {
     dom.appShell.addEventListener('click', handleAppAction);
     dom.contactSearch.addEventListener('input', handleContactSearch);
+    renderMarkup(dom.contactStatusFilter, '<option value="">Todos los estados</option>' + Object.keys(CONTACT_STATUSES).map(function (k) { return '<option value="' + k + '">' + CONTACT_STATUSES[k] + '</option>'; }).join(''));
+    dom.contactStatusFilter.addEventListener('change', function () {
+      state.contactStatusFilter = dom.contactStatusFilter.value;
+      renderContacts();
+    });
     dom.editorForm.addEventListener('submit', saveEditor);
     dom.editorForm.addEventListener('input', function () {
       state.editorDirty = true;
@@ -655,6 +700,7 @@
     });
     dom.customizeForm.addEventListener('submit', onCustomizeSubmit);
     dom.customizeDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeCustomize(); });
+    dom.contactDetailDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeContactDetail(); });
   }
 
   function showConnectionFailure() {
@@ -747,6 +793,7 @@
     if (action === 'new-task') openTaskDialog();
     if (action === 'new-contact') openEditor('contact');
     if (action === 'edit-contact') openEditor('contact', findById(state.contacts, id));
+    if (action === 'view-contact') openContactDetail(findById(state.contacts, id));
     if (action === 'new-event') openEditor('event');
     if (action === 'edit-event') openEditor('event', findById(state.events, id));
     if (action === 'refresh-results') fetchResultados(true);
@@ -1006,6 +1053,7 @@
   function renderContacts() {
     const query = normalize(state.query);
     const contacts = state.contacts.filter(function (contact) {
+      if (state.contactStatusFilter && (contact.status || 'pending') !== state.contactStatusFilter) return false;
       return !query || normalize([contact.name, contact.role, contact.belongs_to].join(' ')).includes(query);
     });
     dom.contactResultCount.textContent = contacts.length + ' de ' + state.contacts.length + ' responsables';
@@ -1017,13 +1065,13 @@
       return;
     }
     renderMarkup(dom.contactsList, contacts.map(function (contact) {
-      return '<article class="contact-card ' + safe(affiliationClass(contact.belongs_to)) + '">' +
-        '<div class="contact-card-header"><div class="contact-avatar" aria-hidden="true">' + safe(initials(contact.name)) + '</div><div><h3>' + safe(contact.name) + '</h3><div class="contact-role">' + safe(contact.role || 'Responsable') + '</div></div></div>' +
-        '<div class="contact-chips"><span class="affiliation-chip">🏷️ ' + safe(contact.belongs_to || 'Pertenencia por confirmar') + '</span></div>' +
-        renderContactDetails(contact) +
-        '<div class="contact-card-actions">' +
-          '<button class="btn btn-secondary" type="button" data-action="edit-contact" data-id="' + safe(contact.id) + '">Editar responsable</button>' +
-        '</div>' +
+      const status = contactStatusInfo(contact);
+      const phone = contact.phone ? safe(contact.phone) : 'Por confirmar';
+      const email = contact.email ? safe(contact.email) : 'Por confirmar';
+      return '<article class="contact-card contact-card-compact ' + safe(affiliationClass(contact.belongs_to)) + '" data-action="view-contact" data-id="' + safe(contact.id) + '" tabindex="0" role="button" aria-label="Ver detalle de ' + safe(contact.name) + '">' +
+        '<div class="contact-card-header"><div class="contact-avatar" aria-hidden="true">' + safe(initials(contact.name)) + '</div><div><h3>' + safe(contact.name) + '</h3><span class="contact-status-pill status-' + safe(status.key) + '">' + safe(status.emoji) + ' ' + safe(status.label) + '</span></div></div>' +
+        '<div class="contact-mini-row">📱 ' + phone + '</div>' +
+        '<div class="contact-mini-row">✉ ' + email + '</div>' +
       '</article>';
     }).join(''));
   }
@@ -1035,16 +1083,49 @@
     const email = contact.email
       ? '<a href="mailto:' + safe(contact.email) + '">' + safe(contact.email) + '</a>'
       : 'Por confirmar';
+    const status = contactStatusInfo(contact);
     return '<div class="contact-details">' +
+      sensitiveRow('🏷️ Pertenece a', safe(contact.belongs_to || 'Por confirmar')) +
       sensitiveRow('▣ Cédula', '<strong>' + safe(contact.national_id || 'Por confirmar') + '</strong>') +
       sensitiveRow('◉ Teléfono', phone) +
       sensitiveRow('✉ Correo', email) +
+      sensitiveRow('Estado', safe(status.emoji) + ' ' + safe(status.label)) +
       sensitiveRow('↳ Notas', safe(contact.notes || 'Por confirmar')) +
     '</div>';
   }
 
   function sensitiveRow(label, value) {
     return '<div class="sensitive-row"><span class="sensitive-label">' + safe(label) + '</span><span class="sensitive-value">' + value + '</span></div>';
+  }
+
+  function openContactDetail(contact) {
+    if (!contact) return;
+    state.viewingContact = contact;
+    dom.contactDetailTitle.textContent = contact.name || 'Responsable';
+    renderMarkup(dom.contactDetailBody, renderContactDetails(contact));
+    dom.contactDetailDialog.showModal();
+  }
+
+  function closeContactDetail() {
+    if (dom.contactDetailDialog.open) dom.contactDetailDialog.close();
+    state.viewingContact = null;
+  }
+
+  function editFromContactDetail() {
+    const contact = state.viewingContact;
+    closeContactDetail();
+    openEditor('contact', contact);
+  }
+
+  async function deleteFromContactDetail() {
+    const contact = state.viewingContact;
+    if (!contact) return;
+    closeContactDetail();
+    const result = await callEditorApi('archive', { entity: 'contact', id: contact.id });
+    if (result.error) { toast('No se pudo eliminar — revisa tu conexión.', 'error'); return; }
+    state.contacts = state.contacts.filter(function (c) { return c.id !== contact.id; });
+    renderContacts();
+    toast('Contacto eliminado.', 'success');
   }
 
   // ---------- Resultados de la jornada (conektados Lite) ----------
@@ -1717,6 +1798,7 @@
       field('Cédula', 'national_id', item.national_id, 'text', false, 'numeric') +
       phoneField('Teléfono', 'phone', item.phone) +
       field('Correo electrónico', 'email', item.email, 'email', false, 'email') +
+      selectField('Estado', 'status', item.status || 'pending', CONTACT_STATUSES) +
       textareaField('Notas operativas', 'notes', item.notes, 'field-full');
   }
 

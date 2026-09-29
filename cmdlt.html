@@ -6,9 +6,9 @@
   <meta name="description" content="Calendario, contactos y tareas de equipo — Centro Médico Docente de La Trinidad.">
   <title>CMDLT — Centro Médico Docente de La Trinidad</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./cmdlt.css?v=4">
+  <link rel="stylesheet" href="./cmdlt.css?v=5">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./cmdlt.js?v=5" defer></script>
+  <script src="./cmdlt.js?v=6" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -106,6 +106,8 @@
           <input id="contact-search" type="text" placeholder="Buscar por nombre o rol…" autocomplete="off">
           <button id="contact-search-clear" class="search-clear" type="button" aria-label="Limpiar búsqueda" onclick="window.cmdltAction(event)" hidden>×</button>
         </div>
+        <label class="sr-only" for="contact-status-filter">Filtrar por estado</label>
+        <select id="contact-status-filter" class="input"></select>
         <p id="contact-result-count" class="result-count" aria-live="polite"></p>
       </div>
       <div id="contacts-list" class="contact-grid"></div>
@@ -247,6 +249,10 @@
           <label for="field-contact-email">Correo electrónico</label>
           <input id="field-contact-email" class="input" name="email" type="email">
         </div>
+        <div class="field">
+          <label for="field-contact-status">Estado</label>
+          <select id="field-contact-status" class="input" name="status"></select>
+        </div>
         <div class="field field-full">
           <label for="field-contact-notes">Notas</label>
           <textarea id="field-contact-notes" class="input" name="notes"></textarea>
@@ -258,6 +264,24 @@
         <button class="btn btn-primary" type="submit">Guardar</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="contact-detail-dialog" class="editor-dialog" aria-labelledby="contact-detail-title">
+    <div class="dialog-form">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">🤝 Equipo</p>
+          <h2 id="contact-detail-title">Contacto</h2>
+        </div>
+        <button id="contact-detail-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.cmdltAction(event)">×</button>
+      </div>
+      <div id="contact-detail-body" class="dialog-fields contact-details" style="padding: 4px 20px 20px;"></div>
+      <div class="dialog-actions contact-detail-actions">
+        <button id="contact-detail-vcard" class="btn btn-secondary" type="button" onclick="window.cmdltAction(event)">📇 Guardar contacto</button>
+        <button id="contact-detail-delete" class="btn btn-secondary" type="button" onclick="window.cmdltAction(event)">🗑️ Eliminar</button>
+        <button id="contact-detail-edit" class="btn btn-primary" type="button" onclick="window.cmdltAction(event)">✏️ Editar</button>
+      </div>
+    </div>
   </dialog>
 
   <dialog id="task-dialog" class="editor-dialog" aria-labelledby="task-dialog-title">

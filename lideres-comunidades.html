@@ -6,9 +6,9 @@
   <meta name="description" content="Contactos de líderes comunitarios agrupados por comunidad y tablero operativo de seguimiento.">
   <title>Líderes de Comunidades — Contactos y seguimiento</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./lideres-comunidades.css?v=5">
+  <link rel="stylesheet" href="./lideres-comunidades.css?v=6">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./lideres-comunidades.js?v=5" defer></script>
+  <script src="./lideres-comunidades.js?v=6" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -134,6 +134,24 @@
         <button class="btn btn-primary" type="submit">Guardar</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="contact-detail-dialog" class="editor-dialog" aria-labelledby="contact-detail-title">
+    <div class="dialog-form">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">👥 Directorio</p>
+          <h2 id="contact-detail-title">Líder</h2>
+        </div>
+        <button id="contact-detail-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.lideresAction(event)">×</button>
+      </div>
+      <div id="contact-detail-body" class="contact-details" style="padding: 4px 20px 20px;"></div>
+      <div class="dialog-actions contact-detail-actions">
+        <button id="contact-detail-vcard" class="btn btn-secondary" type="button" onclick="window.lideresAction(event)">📇 Guardar contacto</button>
+        <button id="contact-detail-archive" class="btn btn-secondary" type="button" onclick="window.lideresAction(event)">🗄️ Archivar</button>
+        <button id="contact-detail-edit" class="btn btn-primary" type="button" onclick="window.lideresAction(event)">✏️ Editar</button>
+      </div>
+    </div>
   </dialog>
 </body>
 </html>

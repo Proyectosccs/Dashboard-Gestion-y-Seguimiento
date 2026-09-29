@@ -6,11 +6,11 @@
   <meta name="description" content="Control operativo móvil para eventos de Coalición Venezuela y Fundación Ingenia.">
   <title>Resumen — Evento Coalición Venezuela</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./evento-coalicion-venezuela.css?v=10">
+  <link rel="stylesheet" href="./evento-coalicion-venezuela.css?v=11">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-  <script src="./evento-coalicion-venezuela.js?v=22" defer></script>
+  <script src="./evento-coalicion-venezuela.js?v=24" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -168,6 +168,8 @@
           <input id="contact-search" type="text" placeholder="Buscar por nombre o rol…" autocomplete="off">
           <button id="contact-search-clear" class="search-clear" type="button" aria-label="Limpiar búsqueda" onclick="window.coalicionAction(event)" hidden>×</button>
         </div>
+        <label class="sr-only" for="contact-status-filter">Filtrar por estado</label>
+        <select id="contact-status-filter" class="toolbar-select"></select>
         <p id="contact-result-count" class="result-count" aria-live="polite"></p>
       </div>
       <div id="contacts-list" class="contact-grid"></div>
@@ -331,6 +333,24 @@
         </button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="contact-detail-dialog" class="editor-dialog" aria-labelledby="contact-detail-title">
+    <div class="dialog-form">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">Equipo del evento</p>
+          <h2 id="contact-detail-title">Responsable</h2>
+        </div>
+        <button id="contact-detail-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.coalicionAction(event)">×</button>
+      </div>
+      <div id="contact-detail-body" class="contact-details" style="padding: 4px 20px 20px;"></div>
+      <div class="dialog-actions contact-detail-actions">
+        <button id="contact-detail-vcard" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)">📇 Guardar contacto</button>
+        <button id="contact-detail-delete" class="btn btn-secondary" type="button" onclick="window.coalicionAction(event)">🗑️ Eliminar</button>
+        <button id="contact-detail-edit" class="btn btn-primary" type="button" onclick="window.coalicionAction(event)">✏️ Editar</button>
+      </div>
+    </div>
   </dialog>
 
   <dialog id="customize-dialog" class="editor-dialog" aria-labelledby="customize-dialog-title">

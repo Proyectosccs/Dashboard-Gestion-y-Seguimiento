@@ -166,6 +166,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .contact-row-label { color: var(--color-neutral-600); }
 .contact-row-value { min-width: 0; overflow-wrap: anywhere; text-align: right; }
 .contact-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: auto; }
+.contact-card-compact { min-height: auto; padding: 14px 16px; gap: 8px; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; }
+.contact-card-compact:hover, .contact-card-compact:focus-visible { transform: translateY(-2px); box-shadow: var(--shadow-md); outline: none; }
+.contact-mini-row { font-size: 12.5px; color: var(--color-neutral-700); overflow-wrap: anywhere; }
+.contact-status-pill { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--color-neutral-200); color: var(--color-neutral-700); }
+.contact-status-pill.status-contacted { background: color-mix(in srgb, #2f9e63 20%, white); color: #1f7a4c; }
+.contact-detail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .phone-field { display: flex; gap: 6px; }
 .phone-field .phone-code { flex: 0 0 96px; padding-left: 8px; padding-right: 4px; }
 .phone-field .phone-number { flex: 1; min-width: 0; }

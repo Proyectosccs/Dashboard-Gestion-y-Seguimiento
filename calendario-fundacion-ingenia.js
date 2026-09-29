@@ -95,6 +95,45 @@
     return digits ? code + digits : '';
   }
 
+  // Estado de contacto (contactado o no) — mismo catálogo en todos los
+  // dashboards con contactos. UCV es la excepción: su propio "status" es
+  // texto libre y se traduce a este catálogo solo para filtrar/mostrar acá
+  // (ver loadAll), sin tocar su campo original.
+  const CONTACT_STATUSES = [
+    { key: 'pending', label: 'Pendiente', emoji: '○' },
+    { key: 'contacted', label: 'Contactado', emoji: '📞' }
+  ];
+  const CONTACT_STATUS_MAP = {};
+  CONTACT_STATUSES.forEach(function (s) { CONTACT_STATUS_MAP[s.key] = s; });
+  function contactStatusInfo(c) { return CONTACT_STATUS_MAP[c && c.status] || CONTACT_STATUSES[0]; }
+  function populateContactStatusSelect(selectEl, current) {
+    renderMarkup(selectEl, CONTACT_STATUSES.map(function (s) { return '<option value="' + s.key + '">' + s.emoji + ' ' + s.label + '</option>'; }).join(''));
+    selectEl.value = current || CONTACT_STATUSES[0].key;
+  }
+  function populateContactStatusFilter(selectEl) {
+    renderMarkup(selectEl, '<option value="">Todos los estados</option>' + CONTACT_STATUSES.map(function (s) { return '<option value="' + s.key + '">' + s.emoji + ' ' + s.label + '</option>'; }).join(''));
+  }
+  function downloadVCard(c) {
+    if (!c) return;
+    const lines = ['BEGIN:VCARD', 'VERSION:3.0', 'FN:' + (c.name || 'Contacto')];
+    if (c.role) lines.push('TITLE:' + c.role);
+    const info = sourceInfo(c.source);
+    if (info && info.label) lines.push('ORG:' + info.label);
+    if (c.phone) lines.push('TEL;TYPE=CELL:' + c.phone);
+    if (c.email) lines.push('EMAIL:' + c.email);
+    if (c.notes) lines.push('NOTE:' + String(c.notes).replace(/\r?\n/g, '\\n'));
+    lines.push('END:VCARD');
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/vcard' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (c.name || 'contacto').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') + '.vcf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   // Organizaciones cuyos contactos se pueden agregar/editar desde este
   // tablero — Networking queda fuera: no es una organización aliada con
   // contactos propios.
@@ -239,7 +278,9 @@
     contacts: [],
     contactQuery: '',
     contactOrgFilter: '',
+    contactStatusFilter: '',
     editingContact: null,
+    viewingContact: null,
     customCalendars: [],
     tasks: [],
     teamMembers: [],
@@ -258,6 +299,8 @@
     kpiOrgFilter: '',
     reunionOrgFilter: '',
     pendientesDraft: [],
+    minutaFilesDraft: [],
+    minutaFileUploading: false,
     editingResponsableId: null,
     ui: cloneUI(DEFAULT_UI),
     customizeForm: cloneUI(DEFAULT_UI)
@@ -298,6 +341,10 @@
       'contact-delete': deleteEditingContact,
       'contact-search-clear': clearContactSearch,
       'field-contact-org': onContactOrgChange,
+      'contact-detail-close': closeContactDetail,
+      'contact-detail-edit': editFromContactDetail,
+      'contact-detail-delete': deleteFromContactDetail,
+      'contact-detail-vcard': function () { downloadVCard(state.viewingContact); },
       'new-task-btn': openTaskDialog,
       'task-dialog-close': closeTaskDialog,
       'task-dialog-cancel': closeTaskDialog,
@@ -341,6 +388,9 @@
     }
     if (target.dataset.contactId) {
       openContactDialog(findById(state.contacts, target.dataset.contactId));
+    }
+    if (target.dataset.contactDetailId) {
+      openContactDetail(findById(state.contacts, target.dataset.contactDetailId));
     }
     if (target.dataset.taskId) {
       openTaskDialog(findById(state.tasks, target.dataset.taskId));
@@ -404,6 +454,13 @@
       state.contactOrgFilter = dom.contactOrgFilter.value;
       renderContacts();
     });
+    populateContactStatusFilter(dom.contactStatusFilter);
+    dom.contactStatusFilter.addEventListener('change', function () {
+      state.contactStatusFilter = dom.contactStatusFilter.value;
+      renderContacts();
+    });
+    dom.contactDetailDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeContactDetail(); });
+    dom.eventMinutaFileInput.addEventListener('change', onMinutaFileSelected);
     dom.taskForm.addEventListener('submit', onTaskSubmit);
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
     dom.tasksOrgFilter.addEventListener('change', function () {
@@ -519,6 +576,9 @@
     dom.resumenUpcoming = document.getElementById('resumen-upcoming');
     dom.eventMeetingField = document.getElementById('event-meeting-field');
     dom.eventPendientesList = document.getElementById('event-pendientes-list');
+    dom.eventMinutaFilesList = document.getElementById('event-minuta-files-list');
+    dom.eventMinutaFileInput = document.getElementById('event-minuta-file-input');
+    dom.eventMinutaFileStatus = document.getElementById('event-minuta-file-status');
     dom.reunionesOrgFilter = document.getElementById('reuniones-org-filter');
     dom.reunionesList = document.getElementById('reuniones-list');
     dom.contactSearch = document.getElementById('contact-search');
@@ -538,7 +598,13 @@
     dom.contactUnitSelect = document.getElementById('field-contact-unit');
     dom.contactRoleField = document.getElementById('contact-role-field');
     dom.contactNotesField = document.getElementById('contact-notes-field');
+    dom.contactStatusField = document.getElementById('contact-status-field');
+    dom.contactStatusSelect = document.getElementById('field-contact-status');
+    dom.contactStatusFilter = document.getElementById('contact-status-filter');
     dom.contactDelete = document.getElementById('contact-delete');
+    dom.contactDetailDialog = document.getElementById('contact-detail-dialog');
+    dom.contactDetailTitle = document.getElementById('contact-detail-title');
+    dom.contactDetailBody = document.getElementById('contact-detail-body');
   }
 
   function toast(message, tone) {
@@ -624,7 +690,7 @@
         const contactsRow = customRows.find(function (r) { return r.key === 'ingenia-custom-' + c.id + '-contacts-v1'; });
         const contactItems = Array.isArray(contactsRow && contactsRow.value) ? contactsRow.value : [];
         contactItems.forEach(function (contact) {
-          customContacts.push({ id: c.id + '-' + contact.id, rawId: contact.id, source: c.id, name: contact.name, role: contact.role, phone: contact.phone, email: contact.email, notes: contact.notes, raw: contact });
+          customContacts.push({ id: c.id + '-' + contact.id, rawId: contact.id, source: c.id, name: contact.name, role: contact.role, phone: contact.phone, email: contact.email, notes: contact.notes, status: contact.status || 'pending', raw: contact });
         });
       });
     }
@@ -662,17 +728,21 @@
     state.events = coalicionEvents.concat(florangelEvents, ucvEvents, networkingEvents, otrosEvents, cmdltEvents, customEvents).filter(function (e) { return !!e.date; });
 
     const coalicionContacts = (coalicionContactsRes.data || []).map(function (c) {
-      return { id: 'coalicion-' + c.id, rawId: c.id, source: 'coalicion', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, raw: c };
+      return { id: 'coalicion-' + c.id, rawId: c.id, source: 'coalicion', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, status: c.status || 'pending', raw: c };
     });
     const florangelContacts = (Array.isArray(florangelContactsRes.data && florangelContactsRes.data.value) ? florangelContactsRes.data.value : []).map(function (c) {
-      return { id: 'florangel-' + c.id, rawId: c.id, source: 'florangel', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, raw: c };
+      return { id: 'florangel-' + c.id, rawId: c.id, source: 'florangel', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, status: c.status || 'pending', raw: c };
     });
     const cmdltContactsRaw = ingeniaRowsEarly.find(function (r) { return r.key === 'cmdlt-contacts-v1'; });
     const cmdltContacts = (Array.isArray(cmdltContactsRaw && cmdltContactsRaw.value) ? cmdltContactsRaw.value : []).map(function (c) {
-      return { id: 'cmdlt-' + c.id, rawId: c.id, source: 'cmdlt', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, raw: c };
+      return { id: 'cmdlt-' + c.id, rawId: c.id, source: 'cmdlt', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, status: c.status || 'pending', raw: c };
     });
     const ucvContacts = (Array.isArray(ucvContactsRes.data && ucvContactsRes.data.value) ? ucvContactsRes.data.value : []).map(function (c) {
-      return { id: 'ucv-' + c.id, rawId: c.id, source: 'ucv', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: '', raw: c };
+      // UCV no usa el catálogo pending/contacted — tiene su propio campo de
+      // texto libre "status" (más rico, ver Jerarquía/Contactos de UCV). Para
+      // el filtro unificado de Networking, se traduce: "Por confirmar" (o
+      // vacío) = pendiente, cualquier otro valor ya escrito = contactado.
+      return { id: 'ucv-' + c.id, rawId: c.id, source: 'ucv', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: '', status: (c.status && c.status !== 'Por confirmar') ? 'contacted' : 'pending', raw: c };
     });
     state.contacts = coalicionContacts.concat(florangelContacts, cmdltContacts, ucvContacts, customContacts).filter(function (c) { return !!c.name; });
 
@@ -1203,7 +1273,8 @@
     const participants = Array.isArray(raw.participants) ? raw.participants : [];
     const minuta = raw.minuta || '';
     const pendientes = Array.isArray(raw.pendientes) ? raw.pendientes : [];
-    return { status: status, endTime: endTime, jornadaType: jornadaType, specialties: specialties, collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, pendientes: pendientes };
+    const minutaFiles = Array.isArray(raw.minuta_files) ? raw.minuta_files : (Array.isArray(raw.minutaFiles) ? raw.minutaFiles : []);
+    return { status: status, endTime: endTime, jornadaType: jornadaType, specialties: specialties, collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, pendientes: pendientes, minutaFiles: minutaFiles };
   }
 
   // Fuentes que tienen su propia lista de contactos, para ofrecerlos en
@@ -1337,6 +1408,8 @@
       dom.eventMeetingField.hidden = extra.jornadaType !== 'reunion';
       state.pendientesDraft = extra.pendientes.map(function (p) { return Object.assign({}, p); });
       renderPendientesList();
+      state.minutaFilesDraft = extra.minutaFiles.map(function (f) { return Object.assign({}, f); });
+      renderMinutaFilesList();
     } else {
       dom.eventForm.elements.event_date.value = state.selectedDay || new Date().toISOString().slice(0, 10);
       dom.eventForm.elements.participates_ingenia.value = 'no';
@@ -1350,6 +1423,8 @@
       dom.eventMeetingField.hidden = presetJornadaType !== 'reunion';
       state.pendientesDraft = [];
       renderPendientesList();
+      state.minutaFilesDraft = [];
+      renderMinutaFilesList();
     }
     dom.eventDialog.showModal();
     dom.eventForm.elements.title.focus();
@@ -1434,6 +1509,52 @@
     if (last) last.focus();
   }
 
+  const MINUTA_FILES_BUCKET = 'reuniones-archivos';
+
+  function renderMinutaFilesList() {
+    if (!state.minutaFilesDraft.length) {
+      renderMarkup(dom.eventMinutaFilesList, '<p style="font-size:12px;color:var(--color-neutral-600)">Sin archivos adjuntos todavía.</p>');
+      return;
+    }
+    renderMarkup(dom.eventMinutaFilesList, state.minutaFilesDraft.map(function (f) {
+      return '<div class="minuta-file-row" data-file-path="' + safe(f.path) + '">' +
+        '<a href="' + safe(f.url) + '" target="_blank" rel="noopener">📎 ' + safe(f.name) + '</a>' +
+        '<button type="button" class="minuta-file-remove" data-path="' + safe(f.path) + '" aria-label="Quitar archivo">🗑️</button>' +
+      '</div>';
+    }).join(''));
+    dom.eventMinutaFilesList.querySelectorAll('.minuta-file-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () { removeMinutaFile(btn.dataset.path); });
+    });
+  }
+
+  async function onMinutaFileSelected(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    state.minutaFileUploading = true;
+    dom.eventMinutaFileStatus.textContent = 'Subiendo "' + file.name + '"…';
+    dom.eventMinutaFileStatus.hidden = false;
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]+/g, '_');
+    const path = 'reuniones/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '-' + safeName;
+    try {
+      const upload = await state.client.storage.from(MINUTA_FILES_BUCKET).upload(path, file, { upsert: false });
+      if (upload.error) throw upload.error;
+      const publicUrl = state.client.storage.from(MINUTA_FILES_BUCKET).getPublicUrl(path).data.publicUrl;
+      state.minutaFilesDraft.push({ name: file.name, path: path, url: publicUrl, size: file.size, uploaded_at: new Date().toISOString() });
+      renderMinutaFilesList();
+      dom.eventMinutaFileStatus.hidden = true;
+    } catch (_err) {
+      dom.eventMinutaFileStatus.textContent = 'No se pudo subir el archivo — revisa tu conexión.';
+    }
+    state.minutaFileUploading = false;
+    e.target.value = '';
+  }
+
+  async function removeMinutaFile(path) {
+    state.minutaFilesDraft = state.minutaFilesDraft.filter(function (f) { return f.path !== path; });
+    renderMinutaFilesList();
+    try { await state.client.storage.from(MINUTA_FILES_BUCKET).remove([path]); } catch (_err) { /* no crítico */ }
+  }
+
   // Crea una tarea de equipo a partir de un pendiente de la minuta, sin
   // cerrar el diálogo del evento — el pendiente queda enlazado a esa tarea
   // (taskId) para no volver a crearla dos veces.
@@ -1480,7 +1601,9 @@
     const participants = readParticipants();
     const minuta = jornadaType === 'reunion' ? dom.eventForm.elements.minuta.value.trim() : '';
     const pendientes = jornadaType === 'reunion' ? readPendientes() : [];
+    const minutaFiles = jornadaType === 'reunion' ? state.minutaFilesDraft : [];
     if (!title || !eventDate) { showError(dom.eventError, 'Nombre del evento y fecha son obligatorios.'); return; }
+    if (state.minutaFileUploading) { showError(dom.eventError, 'Espera a que termine de subirse el archivo.'); return; }
     if (source === 'coalicion' && !location) { showError(dom.eventError, 'Coalición Venezuela necesita una ubicación.'); return; }
 
     let newCalendarName = '';
@@ -1496,7 +1619,8 @@
       title: title, event_date: eventDate, start_time: startTime, end_time: endTime,
       location: location, status: status, notes: notes,
       participatesIngenia: participatesIngenia, jornadaType: jornadaType, specialties: specialties,
-      collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, pendientes: pendientes
+      collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, pendientes: pendientes,
+      minutaFiles: minutaFiles
     };
     let existing = state.editingEvent;
 
@@ -1850,6 +1974,7 @@
       '<p class="reunion-card-title">' + safe(e.title) + '</p>' +
       (minutaPreview ? '<p class="reunion-card-minuta">' + safe(minutaPreview) + '</p>' : '<p class="reunion-card-minuta reunion-card-empty">Sin minuta todavía</p>') +
       (pendientesTotal ? '<span class="reunion-card-pendientes">📋 ' + pendientesDone + '/' + pendientesTotal + ' pendientes resueltos</span>' : '') +
+      (extra.minutaFiles.length ? '<span class="reunion-card-pendientes">📎 ' + extra.minutaFiles.length + ' archivo' + (extra.minutaFiles.length > 1 ? 's' : '') + ' adjunto' + (extra.minutaFiles.length > 1 ? 's' : '') + '</span>' : '') +
     '</button>';
   }
 
@@ -1911,6 +2036,9 @@
     dom.contactUcvFields.hidden = org !== 'ucv';
     dom.contactRoleField.hidden = org === 'ucv';
     dom.contactNotesField.hidden = org === 'ucv';
+    // UCV ya tiene su propio estado (texto libre, rico) en su dashboard —
+    // este selector pending/contacted no aplica ahí, para no pisarlo.
+    dom.contactStatusField.hidden = org === 'ucv';
   }
 
   function handleContactSearch(e) {
@@ -1928,7 +2056,9 @@
   function renderContacts() {
     const query = normalizeText(state.contactQuery);
     const orgFilter = state.contactOrgFilter || null;
+    const statusFilter = state.contactStatusFilter || null;
     const contacts = state.contacts.filter(function (c) {
+      if (statusFilter && (c.status || 'pending') !== statusFilter) return false;
       return (!orgFilter || c.source === orgFilter) && (!query || normalizeText([c.name, c.role].join(' ')).indexOf(query) > -1);
     });
     dom.contactResultCount.textContent = contacts.length + ' de ' + state.contacts.length + ' contactos';
@@ -1939,19 +2069,15 @@
     }
     renderMarkup(dom.contactsList, contacts.map(function (c) {
       const info = sourceInfo(c.source);
-      const phone = c.phone ? '<a href="tel:' + safe(c.phone) + '">' + safe(c.phone) + '</a>' : 'Por confirmar';
-      const email = c.email ? '<a href="mailto:' + safe(c.email) + '">' + safe(c.email) + '</a>' : 'Por confirmar';
-      return '<article class="contact-card" style="--affiliation-color:' + safe(info.color) + '">' +
-        '<div class="contact-card-header"><div class="contact-avatar" aria-hidden="true">' + safe(initials(c.name)) + '</div><div><h3>' + safe(c.name) + '</h3><div class="contact-role">' + safe(c.role || 'Contacto') + '</div></div></div>' +
-        '<div class="contact-chips"><span class="org-tag" style="--source-color:' + safe(info.color) + '">' + safe(info.label) + '</span></div>' +
-        '<div class="contact-details">' +
-          '<div class="contact-row"><span class="contact-row-label">◉ Teléfono</span><span class="contact-row-value">' + phone + '</span></div>' +
-          '<div class="contact-row"><span class="contact-row-label">✉ Correo</span><span class="contact-row-value">' + email + '</span></div>' +
-          (c.notes ? '<div class="contact-row"><span class="contact-row-label">↳ Notas</span><span class="contact-row-value">' + safe(c.notes) + '</span></div>' : '') +
-        '</div>' +
-        '<div class="contact-card-actions">' +
-          '<button class="btn btn-secondary" type="button" data-contact-id="' + safe(c.id) + '" onclick="window.ingeniaAction(event)">Editar contacto</button>' +
-        '</div>' +
+      const phone = c.phone ? safe(c.phone) : 'Por confirmar';
+      const email = c.email ? safe(c.email) : 'Por confirmar';
+      const status = contactStatusInfo(c);
+      return '<article class="contact-card contact-card-compact" style="--affiliation-color:' + safe(info.color) + '" data-contact-detail-id="' + safe(c.id) + '" tabindex="0" role="button" aria-label="Ver detalle de ' + safe(c.name) + '" onclick="window.ingeniaAction(event)">' +
+        '<div class="contact-card-header"><div class="contact-avatar" aria-hidden="true">' + safe(initials(c.name)) + '</div><div><h3>' + safe(c.name) + '</h3>' +
+          '<div class="contact-chips"><span class="org-tag" style="--source-color:' + safe(info.color) + '">' + safe(info.label) + '</span><span class="contact-status-pill status-' + safe(status.key) + '">' + safe(status.emoji) + ' ' + safe(status.label) + '</span></div>' +
+        '</div></div>' +
+        '<div class="contact-mini-row">📱 ' + phone + '</div>' +
+        '<div class="contact-mini-row">✉ ' + email + '</div>' +
       '</article>';
     }).join(''));
   }
@@ -1964,12 +2090,11 @@
     renderMarkup(dom.contactUcvRoleSelect, UCV_ROLES.map(function (r) { return '<option value="' + safe(r.id) + '">' + r.label + '</option>'; }).join(''));
     renderMarkup(dom.contactUnitSelect, UCV_UNITS.map(function (u) { return '<option value="' + safe(u.id) + '">' + safe(u.label) + '</option>'; }).join(''));
     dom.contactDialogTitle.textContent = existing ? 'Editar contacto' : 'Agregar contacto';
-    // Coalición no ofrece eliminar contactos en su propio tablero (no hay
-    // acción de archivar para esa entidad) — se mantiene la misma regla acá.
-    dom.contactDelete.hidden = !existing || existing.source === 'coalicion';
+    dom.contactDelete.hidden = !existing;
     const parsedPhone = splitPhone(existing ? existing.phone : '');
     populatePhoneCodeSelect(dom.contactPhoneCode, parsedPhone.code);
     dom.contactForm.elements.phone_number.value = parsedPhone.number;
+    populateContactStatusSelect(dom.contactStatusSelect, existing ? existing.status : '');
     if (existing) {
       dom.contactOrgSelect.value = existing.source;
       dom.contactForm.elements.name.value = existing.name || '';
@@ -2007,6 +2132,7 @@
       phone: phone,
       email: dom.contactForm.elements.email.value.trim(),
       notes: dom.contactForm.elements.notes.value.trim(),
+      status: dom.contactStatusSelect.value || 'pending',
       belongsTo: dom.contactForm.elements.belongs_to.value,
       nationalId: dom.contactForm.elements.national_id.value.trim(),
       ucvRole: dom.contactForm.elements.ucv_role.value,
@@ -2072,7 +2198,7 @@
           action: 'save', entity: 'contact', id: existing ? existing.rawId : null,
           payload: {
             name: fields.name, role: fields.role, phone: fields.phone, email: fields.email,
-            notes: fields.notes, belongs_to: fields.belongsTo, national_id: fields.nationalId
+            notes: fields.notes, status: fields.status, belongs_to: fields.belongsTo, national_id: fields.nationalId
           }
         })
       });
@@ -2085,18 +2211,29 @@
     const next = upsertById(current, existing, function (base) {
       return Object.assign({}, base, {
         id: existing ? existing.rawId : uid(), name: fields.name, role: fields.role,
-        phone: fields.phone, email: fields.email, notes: fields.notes
+        phone: fields.phone, email: fields.email, notes: fields.notes, status: fields.status || 'pending'
       });
     });
     return writeBoardKey(table, key, next);
   }
 
   async function deleteContactFromSource(existing) {
-    if (existing.source === 'coalicion') return false;
+    if (existing.source === 'coalicion') return deleteCoalicionContact(existing);
     if (existing.source === 'florangel') return deleteFromArrayKey('florangel_board_state', 'florangel-contacts-v1', existing.rawId);
     if (existing.source === 'cmdlt') return deleteFromArrayKey('ingenia_board_state', 'cmdlt-contacts-v1', existing.rawId);
     if (existing.source === 'ucv') return deleteUcvContact(existing);
     return deleteFromArrayKey('ingenia_board_state', 'ingenia-custom-' + existing.source + '-contacts-v1', existing.rawId);
+  }
+
+  async function deleteCoalicionContact(existing) {
+    try {
+      const res = await fetch(COALICION_EDITOR_URL, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'archive', entity: 'contact', id: existing.rawId })
+      });
+      return res.ok;
+    } catch (_err) { return false; }
   }
 
   // Igual que deleteContact en Directorio y Agenda Relaciones UCV.dc.html:
@@ -2113,13 +2250,48 @@
 
   async function deleteEditingContact() {
     const existing = state.editingContact;
-    if (!existing || existing.source === 'coalicion') return;
+    if (!existing) return;
     const submitBtn = dom.contactForm.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     const ok = await deleteContactFromSource(existing);
     submitBtn.disabled = false;
     if (!ok) { showError(dom.contactError, 'No se pudo eliminar — revisa tu conexión.'); return; }
     closeContactDialog();
+    await loadAll();
+    toast('Contacto eliminado.', 'success');
+  }
+
+  function openContactDetail(c) {
+    if (!c) return;
+    state.viewingContact = c;
+    const info = sourceInfo(c.source);
+    const status = contactStatusInfo(c);
+    dom.contactDetailTitle.textContent = c.name || 'Contacto';
+    renderMarkup(dom.contactDetailBody,
+      '<div class="contact-row"><span class="contact-row-label">🏷️ Organización</span><span class="contact-row-value">' + safe(info.label) + '</span></div>' +
+      '<div class="contact-row"><span class="contact-row-label">Rol</span><span class="contact-row-value">' + safe(c.role || 'Contacto') + '</span></div>' +
+      '<div class="contact-row"><span class="contact-row-label">◉ Teléfono</span><span class="contact-row-value">' + (c.phone ? '<a href="tel:' + safe(c.phone) + '">' + safe(c.phone) + '</a>' : 'Por confirmar') + '</span></div>' +
+      '<div class="contact-row"><span class="contact-row-label">✉ Correo</span><span class="contact-row-value">' + (c.email ? '<a href="mailto:' + safe(c.email) + '">' + safe(c.email) + '</a>' : 'Por confirmar') + '</span></div>' +
+      '<div class="contact-row"><span class="contact-row-label">Estado</span><span class="contact-row-value">' + safe(status.emoji) + ' ' + safe(status.label) + '</span></div>' +
+      (c.notes ? '<div class="contact-row"><span class="contact-row-label">↳ Notas</span><span class="contact-row-value">' + safe(c.notes) + '</span></div>' : '')
+    );
+    dom.contactDetailDialog.showModal();
+  }
+
+  function closeContactDetail() { dom.contactDetailDialog.close(); state.viewingContact = null; }
+
+  function editFromContactDetail() {
+    const c = state.viewingContact;
+    closeContactDetail();
+    openContactDialog(c);
+  }
+
+  async function deleteFromContactDetail() {
+    const c = state.viewingContact;
+    if (!c) return;
+    closeContactDetail();
+    const ok = await deleteContactFromSource(c);
+    if (!ok) { toast('No se pudo eliminar — revisa tu conexión.', 'error'); return; }
     await loadAll();
     toast('Contacto eliminado.', 'success');
   }
@@ -2302,7 +2474,7 @@
             jornada_type: fields.jornadaType, specialties: fields.specialties,
             collaborating_orgs: fields.collaboratingOrgs, participants: fields.participants,
             participo_fundacion_ingenia: fields.participatesIngenia,
-            minuta: fields.minuta, pendientes: fields.pendientes
+            minuta: fields.minuta, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
           }
         })
       });
@@ -2330,7 +2502,7 @@
         location: fields.location, status: fields.status, notes: fields.notes,
         participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
         specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
-        minuta: fields.minuta, pendientes: fields.pendientes
+        minuta: fields.minuta, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
       });
     });
     return writeBoardKey('florangel_board_state', 'florangel-events-v1', next);
@@ -2355,7 +2527,7 @@
           location: fields.location, status: sharedStatus,
           notes: fields.notes, participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
           specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
-          minuta: fields.minuta, pendientes: fields.pendientes
+          minuta: fields.minuta, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
         });
       });
       return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
@@ -2367,7 +2539,7 @@
       owner: '', doctors: '', students: '', assignedVolunteers: [], checks: {}, notes: fields.notes,
       participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
       specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
-      minuta: fields.minuta, pendientes: fields.pendientes
+      minuta: fields.minuta, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
     });
     return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
   }
@@ -2381,7 +2553,7 @@
         location: fields.location, status: fields.status, notes: fields.notes,
         participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
         specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
-        minuta: fields.minuta, pendientes: fields.pendientes
+        minuta: fields.minuta, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
       });
     });
     return writeBoardKey('ingenia_board_state', key, next);

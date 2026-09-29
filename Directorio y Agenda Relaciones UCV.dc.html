@@ -512,7 +512,7 @@
     <sc-if value="{{ isList }}" hint-placeholder-val="{{ false }}">
       <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 14px">
         <sc-for list="{{ listContacts }}" as="c" hint-placeholder-count="6">
-          <div style="{{ c.cardStyle }}">
+          <div onClick="{{ c.open }}" style="{{ c.cardStyle }}">
             <div style="display: flex; gap: 12px; align-items: center">
               <div style="{{ c.avatarStyle }}">{{ c.emoji }}</div>
               <div style="min-width: 0; flex: 1">
@@ -524,21 +524,6 @@
             <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--color-neutral-800)">
               <div>✉️ {{ c.email }}</div>
               <div>📱 {{ c.phone }}</div>
-            </div>
-            <div style="background: var(--color-accent-2-100); border-radius: 14px; padding: 10px 12px; display: grid; gap: 4px; font-size: 12px">
-              <div>📍 Estado: <strong>{{ c.status }}</strong></div>
-              <sc-if value="{{ c.hasFunction }}" hint-placeholder-val="{{ false }}">
-                <div>🛠️ Función: <strong>{{ c.functionLabel }}</strong></div>
-              </sc-if>
-              <div>➡️ Próxima acción: {{ c.action }}</div>
-            </div>
-            <div style="background: var(--color-neutral-100); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 12px">
-              <div>🕒 Última: <strong>{{ c.lastLabel }}</strong></div>
-              <div style="{{ c.followStyle }}">⏰ Seguimiento: <strong>{{ c.followLabel }}</strong></div>
-            </div>
-            <div style="display: flex; gap: 8px">
-              <button onClick="{{ c.edit }}" style="border: 1px solid var(--color-neutral-300); background: #fff; cursor: pointer; border-radius: 999px; padding: 10px 14px; font-size: 13px; font-weight: 700; color: var(--color-text)">✏️ Editar</button>
-              <button onClick="{{ c.open }}" style="flex: 1; border: none; cursor: pointer; border-radius: 999px; padding: 10px 14px; font-size: 13px; font-weight: 700; background: var(--color-accent-500); color: #fff" style-hover="{{ primaryHover }}">✍️ Registrar interacción</button>
             </div>
           </div>
         </sc-for>
@@ -1186,9 +1171,10 @@
           <button aria-label="Cerrar ficha del contacto" onClick="{{ closeModal }}" style="border: none; background: var(--color-neutral-200); border-radius: 999px; width: 36px; height: 36px; font-size: 16px; cursor: pointer; flex: none">✕</button>
         </div>
 
-        <div style="display: flex; gap: 8px">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
           <button onClick="{{ modal.editContact }}" style="border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 8px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer">✏️ Editar contacto</button>
           <button onClick="{{ modal.deleteContact }}" style="border: 1px solid #f0bcbc; background: #fdebeb; color: #a02525; border-radius: 999px; padding: 8px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer">🗑️ Eliminar</button>
+          <button onClick="{{ modal.downloadContact }}" style="border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 8px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer">📇 Guardar contacto</button>
         </div>
 
         <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 12.5px">
@@ -1199,6 +1185,9 @@
         <div style="background: var(--color-accent-2-100); border: 1px solid var(--color-accent-2-300); border-radius: 18px; padding: 12px 14px; display: grid; gap: 5px; font-size: 12.5px">
           <div>📍 Estado actual: <strong>{{ modal.status }}</strong></div>
           <div>➡️ Próxima acción: {{ modal.action }}</div>
+          <sc-if value="{{ modal.hasFunction }}" hint-placeholder-val="{{ false }}">
+            <div>🛠️ Función: <strong>{{ modal.functionLabel }}</strong></div>
+          </sc-if>
         </div>
 
         <div style="background: #fff; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 8px">
@@ -1463,6 +1452,25 @@ function splitPhone(value) {
 function combinePhone(code, number) {
   const digits = String(number || '').trim();
   return digits ? code + digits : '';
+}
+
+function downloadVCard(c) {
+  if (!c) return;
+  const lines = ['BEGIN:VCARD', 'VERSION:3.0', 'FN:' + (c.name || 'Contacto')];
+  if (c.role) lines.push('TITLE:' + c.role);
+  if (c.phone && c.phone !== 'Por confirmar') lines.push('TEL;TYPE=CELL:' + c.phone);
+  if (c.email && c.email !== 'Por confirmar') lines.push('EMAIL:' + c.email);
+  if (c.function) lines.push('NOTE:' + String(c.function).replace(/\r?\n/g, '\\n'));
+  lines.push('END:VCARD');
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/vcard' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (c.name || 'contacto').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') + '.vcf';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 const ADMIN = [
@@ -3176,7 +3184,7 @@ class Component extends DCLogic {
         lastLabel: c.last ? TYPES[c.last.type].label + ' · ' + fmt(c.last.date) : 'Sin contacto aún',
         followLabel: c.nextFollow ? fmt(c.nextFollow) + (c.overdue ? ' (vencido)' : '') : 'Por definir',
         followStyle: { color: c.overdue ? '#a02525' : 'var(--color-neutral-800)', fontWeight: c.overdue ? 700 : 400 },
-        cardStyle: { background: '#fff', borderRadius: bubble.radius + 4, padding: bubble.padding + 2, display: 'flex', flexDirection: 'column', gap: 12, boxShadow: 'var(--shadow-sm)', borderLeft: '6px solid ' + c.meta.color },
+        cardStyle: { background: '#fff', borderRadius: bubble.radius + 4, padding: bubble.padding + 2, display: 'flex', flexDirection: 'column', gap: 12, boxShadow: 'var(--shadow-sm)', borderLeft: '6px solid ' + c.meta.color, cursor: 'pointer' },
         avatarStyle: { width: 46, height: 46, borderRadius: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flex: 'none', background: c.meta.soft },
         roleStyle: { borderRadius: 999, padding: '5px 11px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', background: r.bg, color: r.fg },
         open: () => this.openModal(c.id),
@@ -3207,9 +3215,11 @@ class Component extends DCLogic {
     const modal = m ? {
       name: m.name, emoji: mr.emoji, roleShort: mr.short, email: m.email, phone: m.phone, status: m.status, action: m.action,
       affiliation: m.meta.facultyName + ' · ' + m.meta.unitName,
+      hasFunction: !!m.function, functionLabel: m.function || '',
       avatarStyle: { width: 52, height: 52, borderRadius: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flex: 'none', background: m.meta.soft },
       editContact: () => this.openContactEdit(m.id),
       deleteContact: () => this.deleteContact(m.id),
+      downloadContact: () => downloadVCard(m),
       noHistory: m.hist.length === 0,
       history: m.hist.map(h => ({
         id: h.id,
@@ -3218,7 +3228,7 @@ class Component extends DCLogic {
         notes: h.notes,
         remove: () => this.deleteInteraction(h.id)
       }))
-    } : { history: [], noHistory: true, status: 'Por confirmar', action: 'Definir próxima acción.', editContact: () => {}, deleteContact: () => {} };
+    } : { history: [], noHistory: true, status: 'Por confirmar', action: 'Definir próxima acción.', hasFunction: false, functionLabel: '', editContact: () => {}, deleteContact: () => {}, downloadContact: () => {} };
 
     const pillBase = { border: '1px solid var(--color-neutral-300)', borderRadius: 999, padding: '9px 15px', fontSize: 13, fontWeight: 700, cursor: 'pointer' };
     const tstyle = k => Object.assign({}, pillBase, s.type === k

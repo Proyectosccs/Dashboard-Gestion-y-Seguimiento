@@ -93,10 +93,12 @@ Deno.serve(async (request: Request) => {
     }
 
     if (action === 'archive') {
-      if (body?.entity !== 'event' || typeof body?.id !== 'string') {
+      if (!['event', 'contact'].includes(body?.entity) || typeof body?.id !== 'string') {
         return jsonResponse(origin, 400, { error: 'invalid archive request' });
       }
-      const archived = await callRpc('coalicion_archive_event_public', { p_id: body.id });
+      const archived = body.entity === 'contact'
+        ? await callRpc('coalicion_archive_contact_public', { p_id: body.id })
+        : await callRpc('coalicion_archive_event_public', { p_id: body.id });
       return jsonResponse(origin, 200, { data: archived });
     }
 

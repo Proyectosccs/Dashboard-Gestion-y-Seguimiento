@@ -43,6 +43,26 @@
     return digits ? code + digits : '';
   }
 
+  function downloadVCard(c) {
+    if (!c) return;
+    const lines = ['BEGIN:VCARD', 'VERSION:3.0', 'FN:' + (c.name || 'Contacto')];
+    if (c.role) lines.push('TITLE:' + c.role);
+    if (c.community) lines.push('ORG:' + c.community);
+    if (c.phone) lines.push('TEL;TYPE=CELL:' + c.phone);
+    if (c.email) lines.push('EMAIL:' + c.email);
+    if (c.notes) lines.push('NOTE:' + String(c.notes).replace(/\r?\n/g, '\\n'));
+    lines.push('END:VCARD');
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/vcard' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (c.name || 'contacto').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') + '.vcf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   // Solo dos estados de seguimiento: pendiente por contactar y ya contactado.
   const STATUSES = [
     { key: 'pending', label: 'Pendiente', emoji: '○', color: '#82796a' },
@@ -64,6 +84,7 @@
     communityFilter: '',
     statusFilter: '',
     editor: null,
+    viewingContact: null,
     dragId: null
   };
 
@@ -82,7 +103,11 @@
       'filters-clear': clearFilters,
       'contact-dialog-close': closeContactDialog,
       'contact-dialog-cancel': closeContactDialog,
-      'contact-archive': archiveEditingContact
+      'contact-archive': archiveEditingContact,
+      'contact-detail-close': closeContactDetail,
+      'contact-detail-edit': editFromContactDetail,
+      'contact-detail-archive': archiveFromContactDetail,
+      'contact-detail-vcard': function () { downloadVCard(state.viewingContact); }
     };
     const action = actionsById[target.id];
     if (action) action();
@@ -91,6 +116,7 @@
   function handleAction(action, id) {
     if (action === 'new-contact') openContactDialog();
     if (action === 'edit-contact') openContactDialog(findById(state.contacts, id));
+    if (action === 'view-contact') openContactDetail(findById(state.contacts, id));
   }
 
   function init() {
@@ -125,6 +151,9 @@
     dom.statusSelect = document.getElementById('field-contact-status');
     dom.communityFilter = document.getElementById('community-filter');
     dom.statusFilter = document.getElementById('status-filter');
+    dom.contactDetailDialog = document.getElementById('contact-detail-dialog');
+    dom.contactDetailTitle = document.getElementById('contact-detail-title');
+    dom.contactDetailBody = document.getElementById('contact-detail-body');
   }
 
   function bindStaticEvents() {
@@ -142,6 +171,7 @@
       state.statusFilter = dom.statusFilter.value;
       renderContacts();
     });
+    dom.contactDetailDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeContactDetail(); });
   }
 
   function populateStatusSelect() {
@@ -286,28 +316,47 @@
 
   function renderContactCard(contact, color) {
     const status = STATUS_MAP[contact.status] || STATUSES[0];
-    const phone = contact.phone
-      ? '<a href="tel:' + safe(contact.phone) + '">' + safe(contact.phone) + '</a>'
-      : 'Por confirmar';
-    const email = contact.email
-      ? '<a href="mailto:' + safe(contact.email) + '">' + safe(contact.email) + '</a>'
-      : 'Por confirmar';
-    return '<article class="contact-card" style="--affiliation-color:' + safe(color) + '">' +
+    const phone = contact.phone ? safe(contact.phone) : 'Por confirmar';
+    const email = contact.email ? safe(contact.email) : 'Por confirmar';
+    return '<article class="contact-card contact-card-compact" style="--affiliation-color:' + safe(color) + '" data-action="view-contact" data-id="' + safe(contact.id) + '" tabindex="0" role="button" aria-label="Ver detalle de ' + safe(contact.name) + '" onclick="window.lideresAction(event)">' +
       '<div class="contact-card-header">' +
         '<div class="contact-avatar" aria-hidden="true">' + safe(initials(contact.name)) + '</div>' +
         '<div class="contact-card-heading"><h3>' + safe(contact.name) + '</h3><div class="contact-community-line">📍 ' + safe(communityLabel(contact.community)) + '</div></div>' +
-        '<span class="role-chip">' + safe(contact.role || 'Líder comunitario') + '</span>' +
+        '<span class="contact-status-pill status-' + safe(status.key) + '">' + safe(status.emoji) + ' ' + safe(status.label) + '</span>' +
       '</div>' +
       '<div class="contact-simple-row">✉️ ' + email + '</div>' +
       '<div class="contact-simple-row">📱 ' + phone + '</div>' +
-      '<div class="contact-status-box">' +
-        '<div>' + safe(status.emoji) + ' Estado: <strong>' + safe(status.label) + '</strong></div>' +
-        '<div>🗒️ Notas: ' + safe(contact.notes || 'Por confirmar') + '</div>' +
-      '</div>' +
-      '<div class="contact-card-actions">' +
-        '<button class="btn btn-secondary" type="button" data-action="edit-contact" data-id="' + safe(contact.id) + '" onclick="window.lideresAction(event)">✏️ Editar</button>' +
-      '</div>' +
     '</article>';
+  }
+
+  function openContactDetail(contact) {
+    if (!contact) return;
+    state.viewingContact = contact;
+    const status = STATUS_MAP[contact.status] || STATUSES[0];
+    dom.contactDetailTitle.textContent = contact.name || 'Líder';
+    renderMarkup(dom.contactDetailBody,
+      '<div class="contact-row"><span class="contact-row-label">📍 Comunidad</span><span class="contact-row-value">' + safe(communityLabel(contact.community)) + '</span></div>' +
+      '<div class="contact-row"><span class="contact-row-label">Rol</span><span class="contact-row-value">' + safe(contact.role || 'Líder comunitario') + '</span></div>' +
+      '<div class="contact-row"><span class="contact-row-label">📱 Teléfono</span><span class="contact-row-value">' + (contact.phone ? '<a href="tel:' + safe(contact.phone) + '">' + safe(contact.phone) + '</a>' : 'Por confirmar') + '</span></div>' +
+      '<div class="contact-row"><span class="contact-row-label">✉️ Correo</span><span class="contact-row-value">' + (contact.email ? '<a href="mailto:' + safe(contact.email) + '">' + safe(contact.email) + '</a>' : 'Por confirmar') + '</span></div>' +
+      '<div class="contact-row"><span class="contact-row-label">Estado</span><span class="contact-row-value">' + safe(status.emoji) + ' ' + safe(status.label) + '</span></div>' +
+      '<div class="contact-row"><span class="contact-row-label">🗒️ Notas</span><span class="contact-row-value">' + (contact.notes ? safe(contact.notes) : 'Sin notas.') + '</span></div>'
+    );
+    dom.contactDetailDialog.showModal();
+  }
+
+  function closeContactDetail() { dom.contactDetailDialog.close(); state.viewingContact = null; }
+
+  function editFromContactDetail() {
+    const contact = state.viewingContact;
+    closeContactDetail();
+    openContactDialog(contact);
+  }
+
+  async function archiveFromContactDetail() {
+    const contact = state.viewingContact;
+    closeContactDetail();
+    await archiveContact(contact);
   }
 
   function clearSearch() {
@@ -443,17 +492,22 @@
     closeContactDialog();
   }
 
-  async function archiveEditingContact() {
-    if (!state.editor) return;
-    const id = state.editor;
+  async function archiveContact(contact) {
+    if (!contact) return;
+    const id = contact.id;
     const res = await state.client.from(TABLE).update({ archived_at: new Date().toISOString() }).eq('id', id);
     if (res.error) { toast('No se pudo archivar — revisa tu conexión.', 'error'); return; }
     state.contacts = state.contacts.filter(function (c) { return c.id !== id; });
     populateCommunityFilter();
     renderContacts();
     renderStatusBoard();
-    closeContactDialog();
     toast('Líder archivado.', 'success');
+  }
+
+  async function archiveEditingContact() {
+    const contact = findById(state.contacts, state.editor);
+    await archiveContact(contact);
+    closeContactDialog();
   }
 
   // ---------- Utilidades ----------

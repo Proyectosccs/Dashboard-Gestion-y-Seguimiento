@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=23">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=25">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=25" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=27" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -112,6 +112,8 @@
           <button id="contact-search-clear" class="search-clear" type="button" aria-label="Limpiar búsqueda" onclick="window.ingeniaAction(event)" hidden>×</button>
         </div>
         <select id="contact-org-filter" class="toolbar-select"></select>
+        <label class="sr-only" for="contact-status-filter">Filtrar por estado</label>
+        <select id="contact-status-filter" class="toolbar-select"></select>
         <p id="contact-result-count" class="result-count" aria-live="polite"></p>
       </div>
       <div id="contacts-list" class="contact-grid"></div>
@@ -279,6 +281,10 @@
           <label for="field-contact-email">Correo electrónico</label>
           <input id="field-contact-email" class="input" name="email" type="email">
         </div>
+        <div class="field" id="contact-status-field">
+          <label for="field-contact-status">Estado</label>
+          <select id="field-contact-status" class="input" name="status"></select>
+        </div>
         <div class="field field-full" id="contact-notes-field">
           <label for="field-contact-notes">Notas</label>
           <textarea id="field-contact-notes" class="input" name="notes"></textarea>
@@ -290,6 +296,24 @@
         <button class="btn btn-primary" type="submit">Guardar</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="contact-detail-dialog" class="editor-dialog" aria-labelledby="contact-detail-title">
+    <div class="dialog-form">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">🤝 Equipo</p>
+          <h2 id="contact-detail-title">Contacto</h2>
+        </div>
+        <button id="contact-detail-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.ingeniaAction(event)">×</button>
+      </div>
+      <div id="contact-detail-body" class="contact-details" style="padding: 4px 20px 20px;"></div>
+      <div class="dialog-actions contact-detail-actions">
+        <button id="contact-detail-vcard" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)">📇 Guardar contacto</button>
+        <button id="contact-detail-delete" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)">🗑️ Eliminar</button>
+        <button id="contact-detail-edit" class="btn btn-primary" type="button" onclick="window.ingeniaAction(event)">✏️ Editar</button>
+      </div>
+    </div>
   </dialog>
 
   <dialog id="event-dialog" class="editor-dialog" aria-labelledby="event-dialog-title">
@@ -342,6 +366,11 @@
           <label style="margin-top: 10px">Pendientes / Acuerdos</label>
           <div id="event-pendientes-list" class="pendientes-list"></div>
           <button type="button" id="event-pendiente-add" class="btn btn-secondary" style="margin-top: 8px" onclick="window.ingeniaAction(event)">➕ Agregar pendiente</button>
+          <label style="margin-top: 10px">Archivos de la minuta</label>
+          <div id="event-minuta-files-list" class="minuta-files-list"></div>
+          <p id="event-minuta-file-status" class="result-count" hidden></p>
+          <label for="event-minuta-file-input" class="btn btn-secondary" style="margin-top: 8px; width: fit-content; cursor: pointer">📎 Adjuntar archivo</label>
+          <input id="event-minuta-file-input" type="file" accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,image/*" style="position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0">
         </div>
         <div class="field">
           <label for="field-event-date">Fecha</label>
