@@ -1660,7 +1660,19 @@
     refreshCalendarsAfterChange(eventDate);
   }
 
+  // Borra del bucket los archivos adjuntos de la minuta (si tenía) antes de
+  // borrar el evento — evita dejar archivos huérfanos en Storage. Es un
+  // best-effort: si falla, no bloquea el borrado del evento en sí.
+  async function deleteMinutaFilesForEvent(existing) {
+    const extra = readEventExtra(existing.source, existing.raw);
+    if (!extra.minutaFiles.length) return;
+    const paths = extra.minutaFiles.map(function (f) { return f.path; }).filter(Boolean);
+    if (!paths.length) return;
+    try { await state.client.storage.from(MINUTA_FILES_BUCKET).remove(paths); } catch (_err) { /* no crítico */ }
+  }
+
   async function deleteEventFromSource(existing) {
+    await deleteMinutaFilesForEvent(existing);
     if (existing.source === 'coalicion') return deleteCoalicionEvent(existing);
     if (existing.source === 'florangel') return deleteFromArrayKey('florangel_board_state', 'florangel-events-v1', existing.rawId);
     if (existing.source === 'ucv') return deleteUcvEvent(existing);
