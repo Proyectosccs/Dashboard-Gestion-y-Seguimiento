@@ -61,7 +61,8 @@
   // dashboards con contactos.
   const CONTACT_STATUSES = [
     { key: 'pending', label: 'Pendiente', emoji: '○' },
-    { key: 'contacted', label: 'Contactado', emoji: '📞' }
+    { key: 'contacted', label: 'Contactado', emoji: '📞' },
+    { key: 'waiting_response', label: 'Esperando respuesta', emoji: '⏳' }
   ];
   const CONTACT_STATUS_MAP = {};
   CONTACT_STATUSES.forEach(function (s) { CONTACT_STATUS_MAP[s.key] = s; });

@@ -418,10 +418,11 @@
 
   // Estado de contacto (contactado o no) — mismo catálogo en todos los
   // dashboards con contactos.
-  const CONTACT_STATUSES = { pending: '○ Pendiente', contacted: '📞 Contactado' };
+  const CONTACT_STATUSES = { pending: '○ Pendiente', contacted: '📞 Contactado', waiting_response: '⏳ Esperando respuesta' };
   const CONTACT_STATUS_INFO = {
     pending: { key: 'pending', label: 'Pendiente', emoji: '○' },
-    contacted: { key: 'contacted', label: 'Contactado', emoji: '📞' }
+    contacted: { key: 'contacted', label: 'Contactado', emoji: '📞' },
+    waiting_response: { key: 'waiting_response', label: 'Esperando respuesta', emoji: '⏳' }
   };
   function contactStatusInfo(c) { return CONTACT_STATUS_INFO[c && c.status] || CONTACT_STATUS_INFO.pending; }
 

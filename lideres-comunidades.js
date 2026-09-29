@@ -66,7 +66,8 @@
   // Solo dos estados de seguimiento: pendiente por contactar y ya contactado.
   const STATUSES = [
     { key: 'pending', label: 'Pendiente', emoji: '○', color: '#82796a' },
-    { key: 'contacted', label: 'Contactado', emoji: '📞', color: '#4a7fd4' }
+    { key: 'contacted', label: 'Contactado', emoji: '📞', color: '#4a7fd4' },
+    { key: 'waiting_response', label: 'Esperando respuesta', emoji: '⏳', color: '#c67139' }
   ];
   const STATUS_MAP = {};
   STATUSES.forEach(function (s) { STATUS_MAP[s.key] = s; });

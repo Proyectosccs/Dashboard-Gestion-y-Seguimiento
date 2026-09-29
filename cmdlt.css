@@ -202,6 +202,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .contact-mini-row { font-size: 12.5px; color: var(--color-neutral-700); overflow-wrap: anywhere; }
 .contact-status-pill { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--color-neutral-200); color: var(--color-neutral-700); }
 .contact-status-pill.status-contacted { background: color-mix(in srgb, #2f9e63 20%, white); color: #1f7a4c; }
+.contact-status-pill.status-waiting_response { background: color-mix(in srgb, #d97706 20%, white); color: #92400e; }
 .contact-detail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .phone-field { display: flex; gap: 6px; }
 .phone-field .phone-code { flex: 0 0 96px; padding-left: 8px; padding-right: 4px; }
