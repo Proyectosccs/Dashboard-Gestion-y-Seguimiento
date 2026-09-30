@@ -397,6 +397,12 @@
     if (target.dataset.contactId) {
       openContactDialog(findById(state.contacts, target.dataset.contactId));
     }
+    if (target.dataset.contactKpiOrg !== undefined) {
+      const org = target.dataset.contactKpiOrg;
+      state.contactOrgFilter = state.contactOrgFilter === org ? '' : org;
+      dom.contactOrgFilter.value = state.contactOrgFilter;
+      renderContacts();
+    }
     if (target.dataset.contactDetailId) {
       openContactDetail(findById(state.contacts, target.dataset.contactDetailId));
     }
@@ -594,6 +600,7 @@
     dom.contactSearchClear = document.getElementById('contact-search-clear');
     dom.contactOrgFilter = document.getElementById('contact-org-filter');
     dom.contactResultCount = document.getElementById('contact-result-count');
+    dom.contactsKpiStrip = document.getElementById('contacts-kpi-strip');
     dom.contactsList = document.getElementById('contacts-list');
     dom.contactDialog = document.getElementById('contact-dialog');
     dom.contactDialogTitle = document.getElementById('contact-dialog-title');
@@ -635,6 +642,8 @@
     document.querySelectorAll('.view').forEach(function (view) { view.hidden = true; });
     const active = document.getElementById(viewName + '-view');
     if (active) active.hidden = false;
+    // Las jornadas del mes solo tienen sentido en Calendario.
+    if (dom.kpiStrip) dom.kpiStrip.hidden = !state.kpiStripReady || viewName !== 'calendar';
   }
 
   function showConnectionFailure() {
@@ -1862,7 +1871,8 @@
     dom.kpiStripJornadas.textContent = String(stats.total);
     dom.kpiStripParticipacion.textContent = participacionPct + '%';
     dom.kpiStripCanceladas.textContent = canceladasPct + '%';
-    dom.kpiStrip.hidden = false;
+    state.kpiStripReady = true;
+    dom.kpiStrip.hidden = state.view !== 'calendar';
   }
 
   function setKpiPeriod(period) {
@@ -2081,7 +2091,28 @@
     dom.contactSearch.focus();
   }
 
+  // Total de contactos y cuántos tiene cada organización (sin importar el
+  // filtro activo). Clic en una organización = filtrar por ella; otro clic
+  // o clic en el total = quitar el filtro.
+  function renderContactsKpiStrip() {
+    if (!dom.contactsKpiStrip) return;
+    const counts = {};
+    state.contacts.forEach(function (c) { counts[c.source] = (counts[c.source] || 0) + 1; });
+    const orgs = contactOrgOptions()
+      .map(function (o) { return Object.assign({ n: counts[o.id] || 0 }, o); })
+      .filter(function (o) { return o.n > 0; })
+      .sort(function (a, b) { return b.n - a.n; });
+    const active = state.contactOrgFilter || '';
+    renderMarkup(dom.contactsKpiStrip,
+      '<button type="button" class="kpi-strip-chip" data-contact-kpi-org="" aria-pressed="' + (active ? 'false' : 'true') + '" onclick="window.ingeniaAction(event)">👥 <strong>' + state.contacts.length + '</strong> ' + (state.contacts.length === 1 ? 'contacto' : 'contactos') + ' en total</button>' +
+      '<span class="kpi-strip-divider" aria-hidden="true"></span>' +
+      orgs.map(function (o) {
+        return '<button type="button" class="kpi-strip-chip" data-contact-kpi-org="' + safe(o.id) + '" aria-pressed="' + (active === o.id ? 'true' : 'false') + '" title="Ver solo ' + safe(o.label) + '" onclick="window.ingeniaAction(event)">' + o.emoji + ' ' + safe(o.label) + ' <strong>' + o.n + '</strong></button>';
+      }).join(''));
+  }
+
   function renderContacts() {
+    renderContactsKpiStrip();
     const query = normalizeText(state.contactQuery);
     const orgFilter = state.contactOrgFilter || null;
     const statusFilter = state.contactStatusFilter || null;

@@ -911,7 +911,33 @@
     dom.contactSearch.focus();
   }
 
+  // Franja de contactos: total y cuántos hay en cada estado (sin importar
+  // el filtro activo). Clic en un estado = filtrar por él; otro clic o clic
+  // en el total = quitar el filtro.
+  function renderContactsKpiStrip() {
+    const strip = document.getElementById('contacts-kpi-strip');
+    if (!strip) return;
+    const counts = {};
+    state.contacts.forEach(function (c) { const k = c.status || 'pending'; counts[k] = (counts[k] || 0) + 1; });
+    const active = state.contactStatusFilter || '';
+    renderMarkup(strip,
+      '<button type="button" class="kpi-strip-chip" data-kpi-status="" aria-pressed="' + (active ? 'false' : 'true') + '">👥 <strong>' + state.contacts.length + '</strong> ' + (state.contacts.length === 1 ? 'contacto' : 'contactos') + ' en total</button>' +
+      '<span class="kpi-strip-divider" aria-hidden="true"></span>' +
+      CONTACT_STATUSES.map(function (s) {
+        return '<button type="button" class="kpi-strip-chip" data-kpi-status="' + safe(s.key) + '" aria-pressed="' + (active === s.key ? 'true' : 'false') + '" title="Ver solo: ' + safe(s.label) + '">' + s.emoji + ' ' + safe(s.label) + ' <strong>' + (counts[s.key] || 0) + '</strong></button>';
+      }).join(''));
+    strip.onclick = function (e) {
+      const btn = e.target.closest('[data-kpi-status]');
+      if (!btn) return;
+      const k = btn.dataset.kpiStatus;
+      state.contactStatusFilter = (k && state.contactStatusFilter !== k) ? k : '';
+      if (dom.contactStatusFilter) dom.contactStatusFilter.value = state.contactStatusFilter;
+      renderContacts();
+    };
+  }
+
   function renderContacts() {
+    renderContactsKpiStrip();
     const query = normalize(state.query);
     const contacts = state.contacts.filter(function (c) {
       if (state.contactStatusFilter && (c.status || 'pending') !== state.contactStatusFilter) return false;
