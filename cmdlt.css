@@ -294,12 +294,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .tab-button[aria-current="page"] { border: 2px solid ButtonText; }
 }
 
-/* Franja de contactos (mismo estilo que la de jornadas del calendario de
-   Networking): total y desglose por estado; cada estado filtra la lista. */
-.kpi-strip { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 20px; margin-bottom: 14px; border-radius: 14px; background: var(--color-neutral-900); }
-.kpi-strip-divider { width: 1px; height: 16px; background: rgba(255,255,255,.2); }
-.kpi-strip-chip { display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06); color: #e7e2d8; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 12.5px; cursor: pointer; }
-.kpi-strip-chip strong { font-size: 13.5px; color: #fff; }
-.kpi-strip-chip:hover { background: rgba(255,255,255,.14); }
-.kpi-strip-chip[aria-pressed="true"] { background: #fff; color: var(--color-neutral-900); border-color: #fff; }
-.kpi-strip-chip[aria-pressed="true"] strong { color: var(--color-neutral-900); }
+/* Tarjetas de contactos (mismo estilo que las de Tareas y las del directorio
+   UCV): total y desglose por estado; cada tarjeta filtra la lista. */
+.kpi-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1180px) { .kpi-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kpi-card-btn { font: inherit; text-align: left; cursor: pointer; transition: transform .12s, box-shadow .12s; }
+.kpi-card-btn:not(.kpi-primary) { border: 1px solid transparent; }
+.kpi-card-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+.kpi-card-btn[aria-pressed="true"] { outline: 2px solid var(--color-neutral-900); outline-offset: 2px; }

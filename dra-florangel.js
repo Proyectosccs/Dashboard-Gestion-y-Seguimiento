@@ -1117,7 +1117,7 @@
     dom.contactSearch.focus();
   }
 
-  // Franja de contactos: total y cuántos hay en cada estado (sin importar
+  // Tarjetas de contactos: total y cuántos hay en cada estado (sin importar
   // el filtro activo). Clic en un estado = filtrar por él; otro clic o clic
   // en el total = quitar el filtro.
   function renderContactsKpiStrip() {
@@ -1126,12 +1126,18 @@
     const counts = {};
     state.contacts.forEach(function (c) { const k = c.status || 'pending'; counts[k] = (counts[k] || 0) + 1; });
     const active = state.contactStatusFilter || '';
-    renderMarkup(strip,
-      '<button type="button" class="kpi-strip-chip" data-kpi-status="" aria-pressed="' + (active ? 'false' : 'true') + '">👥 <strong>' + state.contacts.length + '</strong> ' + (state.contacts.length === 1 ? 'contacto' : 'contactos') + ' en total</button>' +
-      '<span class="kpi-strip-divider" aria-hidden="true"></span>' +
-      CONTACT_STATUSES.map(function (s) {
-        return '<button type="button" class="kpi-strip-chip" data-kpi-status="' + safe(s.key) + '" aria-pressed="' + (active === s.key ? 'true' : 'false') + '" title="Ver solo: ' + safe(s.label) + '">' + s.emoji + ' ' + safe(s.label) + ' <strong>' + (counts[s.key] || 0) + '</strong></button>';
-      }).join(''));
+    const cards = [
+      { key: '', icon: '👥', value: state.contacts.length, label: state.contacts.length === 1 ? 'Contacto identificado' : 'Contactos identificados', cls: 'kpi-primary' },
+      { key: 'pending', icon: '○', value: counts.pending || 0, label: 'Pendientes', cls: 'kpi-neutral' },
+      { key: 'contacted', icon: '📞', value: counts.contacted || 0, label: 'Contactados', cls: 'kpi-good' },
+      { key: 'waiting_response', icon: '⏳', value: counts.waiting_response || 0, label: 'Esperando respuesta', cls: 'kpi-sky' }
+    ];
+    renderMarkup(strip, cards.map(function (c) {
+      const pressed = c.key ? active === c.key : !active;
+      return '<button type="button" class="kpi-card kpi-card-btn ' + c.cls + '" data-kpi-status="' + c.key + '" aria-pressed="' + pressed + '"' +
+        (c.key ? ' title="Ver solo: ' + safe(c.label) + '"' : ' title="Ver todos"') + '>' +
+        '<span class="kpi-icon" aria-hidden="true">' + c.icon + '</span><strong>' + c.value + '</strong><span class="kpi-label">' + safe(c.label) + '</span></button>';
+    }).join(''));
     strip.onclick = function (e) {
       const btn = e.target.closest('[data-kpi-status]');
       if (!btn) return;
