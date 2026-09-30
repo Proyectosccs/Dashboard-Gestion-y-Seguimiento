@@ -446,12 +446,16 @@
     URL.revokeObjectURL(url);
   }
 
+  // ADRA ya no es una afiliación seleccionable aquí — pasó a ser su propia
+  // organización (organizacion.html?org=adra-geuf), con su propia pestaña de
+  // Jerarquía. Se mantiene su logo en AFFILIATION_LOGOS / COLLABORATOR_STRIP_ORDER
+  // más abajo, porque ese es un reconocimiento visual de socios en el Resumen,
+  // no un valor que un contacto de Coalición pueda tener asignado.
   const AFFILIATIONS = {
     '': 'Selecciona una opción',
     'Coalicion con amor a Venezuela': 'Coalicion con amor a Venezuela',
     'Fundacion Ingenia': 'Fundacion Ingenia',
     'Voluntariado AVAA': 'Voluntariado AVAA',
-    'ADRA': 'ADRA',
     'Nodos Venezuela': 'Nodos Venezuela',
     'Voluntario Particular': 'Voluntario Particular'
   };
@@ -459,7 +463,6 @@
     'Coalicion con amor a Venezuela': 'affiliation-coalicion',
     'Fundacion Ingenia': 'affiliation-ingenia',
     'Voluntariado AVAA': 'affiliation-avaa',
-    'ADRA': 'affiliation-adra',
     'Nodos Venezuela': 'affiliation-nodos',
     'Voluntario Particular': 'affiliation-particular'
   };
