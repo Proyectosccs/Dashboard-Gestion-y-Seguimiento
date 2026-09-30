@@ -284,6 +284,7 @@
     dom.contactDetailDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeContactDetail(); });
     dom.areaForm.addEventListener('submit', onAreaSubmit);
     dom.areaDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeAreaDialog(); });
+    dom.areaContactLink.addEventListener('change', onAreaContactLinkChange);
     dom.taskForm.addEventListener('submit', onTaskSubmit);
     dom.taskDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeTaskDialog(); });
     dom.customizeForm.addEventListener('submit', onCustomizeSubmit);
@@ -352,8 +353,10 @@
     dom.areaForm = document.getElementById('area-form');
     dom.areaError = document.getElementById('area-error');
     dom.areaParentSelect = document.getElementById('field-area-parent');
+    dom.areaContactLink = document.getElementById('field-area-contact-link');
     dom.areaPhoneCode = document.getElementById('field-area-responsible-phone-code');
     dom.areaStatusSelect = document.getElementById('field-area-status');
+    dom.areaSaveAsContact = document.getElementById('field-area-save-as-contact');
     dom.areaDelete = document.getElementById('area-delete');
     dom.customHierarchyTitle = document.getElementById('field-custom-hierarchy-title');
     dom.tasksKpiGrid = document.getElementById('tasks-kpi-grid');
@@ -1088,6 +1091,28 @@
     dom.areaParentSelect.value = current || '';
   }
 
+  function populateAreaContactLink() {
+    const options = state.contacts.map(function (c) {
+      return '<option value="' + safe(c.id) + '">' + safe(c.name) + (c.role ? ' · ' + safe(c.role) : '') + '</option>';
+    }).join('');
+    renderMarkup(dom.areaContactLink, '<option value="">— Selecciona un contacto —</option>' + options);
+    dom.areaContactLink.value = '';
+  }
+
+  // Autocompleta el responsable con los datos de un contacto ya existente
+  // — es una copia puntual, no un vínculo permanente: si ese contacto
+  // cambia después, el área no se actualiza sola.
+  function onAreaContactLinkChange() {
+    const contact = findById(state.contacts, dom.areaContactLink.value);
+    if (!contact) return;
+    dom.areaForm.elements.responsible_name.value = contact.name || '';
+    const parsedPhone = splitPhone(contact.phone || '');
+    populatePhoneCodeSelect(dom.areaPhoneCode, parsedPhone.code);
+    dom.areaForm.elements.responsible_phone_number.value = parsedPhone.number;
+    dom.areaForm.elements.responsible_email.value = contact.email || '';
+    if (!dom.areaForm.elements.responsible_role.value.trim()) dom.areaForm.elements.responsible_role.value = contact.role || '';
+  }
+
   function openAreaDialog(existing, presetParentId) {
     hideError(dom.areaError);
     dom.areaForm.reset();
@@ -1096,6 +1121,7 @@
     dom.areaDelete.hidden = !existing;
     const excludeIds = existing ? [existing.id].concat(getDescendantIds(existing.id)) : [];
     populateAreaParentSelect(excludeIds, existing ? existing.parentId : (presetParentId || ''));
+    populateAreaContactLink();
     const parsedPhone = splitPhone(existing ? existing.responsiblePhone : '');
     populatePhoneCodeSelect(dom.areaPhoneCode, parsedPhone.code);
     dom.areaForm.elements.responsible_phone_number.value = parsedPhone.number;
@@ -1146,8 +1172,32 @@
     if (!ok) { showError(dom.areaError, 'No se pudo guardar — revisa tu conexión.'); return; }
     state.hierarchy = next;
     renderHierarchy();
+    if (dom.areaSaveAsContact.checked && payload.responsibleName) await saveResponsibleAsContact(payload);
     closeAreaDialog();
     toast('Área guardada.', 'success');
+  }
+
+  // Crea (o actualiza, si ya existe uno con el mismo nombre) un contacto de
+  // la organización a partir del responsable del área — para no tener que
+  // escribir sus datos dos veces si también quieres verlo en Contactos.
+  async function saveResponsibleAsContact(area) {
+    const matchName = area.responsibleName.trim().toLowerCase();
+    const next = await mutateBoardKey(CONTACTS_KEY, [], function (list) {
+      const idx = list.findIndex(function (c) { return (c.name || '').trim().toLowerCase() === matchName; });
+      const contact = {
+        id: idx > -1 ? list[idx].id : uid(),
+        name: area.responsibleName,
+        role: area.responsibleRole,
+        phone: area.responsiblePhone,
+        email: area.responsibleEmail,
+        status: idx > -1 ? list[idx].status : 'pending',
+        notes: idx > -1 ? list[idx].notes : '',
+        created_at: idx > -1 ? list[idx].created_at : new Date().toISOString()
+      };
+      if (idx > -1) { const copy = list.slice(); copy[idx] = contact; return copy; }
+      return list.concat(contact);
+    });
+    if (next !== null) { state.contacts = next; renderContacts(); }
   }
 
   async function deleteEditingArea() {

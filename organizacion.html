@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
   <link rel="stylesheet" href="./organizacion.css?v=16">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./organizacion.js?v=18" defer></script>
+  <script src="./organizacion.js?v=19" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -392,6 +392,10 @@
           <select id="field-area-parent" class="input" name="parent_id"></select>
         </div>
         <div class="field field-full">
+          <label for="field-area-contact-link">Autocompletar desde un contacto existente (opcional)</label>
+          <select id="field-area-contact-link" class="input"></select>
+        </div>
+        <div class="field field-full">
           <label for="field-area-responsible-name">Responsable — Nombre</label>
           <input id="field-area-responsible-name" class="input" name="responsible_name" type="text">
         </div>
@@ -429,6 +433,12 @@
         <div class="field field-full">
           <label for="field-area-notes">Notas</label>
           <textarea id="field-area-notes" class="input" name="notes"></textarea>
+        </div>
+        <div class="field field-full">
+          <label class="checkbox-chip" style="width: fit-content">
+            <input type="checkbox" id="field-area-save-as-contact" name="save_as_contact">
+            📇 Guardar también como contacto de la organización
+          </label>
         </div>
       </div>
       <div class="dialog-actions">
