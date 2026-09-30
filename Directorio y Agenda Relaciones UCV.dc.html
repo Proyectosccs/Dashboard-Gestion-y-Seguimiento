@@ -284,6 +284,28 @@
           <button type="button" onClick="{{ onToggleAppStatus }}" style="{{ appStatusToggleStyle }}">{{ appStatusToggleLabel }}</button>
         </div>
 
+        <div style="{{ unplacedUnit.style }}" onDragOver="{{ unplacedUnit.onUnitDragOver }}" onDragLeave="{{ unplacedUnit.onUnitDragLeave }}" onDrop="{{ unplacedUnit.onUnitDrop }}">
+          <div style="display: flex; align-items: center; gap: 10px">
+            <span style="font-size: 20px">{{ unplacedUnit.emoji }}</span>
+            <div style="{{ unplacedUnit.titleStyle }}">{{ unplacedUnit.name }}</div>
+          </div>
+          <div style="font-size: 11.5px; color: var(--color-neutral-700)">{{ unplacedUnit.hint }}</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <sc-for list="{{ unplacedUnit.contacts }}" as="c" hint-placeholder-count="1">
+              <button draggable="{{ c.draggable }}" onDragStart="{{ c.dragStart }}" onDragEnd="{{ c.dragEnd }}" onClick="{{ c.open }}" style="{{ c.chipStyle }}" style-hover="{{ chipHover }}">
+                <span style="font-size: 17px">{{ c.emoji }}</span>
+                <span style="min-width: 0; display: flex; flex-direction: column">
+                  <span style="font-size: 13px; font-weight: 700">{{ c.name }}</span>
+                  <span style="font-size: 11px; color: var(--color-neutral-700)">{{ c.roleShort }}</span>
+                </span>
+                <span style="margin-left: auto; font-size: 12px">{{ c.flag }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <button type="button" onClick="{{ unplacedUnit.addContact }}" style="align-self: flex-start; border: 1px dashed var(--color-neutral-400); background: transparent; border-radius: 999px; padding: 7px 10px; font-size: 11.5px; font-weight: 700; color: var(--color-neutral-700); cursor: pointer">➕ Agregar contacto</button>
+        </div>
+        <div style="height: 16px"></div>
+
         <div style="display: flex; justify-content: center">
           <div style="background: var(--color-neutral-900); color: #fff; border-radius: 24px; padding: 18px 34px; display: flex; align-items: center; gap: 16px; box-shadow: var(--shadow-md)">
             <span style="font-size: 30px">🎓</span>
@@ -1480,6 +1502,12 @@ const ADMIN = [
   { id: 'vad', name: 'Vicerrectorado Administrativo', emoji: '💼', color: '#ef8b2c' },
   { id: 'sg', name: 'Secretaría General', emoji: '🗂️', color: '#6b5bd6' }
 ];
+// Cajón para contactos de UCV cuya unidad todavía no se conoce. No es parte
+// de la jerarquía (no cuelga del Rectorado): se dibuja aparte, arriba del
+// organigrama, y es la unidad por defecto de un contacto nuevo — así nadie
+// queda en el Vicerrectorado Académico por accidente. Se mueve a su unidad
+// real arrastrándolo o editándolo.
+const UNPLACED = { id: 'pu', name: 'Por ubicar · sin unidad asignada', emoji: '❔', color: '#82796a' };
 
 const FACULTIES = [
   {
@@ -1757,9 +1785,16 @@ function writeLocal(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* El tablero sigue funcionando sin persistencia. */ }
 }
 
+// Hasta que no se leyó la versión real de Supabase en esta pestaña, lo que
+// hay en memoria puede ser la semilla CONTACTS o un localStorage viejo:
+// subirlo pisaría todo lo que otros agregaron. Por eso ninguna escritura a
+// Supabase sale antes de la primera carga exitosa (ver _loadFromSupabase).
+let remoteLoaded = false;
+
 function writeStore(key, value) {
   writeLocal(key, value);
   if (!sb) return;
+  if (!remoteLoaded) { console.warn('Escritura a Supabase omitida (' + key + '): todavía no se cargó la data real.'); return; }
   sb.from(SUPABASE_TABLE).upsert({ key: key, value: value, updated_at: new Date().toISOString() }).then(function (res) {
     if (res.error) console.error('Error al sincronizar con Supabase (' + key + ')', res.error);
   });
@@ -1850,18 +1885,18 @@ class Component extends DCLogic {
     taskModal: null,
     taskForm: { title: '', responsable: '', newResponsableName: '', status: 'pendiente', followupStatus: '', priority: 'media', detail: '', nextAction: '', dueDate: '' },
     contactModal: null,
-    contactForm: { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar', function: '', extraUnits: [] }
+    contactForm: { name: '', role: 'Por confirmar', unit: UNPLACED.id, email: 'Por confirmar', phone: 'Por confirmar', status: 'Por confirmar', action: 'Por confirmar', function: '', extraUnits: [] }
   };
 
   componentDidMount() {
     if (!sb) return;
-    this._loadFromSupabase();
-    Promise.all([this._loadTeamMembers(), this._loadTasks()]).then(() => this._syncFromNetworkingPanel());
+    // La sincronización con el panel de networking escribe contactos: solo
+    // corre después de haber cargado la versión real de Supabase.
+    Promise.all([this._loadFromSupabase(), this._loadTeamMembers(), this._loadTasks()]).then(r => { if (r[0]) this._syncFromNetworkingPanel(); });
     this._subscribeRealtime();
     this._onVisible = () => {
       if (document.visibilityState !== 'visible') return;
-      this._loadFromSupabase();
-      Promise.all([this._loadTeamMembers(), this._loadTasks()]).then(() => this._syncFromNetworkingPanel());
+      Promise.all([this._loadFromSupabase(), this._loadTeamMembers(), this._loadTasks()]).then(r => { if (r[0]) this._syncFromNetworkingPanel(); });
       this._subscribeRealtime();
     };
     document.addEventListener('visibilitychange', this._onVisible);
@@ -1895,16 +1930,22 @@ class Component extends DCLogic {
     if (!sbNet) return;
     try {
       const resC = await sbNet.from('contactos_networking').select('id,payload').in('id', NET_CONTACT_IDS);
-      if (!resC.error && resC.data) this._mergeNetworkingContacts(resC.data);
+      if (!resC.error && resC.data) await this._mergeNetworkingContacts(resC.data);
       const resT = await sbNet.from('tareas_networking').select('id,contacto_id,payload').in('contacto_id', NET_CONTACT_IDS);
       if (!resT.error && resT.data) this._mergeNetworkingTasks(resT.data);
     } catch (e) { console.error('Error al sincronizar con el panel de networking', e); }
   }
 
-  _mergeNetworkingContacts(rows) {
-    const s = this.state;
-    let contacts = s.contacts.slice();
-    let unitInfo = Object.assign({}, s.unitInfo);
+  // Parte de la versión recién leída de Supabase — nunca del estado en
+  // memoria — para no volver a subir una lista vieja o la semilla CONTACTS.
+  async _mergeNetworkingContacts(rows) {
+    const fresh = await sb.from(SUPABASE_TABLE).select('key,value').in('key', ['ucv-contacts-v1', 'ucv-unit-info-v1']);
+    if (fresh.error || !fresh.data) return;
+    const freshContacts = (fresh.data.find(r => r.key === 'ucv-contacts-v1') || {}).value;
+    const freshUnits = (fresh.data.find(r => r.key === 'ucv-unit-info-v1') || {}).value;
+    if (!Array.isArray(freshContacts)) return;
+    let contacts = freshContacts.slice();
+    let unitInfo = Object.assign({}, freshUnits || {});
     let changedContacts = false, changedUnits = false;
     rows.forEach(row => {
       const map = NET_CONTACT_MAP[row.id];
@@ -2024,12 +2065,14 @@ class Component extends DCLogic {
     });
     if (Object.keys(patch).length) this.setState(patch);
     this._contactsLoaded = true;
+    remoteLoaded = true;
     return true;
   }
 
   unitIndex() {
     if (this._ui) return this._ui;
     const map = {};
+    map[UNPLACED.id] = { unitName: UNPLACED.name, facultyName: 'Por ubicar', facultyId: UNPLACED.id, color: UNPLACED.color, soft: '#f4f1ea' };
     ADMIN.forEach(a => { map[a.id] = { unitName: a.name, facultyName: 'Rectorado y autoridades', facultyId: a.id, color: a.color, soft: '#f4f1ea' }; });
     FACULTIES.forEach(f => f.cols.forEach(col => col.units.forEach(u => {
       map[u.id] = { unitName: u.name, facultyName: f.name, facultyId: f.id, color: f.color, soft: f.soft };
@@ -2040,7 +2083,7 @@ class Component extends DCLogic {
 
   unitOptionsList() {
     if (this._unitOptions) return this._unitOptions;
-    const list = ADMIN.map(a => ({ id: a.id, label: a.emoji + ' ' + a.name }));
+    const list = [UNPLACED].concat(ADMIN).map(a => ({ id: a.id, label: a.emoji + ' ' + a.name }));
     FACULTIES.forEach(f => f.cols.forEach(col => col.units.forEach(u => {
       list.push({ id: u.id, label: f.name + ' · ' + u.name });
     })));
@@ -2125,7 +2168,7 @@ class Component extends DCLogic {
   }
 
   blankContact() {
-    return { name: '', role: 'Por confirmar', unit: ADMIN[0].id, email: 'Por confirmar', phone: '', phoneCode: DEFAULT_PHONE_CODE, status: 'Por confirmar', action: 'Por confirmar', function: '', extraUnits: [] };
+    return { name: '', role: 'Por confirmar', unit: UNPLACED.id, email: 'Por confirmar', phone: '', phoneCode: DEFAULT_PHONE_CODE, status: 'Por confirmar', action: 'Por confirmar', function: '', extraUnits: [] };
   }
 
   newContact = () => this.setState({ contactModal: 'new', contactForm: this.blankContact() });
@@ -3155,7 +3198,7 @@ class Component extends DCLogic {
       .sort((a, b) => (facultyInactive(a.id) ? 1 : 0) - (facultyInactive(b.id) ? 1 : 0))
       .map(buildFacultyCard);
 
-    const adminUnits = ADMIN.map(a => {
+    const buildUnitBox = a => {
       const isOver = s.dragOverUnit === a.id;
       return {
       name: a.name, emoji: a.emoji,
@@ -3173,7 +3216,13 @@ class Component extends DCLogic {
         const id = s.dragContactId || (e.dataTransfer && e.dataTransfer.getData('text/plain'));
         if (id) this.moveContactToUnit(id, a.id);
       }
-    }; });
+    }; };
+    const adminUnits = ADMIN.map(buildUnitBox);
+    const unplacedUnit = buildUnitBox(UNPLACED);
+    unplacedUnit.style = Object.assign({}, unplacedUnit.style, { border: '2px dashed ' + UNPLACED.color, borderTop: '2px dashed ' + UNPLACED.color, background: '#faf8f4' });
+    unplacedUnit.hint = unplacedUnit.contacts.length
+      ? unplacedUnit.contacts.length + ' contacto' + (unplacedUnit.contacts.length === 1 ? '' : 's') + ' de UCV sin unidad conocida — arrástralos a su unidad cuando se sepa.'
+      : 'Aquí caen los contactos de UCV cuya unidad todavía no se conoce.';
 
     const listContacts = shown.slice().sort((a, b) => a.name.localeCompare(b.name, 'es')).map(c => {
       const r = ROLE[c.role];
@@ -3276,7 +3325,7 @@ class Component extends DCLogic {
       uiText: ui,
       pageTitleStyle: { fontFamily: 'var(--font-heading)', fontWeight: 400, fontSize: Number(ui.titleSize || 40), lineHeight: 1.05, margin: '8px 0 6px' },
       navigationTabs: navigationTabs, boardSectionStyles: boardSectionStyles,
-      kpis: kpis, medCards: medCards, otherCards: otherCards, adminUnits: adminUnits, listContacts: listContacts, timeline: timeline,
+      kpis: kpis, medCards: medCards, otherCards: otherCards, adminUnits: adminUnits, unplacedUnit: unplacedUnit, listContacts: listContacts, timeline: timeline,
       boardColumns: boardColumns,
       calendarMonthLabel: MONTH_NAMES[calendarMonthNum] + ' ' + calendarYear,
       journeyLegend: Object.keys(JOURNEY_STATUS).map(key => ({ label: JOURNEY_STATUS[key].label, color: JOURNEY_STATUS[key].color })),
@@ -3339,7 +3388,7 @@ class Component extends DCLogic {
       volunteersToggleIcon: s.volunteersPanelOpen ? '▾' : '▸',
       volunteersToggleLabel: 'Voluntarios (' + s.volunteers.length + ')',
       query: s.query, facultyFilter: s.faculty, roleFilter: s.role,
-      facultyOptions: ADMIN.map(a => ({ id: a.id, label: a.emoji + ' ' + a.name }))
+      facultyOptions: [UNPLACED].concat(ADMIN).map(a => ({ id: a.id, label: a.emoji + ' ' + a.name }))
         .concat(FACULTIES.map(f => ({ id: f.id, label: f.num + '. ' + f.name }))),
       resultLabel: shown.length + ' de ' + all.length + ' contactos',
       followBtnStyle: Object.assign({ border: '1px solid var(--color-neutral-300)', borderRadius: 999, padding: '10px 16px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }, s.onlyFollow

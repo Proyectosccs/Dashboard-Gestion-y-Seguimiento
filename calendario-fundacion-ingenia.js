@@ -160,6 +160,9 @@
   // (FACULTIES), copiada de unitOptionsList() en el mismo archivo de UCV —
   // un contacto de UCV siempre pertenece a una de estas unidades.
   const UCV_UNITS = [
+    // Primera = valor por defecto: un contacto sin unidad conocida no debe
+    // caer en el Vicerrectorado. Mismo id que UNPLACED en el archivo de UCV.
+    { id: 'pu', label: '❔ Por ubicar · sin unidad asignada' },
     { id: 'vac', label: '🎓 Vicerrectorado Académico' },
     { id: 'sc', label: '🤝 Servicios Comunitarios · bajo Vicerrectorado' },
     { id: 'op', label: '🧩 Coordinación operativa UCV' },
