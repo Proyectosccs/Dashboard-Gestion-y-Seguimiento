@@ -400,7 +400,6 @@
     if (target.dataset.contactKpiOrg !== undefined) {
       const org = target.dataset.contactKpiOrg;
       state.contactOrgFilter = state.contactOrgFilter === org ? '' : org;
-      dom.contactOrgFilter.value = state.contactOrgFilter;
       renderContacts();
     }
     if (target.dataset.contactDetailId) {
@@ -464,10 +463,6 @@
     dom.contactForm.addEventListener('submit', onContactSubmit);
     dom.contactDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeContactDialog(); });
     dom.contactSearch.addEventListener('input', handleContactSearch);
-    dom.contactOrgFilter.addEventListener('change', function () {
-      state.contactOrgFilter = dom.contactOrgFilter.value;
-      renderContacts();
-    });
     populateContactStatusFilter(dom.contactStatusFilter);
     dom.contactStatusFilter.addEventListener('change', function () {
       state.contactStatusFilter = dom.contactStatusFilter.value;
@@ -598,7 +593,6 @@
     dom.reunionesList = document.getElementById('reuniones-list');
     dom.contactSearch = document.getElementById('contact-search');
     dom.contactSearchClear = document.getElementById('contact-search-clear');
-    dom.contactOrgFilter = document.getElementById('contact-org-filter');
     dom.contactResultCount = document.getElementById('contact-result-count');
     dom.contactsKpiStrip = document.getElementById('contacts-kpi-strip');
     dom.contactsList = document.getElementById('contacts-list');
@@ -2048,15 +2042,13 @@
     }));
   }
 
+  // El filtro por organización ahora se elige desde la franja de arriba
+  // (renderContactsKpiStrip); aquí solo se descarta si esa organización ya
+  // no existe.
   function populateContactOrgFilter() {
-    const current = dom.contactOrgFilter.value;
-    const options = contactOrgOptions().map(function (o) {
-      return '<option value="' + safe(o.id) + '">' + o.emoji + ' ' + safe(o.label) + '</option>';
-    });
-    renderMarkup(dom.contactOrgFilter, ['<option value="">Todas las organizaciones</option>'].concat(options).join(''));
-    const stillExists = current === '' || contactOrgOptions().some(function (o) { return o.id === current; });
-    dom.contactOrgFilter.value = stillExists ? current : '';
-    state.contactOrgFilter = dom.contactOrgFilter.value;
+    const current = state.contactOrgFilter;
+    const stillExists = !current || contactOrgOptions().some(function (o) { return o.id === current; });
+    if (!stillExists) state.contactOrgFilter = '';
   }
 
   function populateContactOrgSelect() {

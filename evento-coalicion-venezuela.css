@@ -649,3 +649,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   * { scrollbar-color: auto; }
   .tab-button[aria-current="page"], .auth-mark { border: 2px solid ButtonText; }
 }
+
+/* Tarjetas de contactos (mismo estilo que las de Tareas y las del directorio
+   UCV): total y desglose por estado; cada tarjeta filtra la lista. */
+.task-kpi-grid.kpi-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1180px) { .task-kpi-grid.kpi-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kpi-card-btn { font: inherit; text-align: left; cursor: pointer; transition: transform .12s, box-shadow .12s; }
+.kpi-card-btn:not(.task-kpi-primary) { border: 1px solid transparent; }
+.kpi-card-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+.kpi-card-btn[aria-pressed="true"] { outline: 2px solid var(--color-neutral-900); outline-offset: 2px; }

@@ -1051,7 +1051,39 @@
     }).join(''));
   }
 
+  // Tarjetas de contactos: total y cuántos hay en cada estado (sin importar
+  // el filtro activo). Clic en un estado = filtrar por él; otro clic o clic
+  // en el total = quitar el filtro.
+  function renderContactsKpiStrip() {
+    const strip = document.getElementById('contacts-kpi-strip');
+    if (!strip) return;
+    const counts = {};
+    state.contacts.forEach(function (c) { const k = c.status || 'pending'; counts[k] = (counts[k] || 0) + 1; });
+    const active = state.contactStatusFilter || '';
+    const cards = [
+      { key: '', icon: '👥', value: state.contacts.length, label: state.contacts.length === 1 ? 'Contacto identificado' : 'Contactos identificados', cls: 'task-kpi-primary' },
+      { key: 'pending', icon: '○', value: counts.pending || 0, label: 'Pendientes', cls: 'task-kpi-neutral' },
+      { key: 'contacted', icon: '📞', value: counts.contacted || 0, label: 'Contactados', cls: 'task-kpi-good' },
+      { key: 'waiting_response', icon: '⏳', value: counts.waiting_response || 0, label: 'Esperando respuesta', cls: 'task-kpi-sky' }
+    ];
+    renderMarkup(strip, cards.map(function (c) {
+      const pressed = c.key ? active === c.key : !active;
+      return '<button type="button" class="task-kpi-card kpi-card-btn ' + c.cls + '" data-kpi-status="' + c.key + '" aria-pressed="' + pressed + '"' +
+        (c.key ? ' title="Ver solo: ' + safe(c.label) + '"' : ' title="Ver todos"') + '>' +
+        '<span class="task-kpi-icon" aria-hidden="true">' + c.icon + '</span><strong>' + c.value + '</strong><span class="task-kpi-label">' + safe(c.label) + '</span></button>';
+    }).join(''));
+    strip.onclick = function (e) {
+      const btn = e.target.closest('[data-kpi-status]');
+      if (!btn) return;
+      const k = btn.dataset.kpiStatus;
+      state.contactStatusFilter = (k && state.contactStatusFilter !== k) ? k : '';
+      if (dom.contactStatusFilter) dom.contactStatusFilter.value = state.contactStatusFilter;
+      renderContacts();
+    };
+  }
+
   function renderContacts() {
+    renderContactsKpiStrip();
     const query = normalize(state.query);
     const contacts = state.contacts.filter(function (contact) {
       if (state.contactStatusFilter && (contact.status || 'pending') !== state.contactStatusFilter) return false;
