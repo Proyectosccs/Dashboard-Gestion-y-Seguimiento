@@ -1214,7 +1214,7 @@
     const respLine = area.responsibleName
       ? '👤 ' + safe(area.responsibleName) + (area.responsibleRole ? ' · ' + safe(area.responsibleRole) : '')
       : '<span class="hierarchy-empty">Sin responsable asignado</span>';
-    return '<div class="hierarchy-node">' +
+    return '<li>' +
       '<div class="hierarchy-node-card">' +
         '<div class="hierarchy-node-head">' +
           '<span class="hierarchy-node-name">' + safe(area.name) + '</span>' +
@@ -1227,8 +1227,8 @@
           '<button type="button" class="icon-button icon-button-sm" data-area-id="' + safe(area.id) + '" onclick="window.cmdltAction(event)" aria-label="Editar ' + safe(area.name) + '">✏️</button>' +
         '</div>' +
       '</div>' +
-      (children.length ? '<div class="hierarchy-children">' + children.map(hierarchyNodeHtml).join('') + '</div>' : '') +
-    '</div>';
+      (children.length ? '<ul>' + children.map(hierarchyNodeHtml).join('') + '</ul>' : '') +
+    '</li>';
   }
 
   function renderHierarchy() {
@@ -1238,7 +1238,7 @@
       return;
     }
     const roots = state.hierarchy.filter(function (a) { return !a.parentId || !findById(state.hierarchy, a.parentId); });
-    renderMarkup(dom.hierarchyTree, roots.map(hierarchyNodeHtml).join(''));
+    renderMarkup(dom.hierarchyTree, '<ul class="org-tree">' + roots.map(hierarchyNodeHtml).join('') + '</ul>');
   }
 
   function openContactDetail(c) {
