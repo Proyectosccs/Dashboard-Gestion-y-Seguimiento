@@ -142,7 +142,7 @@
   // (ver NETWORKING_SUBDIVISIONS).
   const CONTACT_ORGS = ['coalicion', 'florangel', 'cmdlt', 'ucv', 'networking'];
   // Subdivisión interna de un contacto de Fundación Ingenia.
-  const NETWORKING_SUBDIVISIONS = ['Voluntario', 'Taller y fabricación', 'Logística', 'Protección civil', 'Driver', 'Bomberos'];
+  const NETWORKING_SUBDIVISIONS = ['Voluntario', 'Taller y fabricación', 'Logística', 'Protección civil', 'Driver', 'Bomberos', 'Doctores', 'Empresas', 'Profesores'];
   // Coalición exige esta afiliación exacta (coalicion_update_contact_public
   // la valida en el servidor) — son las únicas 4 opciones válidas.
   const COALICION_AFFILIATIONS = ['Coalicion con amor a Venezuela', 'Fundacion Ingenia', 'Voluntariado AVAA', 'Voluntario Particular'];
