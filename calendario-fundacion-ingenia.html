@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=28">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=29">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=36" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=37" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -366,6 +366,10 @@
         </div>
         <div class="field field-full" id="event-meeting-field" hidden>
           <label for="field-event-minuta">Minuta</label>
+          <div class="minuta-record-row">
+            <button type="button" id="event-minuta-record" class="btn btn-secondary" onclick="window.ingeniaAction(event)">🎙️ Grabar minuta</button>
+            <span id="event-minuta-record-status" class="result-count" hidden></span>
+          </div>
           <textarea id="field-event-minuta" class="input" name="minuta" placeholder="Resumen de lo conversado…"></textarea>
           <label style="margin-top: 10px">Pendientes / Acuerdos</label>
           <div id="event-pendientes-list" class="pendientes-list"></div>

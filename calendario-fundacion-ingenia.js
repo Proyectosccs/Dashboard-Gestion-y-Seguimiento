@@ -309,6 +309,8 @@
     pendientesDraft: [],
     minutaFilesDraft: [],
     minutaFileUploading: false,
+    minutaRecognition: null,
+    isRecordingMinuta: false,
     editingResponsableId: null,
     ui: cloneUI(DEFAULT_UI),
     customizeForm: cloneUI(DEFAULT_UI)
@@ -343,6 +345,7 @@
       'field-event-jornada-type': onJornadaTypeChange,
       'field-event-specialty-other': onSpecialtyOtherChange,
       'event-pendiente-add': addPendiente,
+      'event-minuta-record': toggleMinutaRecording,
       'new-contact-btn': openContactDialog,
       'contact-dialog-close': closeContactDialog,
       'contact-dialog-cancel': closeContactDialog,
@@ -422,6 +425,15 @@
     }
     if (target.dataset.action === 'cancel-edit-responsable-only') {
       cancelEditResponsable();
+    }
+    if (target.dataset.action === 'reunion-gcal') {
+      addReunionToGoogleCalendar(target.dataset.reunionId);
+    }
+    if (target.dataset.action === 'reunion-reschedule') {
+      openEventDialog(findById(state.events, target.dataset.reunionId), { focusField: 'event_date' });
+    }
+    if (target.dataset.action === 'reunion-whatsapp') {
+      sendReunionWhatsApp(target.dataset.reunionId);
     }
   };
 
@@ -589,6 +601,8 @@
     dom.eventMinutaFilesList = document.getElementById('event-minuta-files-list');
     dom.eventMinutaFileInput = document.getElementById('event-minuta-file-input');
     dom.eventMinutaFileStatus = document.getElementById('event-minuta-file-status');
+    dom.eventMinutaRecordBtn = document.getElementById('event-minuta-record');
+    dom.eventMinutaRecordStatus = document.getElementById('event-minuta-record-status');
     dom.reunionesOrgFilter = document.getElementById('reuniones-org-filter');
     dom.reunionesList = document.getElementById('reuniones-list');
     dom.contactSearch = document.getElementById('contact-search');
@@ -1391,6 +1405,7 @@
     dom.eventSpecialtiesField.hidden = !isMedica;
     if (isMedica) populateSpecialtiesList();
     dom.eventMeetingField.hidden = dom.eventJornadaTypeSelect.value !== 'reunion';
+    if (dom.eventJornadaTypeSelect.value !== 'reunion') stopMinutaRecording();
   }
 
   function onSpecialtyOtherChange() {
@@ -1400,6 +1415,7 @@
 
   function openEventDialog(existing, options) {
     hideError(dom.eventError);
+    stopMinutaRecording();
     dom.eventForm.reset();
     state.editingEvent = existing || null;
     populateSourceSelect();
@@ -1445,10 +1461,12 @@
       renderMinutaFilesList();
     }
     dom.eventDialog.showModal();
-    dom.eventForm.elements.title.focus();
+    const focusName = options && options.focusField;
+    const focusEl = focusName && dom.eventForm.elements[focusName];
+    (focusEl || dom.eventForm.elements.title).focus();
   }
 
-  function closeEventDialog() { dom.eventDialog.close(); state.editingEvent = null; }
+  function closeEventDialog() { stopMinutaRecording(); dom.eventDialog.close(); state.editingEvent = null; }
 
   function refreshCalendarsAfterChange(eventDate) {
     if (eventDate) state.selectedDay = eventDate;
@@ -1525,6 +1543,71 @@
     const inputs = dom.eventPendientesList.querySelectorAll('.pendiente-text');
     const last = inputs[inputs.length - 1];
     if (last) last.focus();
+  }
+
+  // ---------- Dictado en vivo de la minuta (Web Speech API) ----------
+
+  function toggleMinutaRecording() {
+    if (state.isRecordingMinuta) stopMinutaRecording();
+    else startMinutaRecording();
+  }
+
+  function startMinutaRecording() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast('Tu navegador no soporta dictado por voz — usa Chrome o Edge.', 'error');
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'es-419';
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.onresult = function (event) {
+      let finalChunk = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) finalChunk += event.results[i][0].transcript + ' ';
+      }
+      if (!finalChunk) return;
+      const current = dom.eventForm.elements.minuta.value;
+      dom.eventForm.elements.minuta.value = current && !/\s$/.test(current) ? current + ' ' + finalChunk : current + finalChunk;
+    };
+    recognition.onerror = function (event) {
+      if (event.error === 'no-speech' || event.error === 'aborted') return;
+      toast('Error de dictado: ' + event.error, 'error');
+    };
+    recognition.onend = function () {
+      // Algunos navegadores cortan el reconocimiento tras un silencio —
+      // si seguimos "grabando" según el estado, lo reiniciamos solos.
+      if (state.isRecordingMinuta) { try { recognition.start(); } catch (_err) { /* ya iniciado */ } }
+    };
+    try {
+      recognition.start();
+    } catch (_err) {
+      toast('No se pudo iniciar el dictado.', 'error');
+      return;
+    }
+    state.minutaRecognition = recognition;
+    state.isRecordingMinuta = true;
+    updateMinutaRecordUI();
+  }
+
+  function stopMinutaRecording() {
+    state.isRecordingMinuta = false;
+    if (state.minutaRecognition) {
+      try { state.minutaRecognition.stop(); } catch (_err) { /* no crítico */ }
+      state.minutaRecognition = null;
+    }
+    updateMinutaRecordUI();
+  }
+
+  function updateMinutaRecordUI() {
+    if (!dom.eventMinutaRecordBtn) return;
+    dom.eventMinutaRecordBtn.textContent = state.isRecordingMinuta ? '⏹️ Detener grabación' : '🎙️ Grabar minuta';
+    dom.eventMinutaRecordBtn.classList.toggle('is-recording', state.isRecordingMinuta);
+    if (dom.eventMinutaRecordStatus) {
+      dom.eventMinutaRecordStatus.hidden = !state.isRecordingMinuta;
+      dom.eventMinutaRecordStatus.textContent = state.isRecordingMinuta ? '● Escuchando… habla con claridad, se transcribe en vivo.' : '';
+    }
   }
 
   const MINUTA_FILES_BUCKET = 'reuniones-archivos';
@@ -1997,16 +2080,23 @@
     const pendientesTotal = extra.pendientes.length;
     const pendientesDone = extra.pendientes.filter(function (p) { return p.done; }).length;
     const minutaPreview = extra.minuta ? (extra.minuta.length > 140 ? extra.minuta.slice(0, 140) + '…' : extra.minuta) : '';
-    return '<button type="button" class="reunion-card" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)">' +
-      '<div class="reunion-card-head">' +
-        '<span class="agenda-row-source ' + cs.cls + '" ' + cs.style + '>' + safe(info.label) + '</span>' +
-        '<span class="reunion-card-date">' + safe(formatDate(e.date)) + '</span>' +
+    return '<article class="reunion-card">' +
+      '<button type="button" class="reunion-card-body" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)">' +
+        '<div class="reunion-card-head">' +
+          '<span class="agenda-row-source ' + cs.cls + '" ' + cs.style + '>' + safe(info.label) + '</span>' +
+          '<span class="reunion-card-date">' + safe(formatDate(e.date)) + '</span>' +
+        '</div>' +
+        '<p class="reunion-card-title">' + safe(e.title) + '</p>' +
+        (minutaPreview ? '<p class="reunion-card-minuta">' + safe(minutaPreview) + '</p>' : '<p class="reunion-card-minuta reunion-card-empty">Sin minuta todavía</p>') +
+        (pendientesTotal ? '<span class="reunion-card-pendientes">📋 ' + pendientesDone + '/' + pendientesTotal + ' pendientes resueltos</span>' : '') +
+        (extra.minutaFiles.length ? '<span class="reunion-card-pendientes">📎 ' + extra.minutaFiles.length + ' archivo' + (extra.minutaFiles.length > 1 ? 's' : '') + ' adjunto' + (extra.minutaFiles.length > 1 ? 's' : '') + '</span>' : '') +
+      '</button>' +
+      '<div class="reunion-card-actions">' +
+        '<button type="button" class="reunion-quick-btn" data-action="reunion-gcal" data-reunion-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" title="Agregar a Google Calendar">📅 Calendar</button>' +
+        '<button type="button" class="reunion-quick-btn" data-action="reunion-reschedule" data-reunion-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" title="Reprogramar">🔁 Reprogramar</button>' +
+        '<button type="button" class="reunion-quick-btn" data-action="reunion-whatsapp" data-reunion-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" title="Enviar por WhatsApp">💬 WhatsApp</button>' +
       '</div>' +
-      '<p class="reunion-card-title">' + safe(e.title) + '</p>' +
-      (minutaPreview ? '<p class="reunion-card-minuta">' + safe(minutaPreview) + '</p>' : '<p class="reunion-card-minuta reunion-card-empty">Sin minuta todavía</p>') +
-      (pendientesTotal ? '<span class="reunion-card-pendientes">📋 ' + pendientesDone + '/' + pendientesTotal + ' pendientes resueltos</span>' : '') +
-      (extra.minutaFiles.length ? '<span class="reunion-card-pendientes">📎 ' + extra.minutaFiles.length + ' archivo' + (extra.minutaFiles.length > 1 ? 's' : '') + ' adjunto' + (extra.minutaFiles.length > 1 ? 's' : '') + '</span>' : '') +
-    '</button>';
+    '</article>';
   }
 
   function renderReunionesView() {
@@ -2020,6 +2110,52 @@
       return;
     }
     renderMarkup(dom.reunionesList, reuniones.map(reunionCardHtml).join(''));
+  }
+
+  function addReunionToGoogleCalendar(id) {
+    const e = findById(state.events, id);
+    if (!e) return;
+    const extra = readEventExtra(e.source, e.raw);
+    const dateCompact = (e.date || '').replace(/-/g, '');
+    let datesParam;
+    if (e.time) {
+      const startHHMM = e.time.slice(0, 5).replace(':', '');
+      const endRaw = extra.endTime ? extra.endTime.slice(0, 5).replace(':', '') : null;
+      let endHHMM = endRaw;
+      if (!endHHMM) {
+        const h = Number(startHHMM.slice(0, 2));
+        const m = startHHMM.slice(2, 4);
+        endHHMM = String((h + 1) % 24).padStart(2, '0') + m;
+      }
+      datesParam = dateCompact + 'T' + startHHMM + '00/' + dateCompact + 'T' + endHHMM + '00';
+    } else {
+      const d = new Date((e.date || '') + 'T00:00:00');
+      d.setDate(d.getDate() + 1);
+      const nextIso = d.toISOString().slice(0, 10).replace(/-/g, '');
+      datesParam = dateCompact + '/' + nextIso;
+    }
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: e.title || 'Reunión',
+      dates: datesParam,
+      details: extra.minuta || e.notes || '',
+      location: e.location || ''
+    });
+    if (e.time) params.set('ctz', 'America/Caracas');
+    window.open('https://calendar.google.com/calendar/render?' + params.toString(), '_blank', 'noopener');
+  }
+
+  function sendReunionWhatsApp(id) {
+    const e = findById(state.events, id);
+    if (!e) return;
+    const info = sourceInfo(e.source);
+    const lines = [
+      '📅 Recordatorio de reunión: ' + (e.title || ''),
+      '🗓️ ' + formatDate(e.date) + (e.time ? ' a las ' + formatTime(e.time) : ''),
+      e.location ? '📍 ' + e.location : '',
+      '🏷️ ' + info.label
+    ].filter(Boolean);
+    window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(lines.join('\n')), '_blank', 'noopener');
   }
 
   // ---------- Contactos ----------
