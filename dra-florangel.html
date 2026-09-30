@@ -6,9 +6,9 @@
   <meta name="description" content="Tareas y calendario de jornadas — Dra Florangel.">
   <title>Dra Florangel — Tareas y jornadas</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./dra-florangel.css?v=17">
+  <link rel="stylesheet" href="./dra-florangel.css?v=18">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./dra-florangel.js?v=19" defer></script>
+  <script src="./dra-florangel.js?v=20" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -29,6 +29,7 @@
       <button class="tab-button" type="button" data-view="tasks" aria-current="page" onclick="window.florangelAction(event)">📋 Tareas de Equipo</button>
       <button class="tab-button" type="button" data-view="calendar" onclick="window.florangelAction(event)">🗓️ Calendario</button>
       <button class="tab-button" type="button" data-view="contacts" onclick="window.florangelAction(event)">🤝 Contactos</button>
+      <button class="tab-button" type="button" data-view="hierarchy" onclick="window.florangelAction(event)">🏛️ Jerarquía</button>
     </nav>
 
     <div id="connectivity-banner" class="notice notice-warning page-notice" role="status" hidden>
@@ -125,7 +126,96 @@
       </div>
       <div id="contacts-list" class="contact-grid"></div>
     </section>
+
+    <section id="hierarchy-view" class="view" aria-labelledby="hierarchy-view-title" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">🏛️ Estructura</p>
+          <h2 id="hierarchy-view-title">Jerarquía</h2>
+          <p class="view-description">Áreas de la coordinación, con su responsable, en niveles como un organigrama.</p>
+        </div>
+        <button class="btn btn-primary" type="button" data-action="new-area" onclick="window.florangelAction(event)">➕ Agregar área</button>
+      </div>
+      <div id="hierarchy-tree" class="hierarchy-tree"></div>
+    </section>
   </div>
+
+  <dialog id="area-dialog" class="editor-dialog" aria-labelledby="area-dialog-title">
+    <form id="area-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">🏛️ Estructura</p>
+          <h2 id="area-dialog-title">Agregar área</h2>
+        </div>
+        <button id="area-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.florangelAction(event)">×</button>
+      </div>
+      <div id="area-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-fields">
+        <div class="field field-full">
+          <label for="field-area-name">Nombre del área</label>
+          <input id="field-area-name" class="input" name="name" type="text" required placeholder="Ej. Coordinación de jornadas, Enfermería">
+        </div>
+        <div class="field field-full">
+          <label for="field-area-parent">Área superior (opcional)</label>
+          <select id="field-area-parent" class="input" name="parent_id"></select>
+        </div>
+        <div class="field field-full">
+          <label for="field-area-contact-link">Autocompletar desde un contacto existente (opcional)</label>
+          <select id="field-area-contact-link" class="input"></select>
+        </div>
+        <div class="field field-full">
+          <label for="field-area-responsible-name">Responsable — Nombre</label>
+          <input id="field-area-responsible-name" class="input" name="responsible_name" type="text">
+        </div>
+        <div class="field">
+          <label for="field-area-responsible-phone-number">Responsable — Teléfono</label>
+          <div class="phone-field">
+            <select id="field-area-responsible-phone-code" class="input phone-code" aria-label="Código de país"></select>
+            <input id="field-area-responsible-phone-number" class="input phone-number" name="responsible_phone_number" type="tel" placeholder="4141234567">
+          </div>
+        </div>
+        <div class="field">
+          <label for="field-area-responsible-email">Responsable — Correo</label>
+          <input id="field-area-responsible-email" class="input" name="responsible_email" type="email">
+        </div>
+        <div class="field">
+          <label for="field-area-responsible-role">Cargo / Rol</label>
+          <input id="field-area-responsible-role" class="input" name="responsible_role" type="text" placeholder="Ej. Coordinador de logística">
+        </div>
+        <div class="field">
+          <label for="field-area-responsible-function">Función</label>
+          <input id="field-area-responsible-function" class="input" name="responsible_function" type="text" placeholder="Qué está desarrollando">
+        </div>
+        <div class="field">
+          <label for="field-area-responsible-account">Cuenta corporativa</label>
+          <input id="field-area-responsible-account" class="input" name="responsible_account" type="text">
+        </div>
+        <div class="field">
+          <label for="field-area-responsible-affiliation">Afiliación</label>
+          <input id="field-area-responsible-affiliation" class="input" name="responsible_affiliation" type="text">
+        </div>
+        <div class="field">
+          <label for="field-area-status">Estado de la relación</label>
+          <select id="field-area-status" class="input" name="status"></select>
+        </div>
+        <div class="field field-full">
+          <label for="field-area-notes">Notas</label>
+          <textarea id="field-area-notes" class="input" name="notes"></textarea>
+        </div>
+        <div class="field field-full">
+          <label class="checkbox-chip" style="width: fit-content">
+            <input type="checkbox" id="field-area-save-as-contact" name="save_as_contact">
+            📇 Guardar también como contacto
+          </label>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="area-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.florangelAction(event)">Cancelar</button>
+        <button id="area-delete" class="btn btn-secondary" type="button" onclick="window.florangelAction(event)" hidden>🗑️ Eliminar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="task-dialog" class="editor-dialog" aria-labelledby="task-dialog-title">
     <form id="task-form" class="dialog-form" novalidate>
@@ -373,6 +463,10 @@
         <div class="field">
           <label for="field-custom-contacts-title">Título de contactos</label>
           <input id="field-custom-contacts-title" class="input" name="contactsTitle" type="text">
+        </div>
+        <div class="field">
+          <label for="field-custom-hierarchy-title">Título de jerarquía</label>
+          <input id="field-custom-hierarchy-title" class="input" name="hierarchyTitle" type="text">
         </div>
       </div>
       <div class="customize-grid">

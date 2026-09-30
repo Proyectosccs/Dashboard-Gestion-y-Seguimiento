@@ -20,6 +20,7 @@
   const NEW_MEMBER_VALUE = '__new_member__';
   const ORG_ID = 'coalicion';
   const UI_KEY = 'ingenia-coalicion-ui-v1';
+  const HIERARCHY_KEY = 'ingenia-coalicion-hierarchy-v1';
 
   // Modo edición: textos y orden personalizables, igual que en el tablero
   // UCV — pero sin los controles de tamaño de burbuja/título, porque este
@@ -31,13 +32,14 @@
     resultsTitle: '📊 Resultados de la jornada',
     calendarTitle: '🗓️ Calendario del evento',
     tasksTitle: 'Tareas de Equipo',
-    tabOrder: ['summary', 'results', 'contacts', 'calendar', 'tasks'],
+    tabOrder: ['summary', 'results', 'contacts', 'hierarchy', 'calendar', 'tasks'],
     boardOrder: ['kpis', 'board']
   };
   const NAV_ITEMS = {
     summary: { emoji: '🏠', label: 'Resumen' },
     results: { emoji: '📊', label: 'Resultados' },
     contacts: { emoji: '🤝', label: 'Contactos' },
+    hierarchy: { emoji: '🏛️', label: 'Jerarquía' },
     calendar: { emoji: '🗓️', label: 'Calendario' },
     tasks: { emoji: '📋', label: 'Tareas de Equipo' }
   };
@@ -504,6 +506,7 @@
     results: { loading: false, error: null, loaded: false, entregas: [], envios: [], semaforoFilter: null, needsData: [], openNeedCategory: null, selectedJornada: null, jornadaAnchored: false },
     map: null,
     mapMarkers: null,
+    hierarchy: [],
     allTasks: [],
     teamMembers: [],
     taskResponsableFilter: '',
@@ -544,6 +547,7 @@
       'contact-detail-edit': editFromContactDetail,
       'contact-detail-delete': deleteFromContactDetail,
       'contact-detail-vcard': function () { downloadVCard(state.viewingContact); },
+      'dialog-delete': deleteAreaRecord,
       'task-dialog-close': closeTaskDialog,
       'task-dialog-cancel': closeTaskDialog,
       'task-delete': deleteEditingTask,
@@ -599,6 +603,7 @@
     dom.contactSearchClear = document.getElementById('contact-search-clear');
     dom.contactResultCount = document.getElementById('contact-result-count');
     dom.contactsList = document.getElementById('contacts-list');
+    dom.hierarchyTree = document.getElementById('hierarchy-tree');
     dom.contactStatusFilter = document.getElementById('contact-status-filter');
     dom.resultsStatus = document.getElementById('results-status');
     dom.resultsEmpty = document.getElementById('results-empty');
@@ -624,6 +629,7 @@
     dom.dialogError = document.getElementById('dialog-error');
     dom.dialogSave = document.getElementById('dialog-save');
     dom.dialogCancel = document.getElementById('dialog-cancel');
+    dom.dialogDelete = document.getElementById('dialog-delete');
     dom.dialogClose = document.getElementById('dialog-close');
     dom.contactDetailDialog = document.getElementById('contact-detail-dialog');
     dom.contactDetailTitle = document.getElementById('contact-detail-title');
@@ -810,6 +816,9 @@
     }
     if (action === 'jornada-type-change') onJornadaTypeChange();
     if (action === 'specialty-other-change') onSpecialtyOtherChange();
+    if (action === 'new-area') openEditor('area', null, {});
+    if (action === 'edit-area') openEditor('area', findById(state.hierarchy, id));
+    if (action === 'add-child-area') openEditor('area', null, { presetParentId: id });
   }
 
   function renderAll() {
@@ -1807,20 +1816,26 @@
     }).join(''));
   }
 
-  function openEditor(type, record) {
-    state.editor = { type: type, record: record || null };
+  function openEditor(type, record, extra) {
+    state.editor = Object.assign({ type: type, record: record || null }, extra || {});
     state.editorDirty = false;
     state.discardArmed = false;
     dom.dialogCancel.textContent = 'Cancelar';
     hideDialogError();
     const configs = {
       contact: { eyebrow: 'Equipo del evento', title: record ? 'Editar responsable' : 'Agregar responsable', fields: contactFields(record) },
-      event: { eyebrow: 'Agenda compartida', title: record ? 'Editar evento' : 'Agregar evento', fields: eventFields(record) }
+      event: { eyebrow: 'Agenda compartida', title: record ? 'Editar evento' : 'Agregar evento', fields: eventFields(record) },
+      area: { eyebrow: 'Estructura', title: record ? 'Editar área' : 'Agregar área', fields: areaFields(record) }
     };
     const config = configs[type];
     dom.dialogEyebrow.textContent = config.eyebrow;
     dom.dialogTitle.textContent = config.title;
     renderMarkup(dom.dialogFields, config.fields);
+    dom.dialogDelete.hidden = !(type === 'area' && record);
+    if (type === 'area') {
+      const linkSelect = document.getElementById('field-contact_link');
+      if (linkSelect) linkSelect.addEventListener('change', onAreaContactLinkChange);
+    }
     dom.editorDialog.showModal();
     const first = dom.dialogFields.querySelector('input, select, textarea');
     if (first) first.focus();
@@ -1836,6 +1851,171 @@
       field('Correo electrónico', 'email', item.email, 'email', false, 'email') +
       selectField('Estado', 'status', item.status || 'pending', CONTACT_STATUSES) +
       textareaField('Notas operativas', 'notes', item.notes, 'field-full');
+  }
+
+  // ---------- Jerarquía ----------
+
+  function getDescendantIds(id) {
+    const result = [];
+    const stack = [id];
+    while (stack.length) {
+      const current = stack.pop();
+      state.hierarchy.forEach(function (a) {
+        if (a.parentId === current && result.indexOf(a.id) === -1) { result.push(a.id); stack.push(a.id); }
+      });
+    }
+    return result;
+  }
+
+  function areaParentOptions(excludeIds) {
+    const opts = { '': '— Nivel superior (sin área padre) —' };
+    state.hierarchy.forEach(function (a) { if (excludeIds.indexOf(a.id) === -1) opts[a.id] = a.name; });
+    return opts;
+  }
+
+  function areaContactLinkOptions() {
+    const opts = { '': '— Selecciona un contacto —' };
+    state.contacts.forEach(function (c) { opts[c.id] = c.name + (c.role ? ' · ' + c.role : ''); });
+    return opts;
+  }
+
+  function areaFields(record) {
+    const item = record || {};
+    const excludeIds = record ? [record.id].concat(getDescendantIds(record.id)) : [];
+    const presetParentId = record ? (item.parentId || '') : ((state.editor && state.editor.presetParentId) || '');
+    return field('Nombre del área', 'name', item.name, 'text', true, '', 'field-full', 'Ej. Zona de acopio, Equipo médico') +
+      selectField('Área superior (opcional)', 'parent_id', presetParentId, areaParentOptions(excludeIds), 'field-full') +
+      selectField('Autocompletar desde un contacto existente (opcional)', 'contact_link', '', areaContactLinkOptions(), 'field-full') +
+      field('Responsable — Nombre', 'responsible_name', item.responsibleName, 'text', false, '', 'field-full') +
+      phoneField('Responsable — Teléfono', 'responsible_phone', item.responsiblePhone) +
+      field('Responsable — Correo', 'responsible_email', item.responsibleEmail, 'email') +
+      field('Cargo / Rol', 'responsible_role', item.responsibleRole, 'text', false, '', '', 'Ej. Coordinador de logística') +
+      field('Función', 'responsible_function', item.responsibleFunction, 'text', false, '', '', 'Qué está desarrollando') +
+      field('Cuenta corporativa', 'responsible_account', item.responsibleAccount, 'text') +
+      field('Afiliación', 'responsible_affiliation', item.responsibleAffiliation, 'text') +
+      selectField('Estado de la relación', 'status', item.status || 'pending', CONTACT_STATUSES) +
+      textareaField('Notas', 'notes', item.notes, 'field-full') +
+      '<div class="field field-full"><label class="checkbox-chip" style="width:fit-content"><input type="checkbox" id="field-save_as_contact" name="save_as_contact"> 📇 Guardar también como contacto del evento</label></div>';
+  }
+
+  // Autocompleta el responsable con los datos de un contacto ya existente
+  // — es una copia puntual, no un vínculo permanente: si ese contacto
+  // cambia después, el área no se actualiza sola.
+  function onAreaContactLinkChange(e) {
+    const contact = findById(state.contacts, e.target.value);
+    if (!contact) return;
+    const form = dom.editorForm;
+    form.elements.responsible_name.value = contact.name || '';
+    const parsedPhone = splitPhone(contact.phone || '');
+    form.elements.responsible_phone_code.value = parsedPhone.code;
+    form.elements.responsible_phone_number.value = parsedPhone.number;
+    form.elements.responsible_email.value = contact.email || '';
+    if (!form.elements.responsible_role.value.trim()) form.elements.responsible_role.value = contact.role || '';
+  }
+
+  async function saveAreaEditor(fields, existing) {
+    const saveAsContact = fields.save_as_contact === 'on' || fields.save_as_contact === '1';
+    const areaPayload = {
+      id: existing ? existing.id : uid(),
+      name: fields.name,
+      parentId: fields.parent_id || '',
+      responsibleName: fields.responsible_name,
+      responsiblePhone: fields.responsible_phone,
+      responsibleEmail: fields.responsible_email,
+      responsibleRole: fields.responsible_role,
+      responsibleFunction: fields.responsible_function,
+      responsibleAccount: fields.responsible_account,
+      responsibleAffiliation: fields.responsible_affiliation,
+      status: fields.status || 'pending',
+      notes: fields.notes,
+      created_at: existing ? existing.created_at : new Date().toISOString()
+    };
+    const nextHierarchy = existing
+      ? state.hierarchy.map(function (a) { return a.id === existing.id ? areaPayload : a; })
+      : state.hierarchy.concat(areaPayload);
+    const ok = await writeBoardKey(SHARED_TABLE, HIERARCHY_KEY, nextHierarchy);
+    if (!ok) return false;
+    state.hierarchy = nextHierarchy;
+    renderHierarchy();
+    if (saveAsContact && areaPayload.responsibleName) await saveResponsibleAsContact(areaPayload);
+    return true;
+  }
+
+  // Crea (o actualiza, si ya existe uno con el mismo nombre) un responsable
+  // del evento a partir del responsable del área — pasa por el edge
+  // function igual que cualquier otro contacto, porque la tabla de
+  // contactos de Coalición no acepta escrituras directas del anon.
+  async function saveResponsibleAsContact(area) {
+    // El RPC de contactos de Coalición exige teléfono y una afiliación
+    // válida del catálogo fijo — el área no necesariamente tiene ninguno
+    // de los dos, así que completamos con lo mínimo que acepta el servidor.
+    if (!area.responsiblePhone) {
+      toast('El área se guardó. Para crearlo también como contacto, el responsable necesita un teléfono.', 'error');
+      return;
+    }
+    const matchName = area.responsibleName.trim().toLowerCase();
+    const existing = state.contacts.find(function (c) { return (c.name || '').trim().toLowerCase() === matchName; });
+    const payload = {
+      name: area.responsibleName,
+      role: area.responsibleRole || 'Responsable',
+      belongs_to: (existing && existing.belongs_to) || 'Coalicion con amor a Venezuela',
+      national_id: existing ? (existing.national_id || '') : '',
+      phone: area.responsiblePhone,
+      email: area.responsibleEmail,
+      status: existing ? existing.status : 'pending',
+      notes: existing ? existing.notes : ''
+    };
+    const result = await callEditorApi('save', { entity: 'contact', payload: payload, id: existing ? existing.id : null });
+    if (result.error) { toast('El área se guardó, pero no se pudo guardar como contacto.', 'error'); return; }
+    await loadAllData(true);
+  }
+
+  async function deleteAreaRecord() {
+    const area = state.editor && state.editor.record;
+    if (!area) return;
+    const hasChildren = state.hierarchy.some(function (a) { return a.parentId === area.id; });
+    if (hasChildren) { showDialogError('Esta área tiene sub-áreas — muévelas o elimínalas primero.'); return; }
+    const next = state.hierarchy.filter(function (a) { return a.id !== area.id; });
+    const ok = await writeBoardKey(SHARED_TABLE, HIERARCHY_KEY, next);
+    if (!ok) { showDialogError('No se pudo eliminar — revisa tu conexión.'); return; }
+    state.hierarchy = next;
+    renderHierarchy();
+    state.editorDirty = false;
+    closeEditor();
+    toast('Área eliminada.', 'success');
+  }
+
+  function hierarchyNodeHtml(area) {
+    const status = contactStatusInfo(area);
+    const children = state.hierarchy.filter(function (a) { return a.parentId === area.id; });
+    const respLine = area.responsibleName
+      ? '👤 ' + safe(area.responsibleName) + (area.responsibleRole ? ' · ' + safe(area.responsibleRole) : '')
+      : '<span class="hierarchy-empty">Sin responsable asignado</span>';
+    return '<div class="hierarchy-node">' +
+      '<div class="hierarchy-node-card">' +
+        '<div class="hierarchy-node-head">' +
+          '<span class="hierarchy-node-name">' + safe(area.name) + '</span>' +
+          '<span class="contact-status-pill status-' + status.key + '">' + status.emoji + ' ' + safe(status.label) + '</span>' +
+        '</div>' +
+        '<div class="hierarchy-node-resp">' + respLine + '</div>' +
+        (area.notes ? '<div class="hierarchy-node-notes">' + safe(area.notes) + '</div>' : '') +
+        '<div class="hierarchy-node-actions">' +
+          '<button type="button" class="link-button" data-action="add-child-area" data-id="' + safe(area.id) + '" onclick="window.coalicionAction(event)">➕ Sub-área</button>' +
+          '<button type="button" class="icon-button icon-button-sm" data-action="edit-area" data-id="' + safe(area.id) + '" onclick="window.coalicionAction(event)" aria-label="Editar ' + safe(area.name) + '">✏️</button>' +
+        '</div>' +
+      '</div>' +
+      (children.length ? '<div class="hierarchy-children">' + children.map(hierarchyNodeHtml).join('') + '</div>' : '') +
+    '</div>';
+  }
+
+  function renderHierarchy() {
+    if (!dom.hierarchyTree) return;
+    if (!state.hierarchy.length) {
+      renderMarkup(dom.hierarchyTree, '<div class="empty-state"><strong>🏛️ Jerarquía vacía</strong><span>Agrega la primera área con el botón de arriba.</span></div>');
+      return;
+    }
+    const roots = state.hierarchy.filter(function (a) { return !a.parentId || !findById(state.hierarchy, a.parentId); });
+    renderMarkup(dom.hierarchyTree, roots.map(hierarchyNodeHtml).join(''));
   }
 
   function jornadaTypeFieldMarkup(item) {
@@ -1940,6 +2120,12 @@
       delete data.phone_code;
       delete data.phone_number;
     }
+    if (state.editor.type === 'area') {
+      data.responsible_phone = combinePhone(data.responsible_phone_code, data.responsible_phone_number);
+      delete data.responsible_phone_code;
+      delete data.responsible_phone_number;
+      delete data.contact_link;
+    }
     const validation = validateEditor(state.editor.type, data);
     if (validation) {
       showDialogError(validation.message);
@@ -1953,6 +2139,18 @@
 
     dom.editorForm.querySelectorAll('[aria-invalid="true"]').forEach(function (node) { node.removeAttribute('aria-invalid'); });
     const payload = normalizePayload(state.editor.type, data);
+
+    if (state.editor.type === 'area') {
+      setBusy(dom.dialogSave, true);
+      const ok = await saveAreaEditor(payload, state.editor.record);
+      setBusy(dom.dialogSave, false);
+      if (!ok) { showDialogError('No pudimos guardar los cambios. Revisa tu conexión y vuelve a intentarlo.'); return; }
+      state.editorDirty = false;
+      closeEditor();
+      toast('Área guardada.', 'success');
+      return;
+    }
+
     setBusy(dom.dialogSave, true);
     const result = await callEditorApi('save', {
       entity: state.editor.type,
@@ -1983,6 +2181,9 @@
       if (!data.title.trim()) return issue('title', 'Escribe el nombre del evento.');
       if (!data.event_date) return issue('event_date', 'Selecciona la fecha del evento.');
       if (!data.location.trim()) return issue('location', 'Agrega una ubicación.');
+    }
+    if (type === 'area') {
+      if (!data.name.trim()) return issue('name', 'El nombre del área es obligatorio.');
     }
     return null;
   }
@@ -2136,16 +2337,19 @@
 
   async function loadTeamTasks() {
     if (!state.client) return;
-    const [tasksValue, membersValue, uiValue] = await Promise.all([
+    const [tasksValue, membersValue, uiValue, hierarchyValue] = await Promise.all([
       readBoardKey(SHARED_TABLE, TEAM_TASKS_KEY, []),
       readBoardKey(SHARED_TABLE, TEAM_MEMBERS_KEY, []),
-      readBoardKey(SHARED_TABLE, UI_KEY, null)
+      readBoardKey(SHARED_TABLE, UI_KEY, null),
+      readBoardKey(SHARED_TABLE, HIERARCHY_KEY, [])
     ]);
     state.allTasks = (Array.isArray(tasksValue) ? tasksValue : []).map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); });
     state.teamMembers = Array.isArray(membersValue) ? membersValue : [];
+    state.hierarchy = Array.isArray(hierarchyValue) ? hierarchyValue : [];
     state.ui = cloneUI(uiValue);
     applyUI();
     populateTasksResponsableFilter();
+    renderHierarchy();
     if (state.view === 'tasks') { renderTasksBoard(); renderTasksKpis(); }
   }
 

@@ -10,6 +10,7 @@
   const TASKS_KEY = 'florangel-tasks-v1';
   const EVENTS_KEY = 'florangel-events-v1';
   const CONTACTS_KEY = 'florangel-contacts-v1';
+  const HIERARCHY_KEY = 'florangel-hierarchy-v1';
   const UI_KEY = 'florangel-ui-v1';
 
   // Campos compartidos del formulario de eventos, iguales en todos los
@@ -103,13 +104,15 @@
     tasksTitle: 'Tareas de Equipo',
     calendarTitle: '🗓️ Calendario de jornadas',
     contactsTitle: 'Contactos',
-    tabOrder: ['tasks', 'calendar', 'contacts'],
+    hierarchyTitle: 'Jerarquía',
+    tabOrder: ['tasks', 'calendar', 'contacts', 'hierarchy'],
     boardOrder: ['kpis', 'board']
   };
   const NAV_ITEMS = {
     tasks: { emoji: '📋', label: 'Tareas de Equipo' },
     calendar: { emoji: '🗓️', label: 'Calendario' },
-    contacts: { emoji: '🤝', label: 'Contactos' }
+    contacts: { emoji: '🤝', label: 'Contactos' },
+    hierarchy: { emoji: '🏛️', label: 'Jerarquía' }
   };
   const BOARD_ITEMS = {
     kpis: { emoji: '📊', label: 'Indicadores' },
@@ -163,6 +166,8 @@
     tasks: [],
     events: [],
     contacts: [],
+    hierarchy: [],
+    hierarchyEditor: null,
     query: '',
     contactStatusFilter: '',
     teamMembers: [],
@@ -222,6 +227,9 @@
       'contact-detail-edit': editFromContactDetail,
       'contact-detail-delete': deleteFromContactDetail,
       'contact-detail-vcard': function () { downloadVCard(findById(state.contacts, state.contactViewer)); },
+      'area-dialog-close': closeAreaDialog,
+      'area-dialog-cancel': closeAreaDialog,
+      'area-delete': deleteEditingArea,
       'customize-open': openCustomize,
       'customize-dialog-close': closeCustomize,
       'customize-dialog-cancel': closeCustomize,
@@ -243,6 +251,9 @@
     if (action === 'new-contact') openContactDialog();
     if (action === 'edit-contact') openContactDialog(findById(state.contacts, id));
     if (action === 'view-contact') openContactDetail(findById(state.contacts, id));
+    if (action === 'new-area') openAreaDialog(null, '');
+    if (action === 'edit-area') openAreaDialog(findById(state.hierarchy, id));
+    if (action === 'add-child-area') openAreaDialog(null, id);
   }
 
   function init() {
@@ -312,6 +323,19 @@
     dom.contactDetailDialog = document.getElementById('contact-detail-dialog');
     dom.contactDetailTitle = document.getElementById('contact-detail-title');
     dom.contactDetailBody = document.getElementById('contact-detail-body');
+    dom.hierarchyViewTitle = document.getElementById('hierarchy-view-title');
+    dom.hierarchyTree = document.getElementById('hierarchy-tree');
+    dom.areaDialog = document.getElementById('area-dialog');
+    dom.areaDialogTitle = document.getElementById('area-dialog-title');
+    dom.areaForm = document.getElementById('area-form');
+    dom.areaError = document.getElementById('area-error');
+    dom.areaParentSelect = document.getElementById('field-area-parent');
+    dom.areaContactLink = document.getElementById('field-area-contact-link');
+    dom.areaPhoneCode = document.getElementById('field-area-responsible-phone-code');
+    dom.areaStatusSelect = document.getElementById('field-area-status');
+    dom.areaSaveAsContact = document.getElementById('field-area-save-as-contact');
+    dom.areaDelete = document.getElementById('area-delete');
+    dom.customHierarchyTitle = document.getElementById('field-custom-hierarchy-title');
     dom.pageTitle = document.getElementById('page-title');
     dom.pageSubtitle = document.getElementById('page-subtitle');
     dom.tabNav = document.getElementById('tab-nav');
@@ -343,6 +367,9 @@
       renderContacts();
     });
     dom.contactDetailDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeContactDetail(); });
+    dom.areaForm.addEventListener('submit', onAreaSubmit);
+    dom.areaDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeAreaDialog(); });
+    dom.areaContactLink.addEventListener('change', onAreaContactLinkChange);
     dom.customizeForm.addEventListener('submit', onCustomizeSubmit);
     dom.customizeDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeCustomize(); });
     dom.responsableChecklist.addEventListener('change', onResponsableChecklistChange);
@@ -450,10 +477,11 @@
     dom.connectivityBanner.hidden = true;
     state.loadFailed = false;
 
-    const [tasksValue, eventsValue, contactsValue, teamMembers, uiValue] = await Promise.all([
+    const [tasksValue, eventsValue, contactsValue, hierarchyValue, teamMembers, uiValue] = await Promise.all([
       readKey(TASKS_KEY, null),
       readKey(EVENTS_KEY, null),
       readKey(CONTACTS_KEY, null),
+      readKey(HIERARCHY_KEY, null),
       loadTeamMembers(),
       readKey(UI_KEY, null)
     ]);
@@ -478,10 +506,12 @@
     state.tasks = tasks.map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); });
     state.events = events;
     state.contacts = Array.isArray(contactsValue) ? contactsValue : [];
+    state.hierarchy = Array.isArray(hierarchyValue) ? hierarchyValue : [];
     dom.loadingState.hidden = true;
     populateTasksResponsableFilter();
     renderKanban();
     renderContacts();
+    renderHierarchy();
     if (state.view === 'calendar') renderCalendar();
     if (!background) setView(state.view);
   }
@@ -502,6 +532,7 @@
     dom.tasksTitle.textContent = ui.tasksTitle;
     dom.calendarTitle.textContent = ui.calendarTitle;
     dom.contactsViewTitle.textContent = ui.contactsTitle;
+    dom.hierarchyViewTitle.textContent = ui.hierarchyTitle;
     reorderChildren(dom.tabNav, ui.tabOrder, function (id) { return dom.tabNav.querySelector('[data-view="' + id + '"]'); });
     reorderChildren(dom.tasksBlocks, ui.boardOrder, function (id) { return document.getElementById('tasks-block-' + id); });
   }
@@ -520,6 +551,7 @@
     dom.customTasksTitle.value = state.customizeForm.tasksTitle;
     dom.customCalendarTitle.value = state.customizeForm.calendarTitle;
     dom.customContactsTitle.value = state.customizeForm.contactsTitle;
+    dom.customHierarchyTitle.value = state.customizeForm.hierarchyTitle;
     renderCustomizeLists();
     dom.customizeDialog.showModal();
   }
@@ -533,6 +565,7 @@
     dom.customTasksTitle.value = state.customizeForm.tasksTitle;
     dom.customCalendarTitle.value = state.customizeForm.calendarTitle;
     dom.customContactsTitle.value = state.customizeForm.contactsTitle;
+    dom.customHierarchyTitle.value = state.customizeForm.hierarchyTitle;
     renderCustomizeLists();
   }
 
@@ -583,6 +616,7 @@
       tasksTitle: dom.customTasksTitle.value.trim() || DEFAULT_UI.tasksTitle,
       calendarTitle: dom.customCalendarTitle.value.trim() || DEFAULT_UI.calendarTitle,
       contactsTitle: dom.customContactsTitle.value.trim() || DEFAULT_UI.contactsTitle,
+      hierarchyTitle: dom.customHierarchyTitle.value.trim() || DEFAULT_UI.hierarchyTitle,
       tabOrder: state.customizeForm.tabOrder,
       boardOrder: state.customizeForm.boardOrder
     };
@@ -1229,6 +1263,178 @@
     const contact = findById(state.contacts, state.contactEditor);
     deleteContact(contact);
     closeContactDialog();
+  }
+
+  // ---------- Jerarquía ----------
+
+  function getDescendantIds(id) {
+    const result = [];
+    const stack = [id];
+    while (stack.length) {
+      const current = stack.pop();
+      state.hierarchy.forEach(function (a) {
+        if (a.parentId === current && result.indexOf(a.id) === -1) { result.push(a.id); stack.push(a.id); }
+      });
+    }
+    return result;
+  }
+
+  function populateAreaParentSelect(excludeIds, current) {
+    const options = state.hierarchy
+      .filter(function (a) { return excludeIds.indexOf(a.id) === -1; })
+      .map(function (a) { return '<option value="' + safe(a.id) + '">' + safe(a.name) + '</option>'; })
+      .join('');
+    renderMarkup(dom.areaParentSelect, '<option value="">— Nivel superior (sin área padre) —</option>' + options);
+    dom.areaParentSelect.value = current || '';
+  }
+
+  function populateAreaContactLink() {
+    const options = state.contacts.map(function (c) {
+      return '<option value="' + safe(c.id) + '">' + safe(c.name) + (c.role ? ' · ' + safe(c.role) : '') + '</option>';
+    }).join('');
+    renderMarkup(dom.areaContactLink, '<option value="">— Selecciona un contacto —</option>' + options);
+    dom.areaContactLink.value = '';
+  }
+
+  // Autocompleta el responsable con los datos de un contacto ya existente
+  // — es una copia puntual, no un vínculo permanente: si ese contacto
+  // cambia después, el área no se actualiza sola.
+  function onAreaContactLinkChange() {
+    const contact = findById(state.contacts, dom.areaContactLink.value);
+    if (!contact) return;
+    dom.areaForm.elements.responsible_name.value = contact.name || '';
+    const parsedPhone = splitPhone(contact.phone || '');
+    populatePhoneCodeSelect(dom.areaPhoneCode, parsedPhone.code);
+    dom.areaForm.elements.responsible_phone_number.value = parsedPhone.number;
+    dom.areaForm.elements.responsible_email.value = contact.email || '';
+    if (!dom.areaForm.elements.responsible_role.value.trim()) dom.areaForm.elements.responsible_role.value = contact.role || '';
+  }
+
+  function openAreaDialog(existing, presetParentId) {
+    hideError(dom.areaError);
+    dom.areaForm.reset();
+    state.hierarchyEditor = existing ? existing.id : null;
+    dom.areaDialogTitle.textContent = existing ? 'Editar área' : 'Agregar área';
+    dom.areaDelete.hidden = !existing;
+    const excludeIds = existing ? [existing.id].concat(getDescendantIds(existing.id)) : [];
+    populateAreaParentSelect(excludeIds, existing ? existing.parentId : (presetParentId || ''));
+    populateAreaContactLink();
+    const parsedPhone = splitPhone(existing ? existing.responsiblePhone : '');
+    populatePhoneCodeSelect(dom.areaPhoneCode, parsedPhone.code);
+    dom.areaForm.elements.responsible_phone_number.value = parsedPhone.number;
+    populateContactStatusSelect(dom.areaStatusSelect, existing ? existing.status : '');
+    if (existing) {
+      dom.areaForm.elements.name.value = existing.name || '';
+      dom.areaForm.elements.responsible_name.value = existing.responsibleName || '';
+      dom.areaForm.elements.responsible_email.value = existing.responsibleEmail || '';
+      dom.areaForm.elements.responsible_role.value = existing.responsibleRole || '';
+      dom.areaForm.elements.responsible_function.value = existing.responsibleFunction || '';
+      dom.areaForm.elements.responsible_account.value = existing.responsibleAccount || '';
+      dom.areaForm.elements.responsible_affiliation.value = existing.responsibleAffiliation || '';
+      dom.areaForm.elements.notes.value = existing.notes || '';
+    }
+    dom.areaDialog.showModal();
+    dom.areaForm.elements.name.focus();
+  }
+
+  function closeAreaDialog() { dom.areaDialog.close(); state.hierarchyEditor = null; }
+
+  function onAreaSubmit(e) {
+    e.preventDefault();
+    hideError(dom.areaError);
+    const name = dom.areaForm.elements.name.value.trim();
+    if (!name) { showError(dom.areaError, 'El nombre del área es obligatorio.'); return; }
+    const editId = state.hierarchyEditor;
+    const existing = findById(state.hierarchy, editId);
+    const payload = {
+      id: editId || uid(),
+      name: name,
+      parentId: dom.areaParentSelect.value || '',
+      responsibleName: dom.areaForm.elements.responsible_name.value.trim(),
+      responsiblePhone: combinePhone(dom.areaPhoneCode.value, dom.areaForm.elements.responsible_phone_number.value),
+      responsibleEmail: dom.areaForm.elements.responsible_email.value.trim(),
+      responsibleRole: dom.areaForm.elements.responsible_role.value.trim(),
+      responsibleFunction: dom.areaForm.elements.responsible_function.value.trim(),
+      responsibleAccount: dom.areaForm.elements.responsible_account.value.trim(),
+      responsibleAffiliation: dom.areaForm.elements.responsible_affiliation.value.trim(),
+      status: dom.areaStatusSelect.value || 'pending',
+      notes: dom.areaForm.elements.notes.value.trim(),
+      created_at: existing ? existing.created_at : new Date().toISOString()
+    };
+    const saveAsContact = dom.areaSaveAsContact.checked && payload.responsibleName;
+    applyChange(HIERARCHY_KEY, 'hierarchy', function (list) {
+      return editId
+        ? list.map(function (a) { return a.id === editId ? payload : a; })
+        : list.concat(payload);
+    }, renderHierarchy);
+    if (saveAsContact) saveResponsibleAsContact(payload);
+    closeAreaDialog();
+    toast('Área guardada.', 'success');
+  }
+
+  // Crea (o actualiza, si ya existe uno con el mismo nombre) un contacto a
+  // partir del responsable del área — para no tener que escribir sus datos
+  // dos veces si también quieres verlo en Contactos.
+  function saveResponsibleAsContact(area) {
+    const matchName = area.responsibleName.trim().toLowerCase();
+    applyChange(CONTACTS_KEY, 'contacts', function (list) {
+      const idx = list.findIndex(function (c) { return (c.name || '').trim().toLowerCase() === matchName; });
+      const contact = {
+        id: idx > -1 ? list[idx].id : uid(),
+        name: area.responsibleName,
+        role: area.responsibleRole,
+        phone: area.responsiblePhone,
+        email: area.responsibleEmail,
+        status: idx > -1 ? list[idx].status : 'pending',
+        notes: idx > -1 ? list[idx].notes : '',
+        created_at: idx > -1 ? list[idx].created_at : new Date().toISOString()
+      };
+      if (idx > -1) { const copy = list.slice(); copy[idx] = contact; return copy; }
+      return list.concat(contact);
+    }, renderContacts);
+  }
+
+  function deleteEditingArea() {
+    const area = findById(state.hierarchy, state.hierarchyEditor);
+    if (!area) return;
+    const hasChildren = state.hierarchy.some(function (a) { return a.parentId === area.id; });
+    if (hasChildren) { showError(dom.areaError, 'Esta área tiene sub-áreas — muévelas o elimínalas primero.'); return; }
+    applyChange(HIERARCHY_KEY, 'hierarchy', function (list) { return list.filter(function (a) { return a.id !== area.id; }); }, renderHierarchy);
+    closeAreaDialog();
+    toast('Área eliminada.', 'success');
+  }
+
+  function hierarchyNodeHtml(area) {
+    const status = contactStatusInfo(area);
+    const children = state.hierarchy.filter(function (a) { return a.parentId === area.id; });
+    const respLine = area.responsibleName
+      ? '👤 ' + safe(area.responsibleName) + (area.responsibleRole ? ' · ' + safe(area.responsibleRole) : '')
+      : '<span class="hierarchy-empty">Sin responsable asignado</span>';
+    return '<div class="hierarchy-node">' +
+      '<div class="hierarchy-node-card">' +
+        '<div class="hierarchy-node-head">' +
+          '<span class="hierarchy-node-name">' + safe(area.name) + '</span>' +
+          '<span class="contact-status-pill status-' + status.key + '">' + status.emoji + ' ' + safe(status.label) + '</span>' +
+        '</div>' +
+        '<div class="hierarchy-node-resp">' + respLine + '</div>' +
+        (area.notes ? '<div class="hierarchy-node-notes">' + safe(area.notes) + '</div>' : '') +
+        '<div class="hierarchy-node-actions">' +
+          '<button type="button" class="link-button" data-action="add-child-area" data-id="' + safe(area.id) + '" onclick="window.florangelAction(event)">➕ Sub-área</button>' +
+          '<button type="button" class="icon-button icon-button-sm" data-action="edit-area" data-id="' + safe(area.id) + '" onclick="window.florangelAction(event)" aria-label="Editar ' + safe(area.name) + '">✏️</button>' +
+        '</div>' +
+      '</div>' +
+      (children.length ? '<div class="hierarchy-children">' + children.map(hierarchyNodeHtml).join('') + '</div>' : '') +
+    '</div>';
+  }
+
+  function renderHierarchy() {
+    if (!dom.hierarchyTree) return;
+    if (!state.hierarchy.length) {
+      renderMarkup(dom.hierarchyTree, '<div class="empty-state"><strong>🏛️ Jerarquía vacía</strong><span>Agrega la primera área con el botón de arriba.</span></div>');
+      return;
+    }
+    const roots = state.hierarchy.filter(function (a) { return !a.parentId || !findById(state.hierarchy, a.parentId); });
+    renderMarkup(dom.hierarchyTree, roots.map(hierarchyNodeHtml).join(''));
   }
 
   function openContactDetail(c) {

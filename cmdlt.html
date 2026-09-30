@@ -6,9 +6,9 @@
   <meta name="description" content="Calendario, contactos y tareas de equipo — Centro Médico Docente de La Trinidad.">
   <title>CMDLT — Centro Médico Docente de La Trinidad</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./cmdlt.css?v=8">
+  <link rel="stylesheet" href="./cmdlt.css?v=9">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./cmdlt.js?v=10" defer></script>
+  <script src="./cmdlt.js?v=11" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -28,6 +28,7 @@
     <nav id="tab-nav" class="tab-nav" aria-label="Secciones">
       <button class="tab-button" type="button" data-view="calendar" aria-current="page" onclick="window.cmdltAction(event)">🗓️ Calendario</button>
       <button class="tab-button" type="button" data-view="contacts" onclick="window.cmdltAction(event)">🤝 Contactos</button>
+      <button class="tab-button" type="button" data-view="hierarchy" onclick="window.cmdltAction(event)">🏛️ Jerarquía</button>
       <button class="tab-button" type="button" data-view="tasks" onclick="window.cmdltAction(event)">📋 Tareas de Equipo</button>
     </nav>
 
@@ -112,6 +113,18 @@
         <p id="contact-result-count" class="result-count" aria-live="polite"></p>
       </div>
       <div id="contacts-list" class="contact-grid"></div>
+    </section>
+
+    <section id="hierarchy-view" class="view" aria-labelledby="hierarchy-title" hidden>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">🏛️ Estructura</p>
+          <h2 id="hierarchy-title">Jerarquía</h2>
+          <p class="view-description">Áreas del CMDLT, con su responsable, en niveles como un organigrama.</p>
+        </div>
+        <button class="btn btn-primary" type="button" data-action="new-area" onclick="window.cmdltAction(event)">➕ Agregar área</button>
+      </div>
+      <div id="hierarchy-tree" class="hierarchy-tree"></div>
     </section>
 
     <section id="tasks-view" class="view" aria-labelledby="tasks-title" hidden>
@@ -285,6 +298,83 @@
     </div>
   </dialog>
 
+  <dialog id="area-dialog" class="editor-dialog" aria-labelledby="area-dialog-title">
+    <form id="area-form" class="dialog-form" novalidate>
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">🏛️ Estructura</p>
+          <h2 id="area-dialog-title">Agregar área</h2>
+        </div>
+        <button id="area-dialog-close" class="icon-button" type="button" aria-label="Cerrar" onclick="window.cmdltAction(event)">×</button>
+      </div>
+      <div id="area-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-fields">
+        <div class="field field-full">
+          <label for="field-area-name">Nombre del área</label>
+          <input id="field-area-name" class="input" name="name" type="text" required placeholder="Ej. Dirección Médica, Docencia">
+        </div>
+        <div class="field field-full">
+          <label for="field-area-parent">Área superior (opcional)</label>
+          <select id="field-area-parent" class="input" name="parent_id"></select>
+        </div>
+        <div class="field field-full">
+          <label for="field-area-contact-link">Autocompletar desde un contacto existente (opcional)</label>
+          <select id="field-area-contact-link" class="input"></select>
+        </div>
+        <div class="field field-full">
+          <label for="field-area-responsible-name">Responsable — Nombre</label>
+          <input id="field-area-responsible-name" class="input" name="responsible_name" type="text">
+        </div>
+        <div class="field">
+          <label for="field-area-responsible-phone-number">Responsable — Teléfono</label>
+          <div class="phone-field">
+            <select id="field-area-responsible-phone-code" class="input phone-code" aria-label="Código de país"></select>
+            <input id="field-area-responsible-phone-number" class="input phone-number" name="responsible_phone_number" type="tel" placeholder="4141234567">
+          </div>
+        </div>
+        <div class="field">
+          <label for="field-area-responsible-email">Responsable — Correo</label>
+          <input id="field-area-responsible-email" class="input" name="responsible_email" type="email">
+        </div>
+        <div class="field">
+          <label for="field-area-responsible-role">Cargo / Rol</label>
+          <input id="field-area-responsible-role" class="input" name="responsible_role" type="text" placeholder="Ej. Coordinador de logística">
+        </div>
+        <div class="field">
+          <label for="field-area-responsible-function">Función</label>
+          <input id="field-area-responsible-function" class="input" name="responsible_function" type="text" placeholder="Qué está desarrollando">
+        </div>
+        <div class="field">
+          <label for="field-area-responsible-account">Cuenta corporativa</label>
+          <input id="field-area-responsible-account" class="input" name="responsible_account" type="text">
+        </div>
+        <div class="field">
+          <label for="field-area-responsible-affiliation">Afiliación</label>
+          <input id="field-area-responsible-affiliation" class="input" name="responsible_affiliation" type="text">
+        </div>
+        <div class="field">
+          <label for="field-area-status">Estado de la relación</label>
+          <select id="field-area-status" class="input" name="status"></select>
+        </div>
+        <div class="field field-full">
+          <label for="field-area-notes">Notas</label>
+          <textarea id="field-area-notes" class="input" name="notes"></textarea>
+        </div>
+        <div class="field field-full">
+          <label class="checkbox-chip" style="width: fit-content">
+            <input type="checkbox" id="field-area-save-as-contact" name="save_as_contact">
+            📇 Guardar también como contacto
+          </label>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="area-dialog-cancel" class="btn btn-secondary" type="button" onclick="window.cmdltAction(event)">Cancelar</button>
+        <button id="area-delete" class="btn btn-secondary" type="button" onclick="window.cmdltAction(event)" hidden>🗑️ Eliminar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="task-dialog" class="editor-dialog" aria-labelledby="task-dialog-title">
     <form id="task-form" class="dialog-form" novalidate>
       <div class="dialog-header">
@@ -380,6 +470,10 @@
         <div class="field">
           <label for="field-custom-contacts-title">Título de contactos</label>
           <input id="field-custom-contacts-title" class="input" name="contactsTitle" type="text">
+        </div>
+        <div class="field">
+          <label for="field-custom-hierarchy-title">Título de jerarquía</label>
+          <input id="field-custom-hierarchy-title" class="input" name="hierarchyTitle" type="text">
         </div>
         <div class="field">
           <label for="field-custom-tasks-title">Título de tareas</label>
