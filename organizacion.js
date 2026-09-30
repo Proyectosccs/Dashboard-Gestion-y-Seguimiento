@@ -439,6 +439,30 @@
     renderCalendar();
   }
 
+  // Guarda un cambio sobre la versión ACTUAL de Supabase, no sobre la que
+  // este tablero cargó al abrirse: lee, aplica `change` y escribe solo si
+  // nadie guardó entre medio (si alguien lo hizo, reintenta sobre esa
+  // versión). Si la lectura falla no escribe nada — así un fallo de conexión
+  // al abrir nunca termina guardando una lista vacía encima de la real, y dos
+  // computadoras (o dos tableros que comparten las tareas de equipo) no se
+  // pisan. Devuelve el valor guardado, o null si no se pudo guardar.
+  async function mutateBoardKey(key, fallback, change) {
+    for (let intento = 0; intento < 4; intento++) {
+      const res = await state.client.from(TABLE).select('value,updated_at').eq('key', key).maybeSingle();
+      if (res.error) return null;
+      const raw = res.data ? res.data.value : null;
+      const current = (Array.isArray(fallback) ? Array.isArray(raw) : raw != null) ? raw : fallback;
+      const next = change(JSON.parse(JSON.stringify(current)));
+      const stamp = new Date().toISOString();
+      const w = res.data
+        ? await state.client.from(TABLE).update({ value: next, updated_at: stamp }).eq('key', key).eq('updated_at', res.data.updated_at).select('key')
+        : await state.client.from(TABLE).insert({ key: key, value: next, updated_at: stamp }).select('key');
+      if (w.error) { if (!res.data) continue; return null; }
+      if (w.data && w.data.length) return next;
+    }
+    return null;
+  }
+
   async function writeBoardKey(key, value) {
     const res = await state.client.from(TABLE).upsert({ key: key, value: value, updated_at: new Date().toISOString() });
     return !res.error;
@@ -838,12 +862,14 @@
       participants: readParticipants(),
       created_at: existing ? existing.created_at : new Date().toISOString()
     });
-    const next = existing
-      ? state.events.map(function (ev) { return ev.id === existing.id ? payload : ev; })
-      : state.events.concat(payload);
-    const ok = await writeBoardKey(EVENTS_KEY, next);
+    const next = await mutateBoardKey(EVENTS_KEY, [], function (list) {
+      return existing
+        ? list.map(function (ev) { return ev.id === existing.id ? payload : ev; })
+        : list.concat(payload);
+    });
+    const ok = next !== null;
     if (!ok) { showError(dom.eventError, 'No se pudo guardar — revisa tu conexión.'); return; }
-    state.events = next;
+    state.events = next.filter(function (e) { return !!e.event_date; });
     closeEventDialog();
     state.selectedDay = eventDate;
     renderCalendar();
@@ -852,10 +878,10 @@
 
   async function deleteEditingEvent() {
     if (!state.editingEvent) return;
-    const next = state.events.filter(function (ev) { return ev.id !== state.editingEvent.id; });
-    const ok = await writeBoardKey(EVENTS_KEY, next);
+    const next = await mutateBoardKey(EVENTS_KEY, [], function (list) { return list.filter(function (ev) { return ev.id !== state.editingEvent.id; }); });
+    const ok = next !== null;
     if (!ok) { showError(dom.eventError, 'No se pudo eliminar — revisa tu conexión.'); return; }
-    state.events = next;
+    state.events = next.filter(function (e) { return !!e.event_date; });
     closeEventDialog();
     renderCalendar();
     toast('Evento eliminado.', 'success');
@@ -947,10 +973,12 @@
       notes: dom.contactForm.elements.notes.value.trim(),
       created_at: existing ? existing.created_at : new Date().toISOString()
     };
-    const next = existing
-      ? state.contacts.map(function (c) { return c.id === existing.id ? payload : c; })
-      : state.contacts.concat(payload);
-    const ok = await writeBoardKey(CONTACTS_KEY, next);
+    const next = await mutateBoardKey(CONTACTS_KEY, [], function (list) {
+      return existing
+        ? list.map(function (c) { return c.id === existing.id ? payload : c; })
+        : list.concat(payload);
+    });
+    const ok = next !== null;
     if (!ok) { showError(dom.contactError, 'No se pudo guardar — revisa tu conexión.'); return; }
     state.contacts = next;
     renderContacts();
@@ -960,8 +988,8 @@
 
   async function deleteContact(contact) {
     if (!contact) return;
-    const next = state.contacts.filter(function (c) { return c.id !== contact.id; });
-    const ok = await writeBoardKey(CONTACTS_KEY, next);
+    const next = await mutateBoardKey(CONTACTS_KEY, [], function (list) { return list.filter(function (c) { return c.id !== contact.id; }); });
+    const ok = next !== null;
     if (!ok) { toast('No se pudo eliminar — revisa tu conexión.', 'error'); return; }
     state.contacts = next;
     renderContacts();
@@ -1145,8 +1173,8 @@
 
   async function createTeamMember(name) {
     const entry = { id: uid(), name: name, created_at: new Date().toISOString() };
-    const next = state.teamMembers.concat(entry);
-    const ok = await writeBoardKey(TEAM_MEMBERS_KEY, next);
+    const next = await mutateBoardKey(TEAM_MEMBERS_KEY, [], function (list) { return list.concat(entry); });
+    const ok = next !== null;
     if (!ok) return null;
     state.teamMembers = next;
     return entry;
@@ -1160,8 +1188,13 @@
     task.status = status;
     renderTasksBoard();
     renderKpis();
-    const ok = await writeBoardKey(TEAM_TASKS_KEY, state.allTasks);
-    if (!ok) { task.status = previous; renderTasksBoard(); renderKpis(); toast('No se pudo actualizar el estado — revisa tu conexión.', 'error'); }
+    const next = await mutateBoardKey(TEAM_TASKS_KEY, [], function (list) {
+      return list.map(function (t) { return t.id === id ? Object.assign({}, t, { status: status }) : t; });
+    });
+    if (next === null) { task.status = previous; renderTasksBoard(); renderKpis(); toast('No se pudo actualizar el estado — revisa tu conexión.', 'error'); return; }
+    state.allTasks = next.map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); });
+    renderTasksBoard();
+    renderKpis();
   }
 
   function openTaskDialog(existing) {
@@ -1214,12 +1247,14 @@
       nextAction: dom.taskNextAction.value.trim(),
       created_at: existing ? existing.created_at : new Date().toISOString()
     };
-    const next = existing
-      ? state.allTasks.map(function (t) { return t.id === existing.id ? payload : t; })
-      : state.allTasks.concat(payload);
-    const ok = await writeBoardKey(TEAM_TASKS_KEY, next);
+    const next = await mutateBoardKey(TEAM_TASKS_KEY, [], function (list) {
+      return existing
+        ? list.map(function (t) { return t.id === existing.id ? payload : t; })
+        : list.concat(payload);
+    });
+    const ok = next !== null;
     if (!ok) { showError(dom.taskError, 'No se pudo guardar — revisa tu conexión.'); return; }
-    state.allTasks = next;
+    state.allTasks = next.map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); });
     renderTasksBoard();
     renderKpis();
     closeTaskDialog();
@@ -1228,10 +1263,10 @@
 
   async function deleteEditingTask() {
     if (!state.editingTask) return;
-    const next = state.allTasks.filter(function (t) { return t.id !== state.editingTask.id; });
-    const ok = await writeBoardKey(TEAM_TASKS_KEY, next);
+    const next = await mutateBoardKey(TEAM_TASKS_KEY, [], function (list) { return list.filter(function (t) { return t.id !== state.editingTask.id; }); });
+    const ok = next !== null;
     if (!ok) { toast('No se pudo eliminar — revisa tu conexión.', 'error'); return; }
-    state.allTasks = next;
+    state.allTasks = next.map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); });
     renderTasksBoard();
     renderKpis();
     closeTaskDialog();

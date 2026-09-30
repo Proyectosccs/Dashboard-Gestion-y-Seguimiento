@@ -373,7 +373,8 @@
   async function readKey(key, fallback) {
     if (!state.client) return fallback;
     const res = await state.client.from(TABLE).select('value').eq('key', key).maybeSingle();
-    if (res.error || !res.data) return fallback;
+    if (res.error) { state.loadFailed = true; return fallback; }
+    if (!res.data) return fallback;
     return res.data.value;
   }
 
@@ -384,6 +385,48 @@
       console.error('Error al guardar (' + key + ')', res.error);
       toast('No se pudo guardar — revisa tu conexión.', 'error');
     }
+  }
+
+  // Guarda un cambio sobre la versión ACTUAL de Supabase, no sobre la que
+  // este tablero tiene en memoria: lee, aplica `change` y escribe solo si
+  // nadie guardó entre medio (si alguien lo hizo, reintenta sobre esa
+  // versión). Si la lectura falla no escribe nada. Devuelve el valor
+  // guardado, o null si no se pudo guardar.
+  async function mutateKey(table, key, fallback, change) {
+    if (!state.client) return null;
+    for (let intento = 0; intento < 4; intento++) {
+      const res = await state.client.from(table).select('value,updated_at').eq('key', key).maybeSingle();
+      if (res.error) return null;
+      const raw = res.data ? res.data.value : null;
+      const current = (Array.isArray(fallback) ? Array.isArray(raw) : raw != null) ? raw : fallback;
+      const next = change(JSON.parse(JSON.stringify(current)));
+      const stamp = new Date().toISOString();
+      const w = res.data
+        ? await state.client.from(table).update({ value: next, updated_at: stamp }).eq('key', key).eq('updated_at', res.data.updated_at).select('key')
+        : await state.client.from(table).insert({ key: key, value: next, updated_at: stamp }).select('key');
+      if (w.error) { if (!res.data) continue; return null; }
+      if (w.data && w.data.length) return next;
+    }
+    return null;
+  }
+
+  // Aplica `change` al instante en pantalla y lo guarda con mutateKey; al
+  // terminar, la pantalla queda con lo que realmente quedó guardado
+  // (incluido lo que otra persona haya agregado mientras tanto).
+  function applyChange(key, field, change, render) {
+    state[field] = change(state[field]);
+    render();
+    mutateKey(TABLE, key, [], change).then(function (saved) {
+      if (saved === null) {
+        toast('No se pudo guardar — revisa tu conexión.', 'error');
+        loadAllData(true);
+        return;
+      }
+      state[field] = field === 'tasks'
+        ? saved.map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); })
+        : saved;
+      render();
+    });
   }
 
   // El roster de responsables vive en la tabla compartida (SHARED_TABLE),
@@ -405,6 +448,7 @@
     if (!state.client) return;
     if (!background) dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
+    state.loadFailed = false;
 
     const [tasksValue, eventsValue, contactsValue, teamMembers, uiValue] = await Promise.all([
       readKey(TASKS_KEY, null),
@@ -422,7 +466,7 @@
 
     // Primera vez que se abre este tablero: siembra un evento de ejemplo
     // este fin de semana para que el calendario no arranque vacío.
-    if (tasksValue === null && eventsValue === null) {
+    if (tasksValue === null && eventsValue === null && !state.loadFailed) {
       events = [{
         id: uid(), title: 'Jornadas', event_date: upcomingWeekendDate(), start_time: '',
         location: '', notes: '', created_at: new Date().toISOString()
@@ -692,9 +736,8 @@
 
   async function createTeamMember(name) {
     const entry = { id: uid(), name: name, created_at: new Date().toISOString() };
-    const next = state.teamMembers.concat(entry);
-    const ok = await writeTeamMembers(next);
-    if (!ok) return null;
+    const next = await mutateKey(SHARED_TABLE, TEAM_MEMBERS_KEY, [], function (list) { return list.concat(entry); });
+    if (next === null) return null;
     state.teamMembers = next;
     return entry;
   }
@@ -702,9 +745,9 @@
   function moveTask(id, stage) {
     const task = findById(state.tasks, id);
     if (!task || task.stage === stage) return;
-    task.stage = stage;
-    renderKanban();
-    writeKey(TASKS_KEY, state.tasks);
+    applyChange(TASKS_KEY, 'tasks', function (list) {
+      return list.map(function (t) { return t.id === id ? Object.assign({}, t, { stage: stage }) : t; });
+    }, renderKanban);
   }
 
   function openTaskDialog(task) {
@@ -753,23 +796,19 @@
       nextAction: dom.taskNextAction.value.trim(),
       created_at: new Date().toISOString()
     };
-    if (state.taskEditor) {
-      const existing = findById(state.tasks, state.taskEditor);
-      state.tasks = state.tasks.map(function (t) { return t.id === state.taskEditor ? Object.assign({}, existing, payload, { created_at: existing.created_at }) : t; });
-    } else {
-      state.tasks = state.tasks.concat(payload);
-    }
-    writeKey(TASKS_KEY, state.tasks);
-    renderKanban();
+    const editId = state.taskEditor;
+    applyChange(TASKS_KEY, 'tasks', function (list) {
+      if (!editId) return list.concat(payload);
+      return list.map(function (t) { return t.id === editId ? Object.assign({}, t, payload, { created_at: t.created_at }) : t; });
+    }, renderKanban);
     closeTaskDialog();
     toast('Tarea guardada.', 'success');
   }
 
   function deleteEditingTask() {
     if (!state.taskEditor) return;
-    state.tasks = state.tasks.filter(function (t) { return t.id !== state.taskEditor; });
-    writeKey(TASKS_KEY, state.tasks);
-    renderKanban();
+    const delId = state.taskEditor;
+    applyChange(TASKS_KEY, 'tasks', function (list) { return list.filter(function (t) { return t.id !== delId; }); }, renderKanban);
     closeTaskDialog();
     toast('Tarea eliminada.', 'success');
   }
@@ -1037,23 +1076,19 @@
       participants: readParticipants(),
       created_at: new Date().toISOString()
     };
-    if (state.eventEditor) {
-      const existing = findById(state.events, state.eventEditor);
-      state.events = state.events.map(function (ev) { return ev.id === state.eventEditor ? Object.assign({}, existing, payload, { created_at: existing.created_at }) : ev; });
-    } else {
-      state.events = state.events.concat(payload);
-    }
-    writeKey(EVENTS_KEY, state.events);
-    renderCalendar();
+    const editId = state.eventEditor;
+    applyChange(EVENTS_KEY, 'events', function (list) {
+      if (!editId) return list.concat(payload);
+      return list.map(function (ev) { return ev.id === editId ? Object.assign({}, ev, payload, { created_at: ev.created_at }) : ev; });
+    }, renderCalendar);
     closeEventDialog();
     toast('Evento guardado.', 'success');
   }
 
   function deleteEditingEvent() {
     if (!state.eventEditor) return;
-    state.events = state.events.filter(function (ev) { return ev.id !== state.eventEditor; });
-    writeKey(EVENTS_KEY, state.events);
-    renderCalendar();
+    const delId = state.eventEditor;
+    applyChange(EVENTS_KEY, 'events', function (list) { return list.filter(function (ev) { return ev.id !== delId; }); }, renderCalendar);
     closeEventDialog();
     toast('Evento eliminado.', 'success');
   }
@@ -1143,23 +1178,18 @@
       notes: dom.contactForm.elements.notes.value.trim(),
       created_at: new Date().toISOString()
     };
-    if (state.contactEditor) {
-      const existing = findById(state.contacts, state.contactEditor);
-      state.contacts = state.contacts.map(function (c) { return c.id === state.contactEditor ? Object.assign({}, existing, payload, { created_at: existing.created_at }) : c; });
-    } else {
-      state.contacts = state.contacts.concat(payload);
-    }
-    writeKey(CONTACTS_KEY, state.contacts);
-    renderContacts();
+    const editId = state.contactEditor;
+    applyChange(CONTACTS_KEY, 'contacts', function (list) {
+      if (!editId) return list.concat(payload);
+      return list.map(function (c) { return c.id === editId ? Object.assign({}, c, payload, { created_at: c.created_at }) : c; });
+    }, renderContacts);
     closeContactDialog();
     toast('Contacto guardado.', 'success');
   }
 
   function deleteContact(contact) {
     if (!contact) return;
-    state.contacts = state.contacts.filter(function (c) { return c.id !== contact.id; });
-    writeKey(CONTACTS_KEY, state.contacts);
-    renderContacts();
+    applyChange(CONTACTS_KEY, 'contacts', function (list) { return list.filter(function (c) { return c.id !== contact.id; }); }, renderContacts);
     toast('Contacto eliminado.', 'success');
   }
 

@@ -1219,7 +1219,7 @@
     const input = document.getElementById('responsable-edit-input');
     const name = input ? input.value.trim() : '';
     if (!name) { showError(dom.responsablesError, 'El nombre no puede quedar vacío.'); return; }
-    const next = state.teamMembers.map(function (m) { return m.id === id ? Object.assign({}, m, { name: name }) : m; });
+    const next = (await readBoardKey('ingenia_board_state', TEAM_MEMBERS_KEY, [])).map(function (m) { return m.id === id ? Object.assign({}, m, { name: name }) : m; });
     const ok = await writeBoardKey('ingenia_board_state', TEAM_MEMBERS_KEY, next);
     if (!ok) { showError(dom.responsablesError, 'No se pudo guardar — revisa tu conexión.'); return; }
     state.teamMembers = next;
@@ -1245,7 +1245,7 @@
   async function deleteResponsableOnly(id) {
     const member = findTeamMember(id);
     if (!member) return;
-    const next = state.teamMembers.filter(function (m) { return m.id !== id; });
+    const next = (await readBoardKey('ingenia_board_state', TEAM_MEMBERS_KEY, [])).filter(function (m) { return m.id !== id; });
     const ok = await writeBoardKey('ingenia_board_state', TEAM_MEMBERS_KEY, next);
     if (!ok) { showError(dom.responsablesError, 'No se pudo eliminar — revisa tu conexión.'); return; }
     state.teamMembers = next;
@@ -1257,7 +1257,7 @@
 
   async function createTeamMember(name) {
     const entry = { id: uid(), name: name, created_at: new Date().toISOString() };
-    const next = state.teamMembers.concat(entry);
+    const next = (await readBoardKey('ingenia_board_state', TEAM_MEMBERS_KEY, [])).concat(entry);
     const ok = await writeBoardKey('ingenia_board_state', TEAM_MEMBERS_KEY, next);
     if (!ok) return null;
     state.teamMembers = next;
@@ -1587,10 +1587,10 @@
       status: 'pendiente', followupStatus: '', priority: 'media', responsable: [],
       dueDate: '', nextAction: '', created_at: new Date().toISOString()
     };
-    const next = state.tasks.concat(payload);
+    const next = (await readBoardKey('ingenia_board_state', TEAM_TASKS_KEY, [])).concat(payload);
     const ok = await writeBoardKey('ingenia_board_state', TEAM_TASKS_KEY, next);
     if (!ok) { toast('No se pudo crear la tarea — revisa tu conexión.', 'error'); return; }
-    state.tasks = next;
+    state.tasks = next.map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); });
     item.text = text;
     item.taskId = payload.id;
     renderPendientesList();
@@ -1721,7 +1721,7 @@
     const id = slugify(name) + '-' + Date.now().toString(36).slice(-4);
     const color = CUSTOM_PALETTE[state.customCalendars.length % CUSTOM_PALETTE.length];
     const entry = { id: id, name: name, color: color, created_at: new Date().toISOString() };
-    const next = state.customCalendars.concat(entry);
+    const next = (await readBoardKey('ingenia_board_state', CUSTOM_CALENDARS_KEY, [])).concat(entry);
     const okWrite = await writeBoardKey('ingenia_board_state', CUSTOM_CALENDARS_KEY, next);
     if (!okWrite) return null;
     state.customCalendars = next;
@@ -2371,7 +2371,9 @@
     const previous = task.status;
     task.status = status;
     refreshTaskBoards();
-    const ok = await writeBoardKey('ingenia_board_state', TEAM_TASKS_KEY, state.tasks);
+    const fresh = (await readBoardKey('ingenia_board_state', TEAM_TASKS_KEY, [])).map(function (t) { return t.id === id ? Object.assign({}, t, { status: status }) : t; });
+    const ok = await writeBoardKey('ingenia_board_state', TEAM_TASKS_KEY, fresh);
+    if (ok) { state.tasks = fresh.map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); }); refreshTaskBoards(); }
     if (!ok) { task.status = previous; refreshTaskBoards(); toast('No se pudo actualizar el estado — revisa tu conexión.', 'error'); }
   }
 
@@ -2428,12 +2430,13 @@
       nextAction: dom.taskNextAction.value.trim(),
       created_at: state.editingTask ? state.editingTask.created_at : new Date().toISOString()
     };
+    const freshTasks = await readBoardKey('ingenia_board_state', TEAM_TASKS_KEY, []);
     const next = state.editingTask
-      ? state.tasks.map(function (t) { return t.id === state.editingTask.id ? payload : t; })
-      : state.tasks.concat(payload);
+      ? freshTasks.map(function (t) { return t.id === state.editingTask.id ? payload : t; })
+      : freshTasks.concat(payload);
     const ok = await writeBoardKey('ingenia_board_state', TEAM_TASKS_KEY, next);
     if (!ok) { showError(dom.taskError, 'No se pudo guardar — revisa tu conexión.'); return; }
-    state.tasks = next;
+    state.tasks = next.map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); });
     refreshTaskBoards();
     closeTaskDialog();
     toast('Tarea guardada.', 'success');
@@ -2441,10 +2444,10 @@
 
   async function deleteEditingTask() {
     if (!state.editingTask) return;
-    const next = state.tasks.filter(function (t) { return t.id !== state.editingTask.id; });
+    const next = (await readBoardKey('ingenia_board_state', TEAM_TASKS_KEY, [])).filter(function (t) { return t.id !== state.editingTask.id; });
     const ok = await writeBoardKey('ingenia_board_state', TEAM_TASKS_KEY, next);
     if (!ok) { toast('No se pudo eliminar — revisa tu conexión.', 'error'); return; }
-    state.tasks = next;
+    state.tasks = next.map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); });
     refreshTaskBoards();
     closeTaskDialog();
     toast('Tarea eliminada.', 'success');
@@ -2611,14 +2614,38 @@
     return found ? next : list.concat(buildItem({ created_at: new Date().toISOString() }));
   }
 
+  // readBoardKey + writeBoardKey forman un par: la lectura anota en qué
+  // versión estaba la fila y la escritura siguiente solo se aplica si nadie
+  // guardó entre medio (si alguien lo hizo, devuelve false y el formulario
+  // pide intentar de nuevo). Y si la lectura falló, la escritura no se hace:
+  // así un fallo de conexión nunca termina guardando una lista vacía encima
+  // de la real.
+  const readTokens = {};
+
   async function readBoardKey(table, key, fallback) {
-    const res = await state.client.from(table).select('value').eq('key', key).maybeSingle();
-    if (res.error || !res.data || !Array.isArray(res.data.value)) return fallback;
+    const res = await state.client.from(table).select('value,updated_at').eq('key', key).maybeSingle();
+    if (res.error) { readTokens[table + '|' + key] = { failed: true }; return fallback; }
+    readTokens[table + '|' + key] = { updatedAt: res.data ? res.data.updated_at : null };
+    if (!res.data || !Array.isArray(res.data.value)) return fallback;
     return res.data.value;
   }
 
   async function writeBoardKey(table, key, value) {
-    const res = await state.client.from(table).upsert({ key: key, value: value, updated_at: new Date().toISOString() });
+    const token = readTokens[table + '|' + key];
+    delete readTokens[table + '|' + key];
+    if (token && token.failed) return false;
+    const row = { key: key, value: value, updated_at: new Date().toISOString() };
+    if (token && token.updatedAt) {
+      const res = await state.client.from(table).update({ value: value, updated_at: row.updated_at })
+        .eq('key', key).eq('updated_at', token.updatedAt).select('key');
+      return !res.error && Array.isArray(res.data) && res.data.length > 0;
+    }
+    if (token) {
+      const res = await state.client.from(table).insert(row);
+      return !res.error;
+    }
+    // Sin lectura previa: solo lo usan las preferencias de pantalla (UI).
+    const res = await state.client.from(table).upsert(row);
     return !res.error;
   }
 
