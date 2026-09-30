@@ -1803,6 +1803,51 @@ function writeStore(key, value) {
   });
 }
 
+// Guarda un cambio puntual sobre la versión ACTUAL de Supabase, no sobre la
+// que esta pestaña tiene en memoria: lee, aplica `change` y escribe solo si
+// nadie más escribió entre medio (si alguien lo hizo, reintenta sobre esa
+// versión nueva). Así dos computadoras trabajando a la vez no se pisan.
+// `change` recibe una copia del valor actual y devuelve el nuevo; si
+// devuelve CONFLICT no se guarda nada. Devuelve el valor guardado, CONFLICT
+// o null si no se pudo guardar.
+const CONFLICT = { conflict: true };
+const clone = v => JSON.parse(JSON.stringify(v));
+// Comparación que no depende del orden de las claves (jsonb las reordena).
+function sameData(a, b) {
+  const norm = v => Array.isArray(v) ? v.map(norm)
+    : (v && typeof v === 'object') ? Object.keys(v).sort().reduce((o, k) => { o[k] = norm(v[k]); return o; }, {}) : v;
+  return JSON.stringify(norm(a)) === JSON.stringify(norm(b));
+}
+async function mutateStore(key, fallback, change) {
+  if (!sb) {
+    const v = change(clone(readStore(key, fallback)));
+    if (v !== CONFLICT) writeLocal(key, v);
+    return v;
+  }
+  if (!remoteLoaded) { window.alert('Todavía se están cargando los datos. Intenta de nuevo en unos segundos.'); return null; }
+  for (let intento = 0; intento < 4; intento++) {
+    const res = await sb.from(SUPABASE_TABLE).select('value,updated_at').eq('key', key).maybeSingle();
+    if (res.error) break;
+    const current = res.data ? res.data.value : fallback;
+    const next = change(clone(current));
+    if (next === CONFLICT) return CONFLICT;
+    const stamp = new Date().toISOString();
+    const w = res.data
+      ? await sb.from(SUPABASE_TABLE).update({ value: next, updated_at: stamp }).eq('key', key).eq('updated_at', res.data.updated_at).select('key')
+      : await sb.from(SUPABASE_TABLE).insert({ key: key, value: next, updated_at: stamp }).select('key');
+    if (w.error) { if (!res.data) continue; break; }
+    if (!w.data || !w.data.length) continue; // alguien guardó entre medio: se reintenta sobre su versión
+    writeLocal(key, next);
+    sb.from('ucv_board_state_history').insert({ key: key, value: next }).then(function (h) {
+      if (h.error) console.error('Error al respaldar historial (' + key + ')', h.error);
+    });
+    return next;
+  }
+  window.alert('No se pudo guardar el cambio — revisa tu conexión e intenta de nuevo.');
+  return null;
+}
+const saved = v => v !== null && v !== CONFLICT;
+
 function normalizeJourney(j) {
   const withDates = (Array.isArray(j.dates) && j.dates.length) ? j : Object.assign({}, j, { dates: j.date ? [j.date] : [] });
   return Object.assign({ specialtyUnit: '', doctors: '', students: '', endTime: '', participants: [], jornadaType: '', specialties: [] }, withDates, { status: migrateJourneyStatus(withDates.status) });
@@ -2138,33 +2183,32 @@ class Component extends DCLogic {
     };
   }
 
-  moveContactToUnit = (contactId, unitId) => {
+  moveContactToUnit = async (contactId, unitId) => {
     const s = this.state;
     const contact = s.contacts.find(c => c.id === contactId);
-    if (!contact || contact.unit === unitId) { this.setState({ dragContactId: null, dragOverUnit: null }); return; }
-    const list = s.contacts.map(c => c.id === contactId ? Object.assign({}, c, { unit: unitId }) : c);
-    writeStore('ucv-contacts-v1', list);
-    this.setState({ contacts: list, dragContactId: null, dragOverUnit: null });
+    this.setState({ dragContactId: null, dragOverUnit: null });
+    if (!contact || contact.unit === unitId) return;
+    const list = await mutateStore('ucv-contacts-v1', [], cs => cs.map(c => c.id === contactId ? Object.assign({}, c, { unit: unitId }) : c));
+    if (saved(list)) this.setState({ contacts: list });
   }
 
   openModal(id) { this.setState({ modal: id, type: 'meeting', notes: '', date: TODAY, follow: '' }); }
   closeModal = () => this.setState({ modal: null });
 
-  saveInteraction = () => {
+  saveInteraction = async () => {
     const s = this.state;
     if (!s.modal) return;
-    const list = s.interactions.concat([{
+    const entry = {
       id: 'i' + Date.now(), contact: s.modal, type: s.type,
       date: s.date || TODAY, notes: s.notes.trim() || 'Interacción registrada sin notas.', follow: s.follow
-    }]);
-    writeStore('ucv-interactions-v2', list);
-    this.setState({ interactions: list, modal: null, notes: '', follow: '' });
+    };
+    const list = await mutateStore('ucv-interactions-v2', [], is => is.concat([entry]));
+    if (saved(list)) this.setState({ interactions: list, modal: null, notes: '', follow: '' });
   };
 
-  deleteInteraction(id) {
-    const list = this.state.interactions.filter(i => i.id !== id);
-    writeStore('ucv-interactions-v2', list);
-    this.setState({ interactions: list });
+  async deleteInteraction(id) {
+    const list = await mutateStore('ucv-interactions-v2', [], is => is.filter(i => i.id !== id));
+    if (saved(list)) this.setState({ interactions: list });
   }
 
   blankContact() {
@@ -2179,12 +2223,15 @@ class Component extends DCLogic {
     const c = this.state.contacts.find(x => x.id === id);
     if (!c) return;
     const parsedPhone = splitPhone(c.phone);
+    // Versión con la que se abrió el formulario: al guardar se compara con la
+    // de Supabase para no pisar lo que otra persona cambió mientras tanto.
+    this._contactBase = clone(c);
     this.setState({ modal: null, contactModal: id, contactForm: Object.assign(this.blankContact(), c, { phone: parsedPhone.number, phoneCode: parsedPhone.code }) });
   }
 
   closeContactModal = () => this.setState({ contactModal: null });
 
-  saveContact = () => {
+  saveContact = async () => {
     const s = this.state;
     const clean = Object.assign({}, s.contactForm, {
       name: s.contactForm.name.trim() || 'Contacto sin nombre',
@@ -2195,21 +2242,29 @@ class Component extends DCLogic {
       extraUnits: (Array.isArray(s.contactForm.extraUnits) ? s.contactForm.extraUnits : []).filter(id => id !== s.contactForm.unit)
     });
     delete clean.phoneCode;
-    let list;
-    if (s.contactModal === 'new') list = s.contacts.concat([Object.assign({}, clean, { id: 'c' + Date.now() })]);
-    else list = s.contacts.map(c => c.id === s.contactModal ? Object.assign({}, clean, { id: c.id }) : c);
-    writeStore('ucv-contacts-v1', list);
-    this.setState({ contacts: list, contactModal: null });
+    const editId = s.contactModal, base = this._contactBase;
+    const list = await mutateStore('ucv-contacts-v1', [], cs => {
+      if (editId === 'new') return cs.concat([Object.assign({}, clean, { id: 'c' + Date.now() })]);
+      const fresh = cs.find(c => c.id === editId);
+      if (!fresh || (base && !sameData(fresh, base))) return CONFLICT;
+      return cs.map(c => c.id === editId ? Object.assign({}, clean, { id: c.id }) : c);
+    });
+    if (list === CONFLICT) {
+      window.alert('Otra persona modificó o eliminó este contacto mientras lo editabas. Se cargó la versión más reciente: revísala y vuelve a guardar tus cambios.');
+      await this._loadFromSupabase();
+      if (this.state.contacts.some(c => c.id === editId)) this.openContactEdit(editId); else this.setState({ contactModal: null });
+      return;
+    }
+    if (saved(list)) this.setState({ contacts: list, contactModal: null });
   };
 
-  deleteContact = (id) => {
+  deleteContact = async (id) => {
     if (!id) return;
     if (typeof window !== 'undefined' && window.confirm && !window.confirm('¿Eliminar este contacto de forma permanente?')) return;
-    const contacts = this.state.contacts.filter(c => c.id !== id);
-    const interactions = this.state.interactions.filter(i => i.contact !== id);
-    writeStore('ucv-contacts-v1', contacts);
-    writeStore('ucv-interactions-v2', interactions);
-    this.setState({ contacts: contacts, interactions: interactions, contactModal: null, modal: null });
+    const contacts = await mutateStore('ucv-contacts-v1', [], cs => cs.filter(c => c.id !== id));
+    if (!saved(contacts)) return;
+    const interactions = await mutateStore('ucv-interactions-v2', [], is => is.filter(i => i.contact !== id));
+    this.setState(Object.assign({ contacts: contacts, contactModal: null, modal: null }, saved(interactions) ? { interactions: interactions } : {}));
   };
 
   newTask = () => this.setState({
@@ -2345,7 +2400,7 @@ class Component extends DCLogic {
 
   closeVolunteerModal = () => this.setState({ volunteerModal: null });
 
-  saveVolunteer = () => {
+  saveVolunteer = async () => {
     const s = this.state;
     const clean = {
       name: s.volunteerForm.name.trim() || 'Voluntario sin nombre',
@@ -2355,21 +2410,20 @@ class Component extends DCLogic {
       notes: s.volunteerForm.notes.trim(),
       availability: Array.isArray(s.volunteerForm.availability) ? s.volunteerForm.availability.slice().sort() : []
     };
-    let list;
-    if (s.volunteerModal === 'new') list = s.volunteers.concat([Object.assign({}, clean, { id: 'v' + Date.now() })]);
-    else list = s.volunteers.map(v => v.id === s.volunteerModal ? Object.assign({}, clean, { id: v.id }) : v);
-    writeStore('ucv-volunteers-v1', list);
-    this.setState({ volunteers: list, volunteerModal: null });
+    const editId = s.volunteerModal;
+    const list = await mutateStore('ucv-volunteers-v1', [], vs => editId === 'new'
+      ? vs.concat([Object.assign({}, clean, { id: 'v' + Date.now() })])
+      : vs.map(v => v.id === editId ? Object.assign({}, clean, { id: v.id }) : v));
+    if (saved(list)) this.setState({ volunteers: list, volunteerModal: null });
   };
 
-  deleteVolunteer(id) {
-    const list = this.state.volunteers.filter(v => v.id !== id);
-    const journeys = this.state.journeys.map(j => (j.assignedVolunteers || []).indexOf(id) > -1
+  async deleteVolunteer(id) {
+    const list = await mutateStore('ucv-volunteers-v1', [], vs => vs.filter(v => v.id !== id));
+    if (!saved(list)) return;
+    const journeys = await mutateStore('ucv-journeys-v3', [], js => js.map(j => (j.assignedVolunteers || []).indexOf(id) > -1
       ? Object.assign({}, j, { assignedVolunteers: j.assignedVolunteers.filter(x => x !== id) })
-      : j);
-    writeStore('ucv-volunteers-v1', list);
-    writeStore('ucv-journeys-v3', journeys);
-    this.setState({ volunteers: list, journeys: journeys, volunteerModal: null });
+      : j));
+    this.setState(Object.assign({ volunteers: list, volunteerModal: null }, saved(journeys) ? { journeys: journeys.map(normalizeJourney) } : {}));
   }
 
   moveVolunteerCalendar(delta) {
@@ -2407,15 +2461,14 @@ class Component extends DCLogic {
     });
   }
 
-  toggleAssignVolunteer(journeyId, volunteerId) {
-    const journeys = this.state.journeys.map(j => {
+  async toggleAssignVolunteer(journeyId, volunteerId) {
+    const journeys = await mutateStore('ucv-journeys-v3', [], js => js.map(j => {
       if (j.id !== journeyId) return j;
       const current = j.assignedVolunteers || [];
       const next = current.indexOf(volunteerId) > -1 ? current.filter(x => x !== volunteerId) : current.concat([volunteerId]);
       return Object.assign({}, j, { assignedVolunteers: next });
-    });
-    writeStore('ucv-journeys-v3', journeys);
-    this.setState({ journeys: journeys });
+    }));
+    if (saved(journeys)) this.setState({ journeys: journeys.map(normalizeJourney) });
   }
 
   newJourney = (date) => this.setState({
@@ -2451,7 +2504,7 @@ class Component extends DCLogic {
     this.setState({ journeyForm: Object.assign({}, s.journeyForm, { specialties: next }) });
   }
 
-  saveJourney = () => {
+  saveJourney = async () => {
     const s = this.state;
     const dates = Array.isArray(s.journeyForm.dates) && s.journeyForm.dates.length ? s.journeyForm.dates.slice().sort() : [TODAY];
     const clean = Object.assign({}, s.journeyForm, {
@@ -2465,11 +2518,11 @@ class Component extends DCLogic {
       notes: s.journeyForm.notes.trim(),
       checks: Object.assign({}, s.journeyForm.checks || {})
     });
-    let list;
-    if (s.journeyModal === 'new') list = s.journeys.concat([Object.assign({}, clean, { id: 'j' + Date.now() })]);
-    else list = s.journeys.map(j => j.id === s.journeyModal ? Object.assign({}, clean, { id: j.id }) : j);
-    writeStore('ucv-journeys-v3', list);
-    this.setState({ journeys: list, journeyModal: null, calendarMonth: dates[0].slice(0, 7) });
+    const editId = s.journeyModal;
+    const list = await mutateStore('ucv-journeys-v3', [], js => editId === 'new'
+      ? js.concat([Object.assign({}, clean, { id: 'j' + Date.now() })])
+      : js.map(j => j.id === editId ? Object.assign({}, clean, { id: j.id }) : j));
+    if (saved(list)) this.setState({ journeys: list.map(normalizeJourney), journeyModal: null, calendarMonth: dates[0].slice(0, 7) });
   };
 
   moveCalendar(delta) {
@@ -2500,19 +2553,16 @@ class Component extends DCLogic {
     this.setState({ journeyForm: Object.assign({}, current, { checks: checks }) });
   }
 
-  setAppStatus(unitId, value) {
+  async setAppStatus(unitId, value) {
     if (!APP_STATUS[value]) return;
-    const statuses = Object.assign({}, this.state.appStatuses, { [unitId]: value });
-    writeStore('ucv-app-status-v1', statuses);
-    this.setState({ appStatuses: statuses });
+    const statuses = await mutateStore('ucv-app-status-v1', {}, st => Object.assign({}, st, { [unitId]: value }));
+    if (saved(statuses)) this.setState({ appStatuses: statuses });
   }
 
-  setSpecialtyStatus(unitId, value) {
+  async setSpecialtyStatus(unitId, value) {
     if (!SPECIALTY_STATUS[value]) return;
-    const info = Object.assign({}, this.state.unitInfo);
-    info[unitId] = Object.assign({}, info[unitId], { specialtyStatus: value });
-    writeStore('ucv-unit-info-v1', info);
-    this.setState({ unitInfo: info });
+    const info = await mutateStore('ucv-unit-info-v1', {}, inf => Object.assign({}, inf, { [unitId]: Object.assign({}, inf[unitId], { specialtyStatus: value }) }));
+    if (saved(info)) this.setState({ unitInfo: info });
   }
 
   toggleAppStatusVisible = () => {
@@ -2546,11 +2596,12 @@ class Component extends DCLogic {
 
   closeUnitModal = () => this.setState({ unitModal: null });
 
-  saveUnitInfo = () => {
+  saveUnitInfo = async () => {
     const s = this.state;
     if (!s.unitModal) return;
-    const info = Object.assign({}, s.unitInfo, {
-      [s.unitModal]: {
+    const unitId = s.unitModal;
+    const patch = {
+      [unitId]: {
         responsibleName: s.unitForm.responsibleName.trim(), responsiblePhone: combinePhone(s.unitForm.responsiblePhoneCode, s.unitForm.responsiblePhone), responsibleEmail: s.unitForm.responsibleEmail.trim(),
         responsibleRole: s.unitForm.responsibleRole, responsibleFunction: s.unitForm.responsibleFunction.trim(), responsibleAccount: s.unitForm.responsibleAccount.trim(), responsibleAffiliation: s.unitForm.responsibleAffiliation.trim(),
         supportName: s.unitForm.supportName.trim(), supportPhone: combinePhone(s.unitForm.supportPhoneCode, s.unitForm.supportPhone), supportEmail: s.unitForm.supportEmail.trim(),
@@ -2562,9 +2613,9 @@ class Component extends DCLogic {
         attachmentData: s.unitForm.attachmentData,
         attachmentText: s.unitForm.attachmentText.trim()
       }
-    });
-    writeStore('ucv-unit-info-v1', info);
-    this.setState({ unitInfo: info, unitModal: null });
+    };
+    const info = await mutateStore('ucv-unit-info-v1', {}, inf => Object.assign({}, inf, patch));
+    if (saved(info)) this.setState({ unitInfo: info, unitModal: null });
   };
 
   onUnitAttachment(e) {
