@@ -1825,25 +1825,33 @@ async function mutateStore(key, fallback, change) {
     return v;
   }
   if (!remoteLoaded) { window.alert('Todavía se están cargando los datos. Intenta de nuevo en unos segundos.'); return null; }
+  const next = await mutateTable(SUPABASE_TABLE, key, fallback, change);
+  if (!saved(next)) { if (next === null) window.alert('No se pudo guardar el cambio — revisa tu conexión e intenta de nuevo.'); return next; }
+  writeLocal(key, next);
+  sb.from('ucv_board_state_history').insert({ key: key, value: next }).then(function (h) {
+    if (h.error) console.error('Error al respaldar historial (' + key + ')', h.error);
+  });
+  return next;
+}
+// Núcleo de mutateStore, para cualquier tabla (también la compartida con
+// Networking: tareas de equipo y responsables).
+async function mutateTable(table, key, fallback, change) {
+  if (!sb) return null;
   for (let intento = 0; intento < 4; intento++) {
-    const res = await sb.from(SUPABASE_TABLE).select('value,updated_at').eq('key', key).maybeSingle();
+    const res = await sb.from(table).select('value,updated_at').eq('key', key).maybeSingle();
     if (res.error) break;
-    const current = res.data ? res.data.value : fallback;
+    const raw = res.data ? res.data.value : null;
+    const current = (Array.isArray(fallback) ? Array.isArray(raw) : raw != null) ? raw : fallback;
     const next = change(clone(current));
     if (next === CONFLICT) return CONFLICT;
     const stamp = new Date().toISOString();
     const w = res.data
-      ? await sb.from(SUPABASE_TABLE).update({ value: next, updated_at: stamp }).eq('key', key).eq('updated_at', res.data.updated_at).select('key')
-      : await sb.from(SUPABASE_TABLE).insert({ key: key, value: next, updated_at: stamp }).select('key');
+      ? await sb.from(table).update({ value: next, updated_at: stamp }).eq('key', key).eq('updated_at', res.data.updated_at).select('key')
+      : await sb.from(table).insert({ key: key, value: next, updated_at: stamp }).select('key');
     if (w.error) { if (!res.data) continue; break; }
     if (!w.data || !w.data.length) continue; // alguien guardó entre medio: se reintenta sobre su versión
-    writeLocal(key, next);
-    sb.from('ucv_board_state_history').insert({ key: key, value: next }).then(function (h) {
-      if (h.error) console.error('Error al respaldar historial (' + key + ')', h.error);
-    });
     return next;
   }
-  window.alert('No se pudo guardar el cambio — revisa tu conexión e intenta de nuevo.');
   return null;
 }
 const saved = v => v !== null && v !== CONFLICT;
@@ -2049,10 +2057,8 @@ class Component extends DCLogic {
       }));
     }
     if (added.length) {
-      const nextRaw = rawList.concat(added);
-      const ok = await this._writeSharedTasks(nextRaw);
-      if (!ok) return;
-      this._sharedTasksRaw = nextRaw;
+      const nextRaw = await this._mutateSharedTasks(list => list.concat(added.filter(a => !list.some(t => t.id === a.id))));
+      if (!nextRaw) return;
       this.setState({ tasks: nextRaw.filter(t => t.org === 'ucv') });
     }
   }
@@ -2280,17 +2286,20 @@ class Component extends DCLogic {
 
   closeTaskModal = () => this.setState({ taskModal: null });
 
-  async _writeSharedTasks(list) {
-    if (!sb) return false;
-    const res = await sb.from(TEAM_MEMBERS_TABLE).upsert({ key: SHARED_TASKS_KEY, value: list, updated_at: new Date().toISOString() });
-    return !res.error;
+  // Las tareas de equipo son una sola lista compartida con Networking, CMD LT
+  // y las demás organizaciones: cada cambio se aplica sobre la versión
+  // actual de Supabase, nunca sobre la copia que este tablero cargó.
+  async _mutateSharedTasks(change) {
+    const next = await mutateTable(TEAM_MEMBERS_TABLE, SHARED_TASKS_KEY, [], change);
+    if (next === null) return null;
+    this._sharedTasksRaw = next.map(normalizeTaskStatus);
+    return this._sharedTasksRaw;
   }
 
   async _createTeamMember(name) {
     const entry = { id: 'id-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36), name: name, created_at: new Date().toISOString() };
-    const next = this.state.teamMembers.concat(entry);
-    const res = await sb.from(TEAM_MEMBERS_TABLE).upsert({ key: TEAM_MEMBERS_KEY, value: next, updated_at: new Date().toISOString() });
-    if (res.error) return null;
+    const next = await mutateTable(TEAM_MEMBERS_TABLE, TEAM_MEMBERS_KEY, [], list => list.concat(entry));
+    if (next === null) return null;
     this.setState({ teamMembers: next });
     return entry;
   }
@@ -2327,22 +2336,18 @@ class Component extends DCLogic {
     delete clean.newResponsableChecked;
     const id = s.taskModal === 'new' ? ('ucv-' + Date.now()) : s.taskModal;
     const finalTask = Object.assign({}, clean, { id: id, org: 'ucv' });
-    const rawList = this._sharedTasksRaw || [];
-    const nextRaw = s.taskModal === 'new' ? rawList.concat([finalTask]) : rawList.map(t => t.id === id ? finalTask : t);
-    const ok = await this._writeSharedTasks(nextRaw);
-    if (!ok) return;
-    this._sharedTasksRaw = nextRaw;
+    const isNew = s.taskModal === 'new';
+    const nextRaw = await this._mutateSharedTasks(list => isNew ? list.concat([finalTask]) : list.map(t => t.id === id ? finalTask : t));
+    if (!nextRaw) { window.alert('No se pudo guardar la tarea — revisa tu conexión e intenta de nuevo.'); return; }
     this.setState({ tasks: nextRaw.filter(t => t.org === 'ucv'), taskModal: null });
   };
 
   deleteTask = async () => {
     const s = this.state;
     if (!s.taskModal || s.taskModal === 'new') return;
-    const rawList = this._sharedTasksRaw || [];
-    const nextRaw = rawList.filter(t => t.id !== s.taskModal);
-    const ok = await this._writeSharedTasks(nextRaw);
-    if (!ok) return;
-    this._sharedTasksRaw = nextRaw;
+    const delId = s.taskModal;
+    const nextRaw = await this._mutateSharedTasks(list => list.filter(t => t.id !== delId));
+    if (!nextRaw) { window.alert('No se pudo eliminar la tarea — revisa tu conexión e intenta de nuevo.'); return; }
     this.setState({ tasks: nextRaw.filter(t => t.org === 'ucv'), taskModal: null });
   };
 
@@ -2356,30 +2361,34 @@ class Component extends DCLogic {
     const next = Math.max(0, Math.min(order.length - 1, current + direction));
     const nextStatus = order[next];
     const updated = applyTaskStatus(original, nextStatus);
-    const nextRaw = rawList.map(t => t.id === id ? updated : t);
-    this._sharedTasksRaw = nextRaw;
-    this.setState({ tasks: nextRaw.filter(t => t.org === 'ucv') });
-    const ok = await this._writeSharedTasks(nextRaw);
-    if (!ok) { this._sharedTasksRaw = rawList; this.setState({ tasks: rawList.filter(t => t.org === 'ucv') }); }
+    const optimistic = rawList.map(t => t.id === id ? updated : t);
+    this.setState({ tasks: optimistic.filter(t => t.org === 'ucv') });
+    const nextRaw = await this._mutateSharedTasks(list => list.map(t => t.id === id ? applyTaskStatus(t, nextStatus) : t));
+    this.setState({ tasks: (nextRaw || rawList).filter(t => t.org === 'ucv') });
   };
 
   reorderTask = async (id, targetStatus, targetIndex) => {
-    const rawList = (this._sharedTasksRaw || []).slice();
-    const fromIdx = rawList.findIndex(t => t.id === id);
-    if (fromIdx === -1) return;
-    const original = rawList[fromIdx];
-    const moved = applyTaskStatus(original, targetStatus);
-    rawList.splice(fromIdx, 1);
-    const ucvTasks = rawList.filter(t => t.org === 'ucv');
-    const colTasks = ucvTasks.filter(t => t.status === targetStatus);
-    let insertAt;
-    if (targetIndex < colTasks.length) insertAt = rawList.indexOf(colTasks[targetIndex]);
-    else if (colTasks.length) insertAt = rawList.indexOf(colTasks[colTasks.length - 1]) + 1;
-    else insertAt = rawList.length;
-    rawList.splice(insertAt, 0, moved);
-    this._sharedTasksRaw = rawList;
-    this.setState({ tasks: rawList.filter(t => t.org === 'ucv'), dragTaskId: null, dragOverCol: null, dragOverIndex: null });
-    await this._writeSharedTasks(rawList);
+    // Misma lógica de antes, pero como función de la lista: se aplica a la
+    // copia local (para que se vea al instante) y a la versión de Supabase.
+    const reorder = source => {
+      const rawList = source.slice();
+      const fromIdx = rawList.findIndex(t => t.id === id);
+      if (fromIdx === -1) return rawList;
+      const moved = applyTaskStatus(rawList[fromIdx], targetStatus);
+      rawList.splice(fromIdx, 1);
+      const colTasks = rawList.filter(t => t.org === 'ucv' && t.status === targetStatus);
+      let insertAt;
+      if (targetIndex < colTasks.length) insertAt = rawList.indexOf(colTasks[targetIndex]);
+      else if (colTasks.length) insertAt = rawList.indexOf(colTasks[colTasks.length - 1]) + 1;
+      else insertAt = rawList.length;
+      rawList.splice(insertAt, 0, moved);
+      return rawList;
+    };
+    const before = this._sharedTasksRaw || [];
+    if (before.findIndex(t => t.id === id) === -1) return;
+    this.setState({ tasks: reorder(before).filter(t => t.org === 'ucv'), dragTaskId: null, dragOverCol: null, dragOverIndex: null });
+    const nextRaw = await this._mutateSharedTasks(list => reorder(list.map(normalizeTaskStatus)));
+    this.setState({ tasks: (nextRaw || before).filter(t => t.org === 'ucv') });
   };
 
   blankJourney(date) {
