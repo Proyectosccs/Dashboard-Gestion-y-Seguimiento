@@ -1211,14 +1211,19 @@
   function hierarchyNodeHtml(area) {
     const status = contactStatusInfo(area);
     const children = state.hierarchy.filter(function (a) { return a.parentId === area.id; });
+    // Un área raíz sin responsable propio es un rótulo/paraguas que agrupa
+    // a las demás (ej. "Coalición con Amor a Venezuela") — se dibuja como
+    // una píldora neutra, igual que "Rectorado" en UCV, en vez de la
+    // tarjeta a color normal.
+    const isRootLabel = !area.parentId && !area.responsibleName;
     const respLine = area.responsibleName
       ? '<div class="hierarchy-node-resp">👤 ' + safe(area.responsibleName) + (area.responsibleRole ? ' · ' + safe(area.responsibleRole) : '') + '</div>'
       : '';
     return '<li>' +
-      '<div class="hierarchy-node-card">' +
+      '<div class="hierarchy-node-card' + (isRootLabel ? ' hierarchy-node-pill' : '') + '">' +
         '<div class="hierarchy-node-head">' +
           '<span class="hierarchy-node-name">' + safe(area.name) + '</span>' +
-          '<span class="contact-status-pill status-' + status.key + '">' + status.emoji + ' ' + safe(status.label) + '</span>' +
+          (isRootLabel ? '' : '<span class="contact-status-pill status-' + status.key + '">' + status.emoji + ' ' + safe(status.label) + '</span>') +
         '</div>' +
         respLine +
         (area.notes ? '<div class="hierarchy-node-notes">' + safe(area.notes) + '</div>' : '') +

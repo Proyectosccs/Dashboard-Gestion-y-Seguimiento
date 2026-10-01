@@ -490,6 +490,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .hierarchy-empty { font-style: italic; color: var(--color-neutral-500); }
 .hierarchy-node-notes { font-size: 11.5px; color: var(--color-neutral-600); }
 .hierarchy-node-actions { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+.hierarchy-node-pill { width: auto; max-width: 320px; align-items: center; text-align: center; border-radius: 999px; border: 2px solid var(--color-text); padding: 14px 28px; background: #fff; box-shadow: none; }
+.hierarchy-node-pill .hierarchy-node-head { justify-content: center; }
+.hierarchy-node-pill .hierarchy-node-actions { justify-content: center; }
 
 .toast-region { position: fixed; top: 16px; right: 16px; z-index: 1000; width: min(380px, calc(100vw - 32px)); display: grid; gap: 8px; }
 .toast { padding: 12px 14px; border: 1px solid var(--color-neutral-300); border-radius: 14px; background: #fff; box-shadow: var(--shadow-lg); font-size: 13px; }
