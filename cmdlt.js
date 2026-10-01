@@ -1237,7 +1237,7 @@
     return state.hierarchy.some(function (a) { return a.parentId === area.id; });
   }
 
-  function hierarchyNodeHtml(area) {
+  function hierarchyNodeHtml(area, skipChildren) {
     const status = contactStatusInfo(area);
     // Un área marcada explícitamente como "rótulo" (ej. "Coalición con
     // Amor a Venezuela") se dibuja como una píldora neutra, igual que
@@ -1249,13 +1249,13 @@
     // puede no tener un responsable único y aun así necesitar varios
     // contactos propios.
     const isLabel = !!area.isLabel;
-    const directChildren = state.hierarchy.filter(function (a) { return a.parentId === area.id; });
+    const directChildren = skipChildren ? [] : state.hierarchy.filter(function (a) { return a.parentId === area.id; });
     if (isLabel) {
       return '<li>' +
         '<div class="hierarchy-node-card hierarchy-node-pill">' +
           '<div class="hierarchy-node-head"><span class="hierarchy-node-name">' + safe(area.name) + '</span></div>' +
         '</div>' +
-        (directChildren.length ? '<ul>' + directChildren.map(hierarchyNodeHtml).join('') + '</ul>' : '') +
+        (directChildren.length ? '<ul>' + directChildren.map(function (a) { return hierarchyNodeHtml(a); }).join('') + '</ul>' : '') +
       '</li>';
     }
     const respLine = area.responsibleName
@@ -1277,8 +1277,25 @@
           '<button type="button" class="icon-button icon-button-sm" data-area-id="' + safe(area.id) + '" onclick="window.cmdltAction(event)" aria-label="Editar ' + safe(area.name) + '">✏️</button>' +
         '</div>' +
       '</div>' +
-      (containerChildren.length ? '<ul>' + containerChildren.map(hierarchyNodeHtml).join('') + '</ul>' : '') +
+      (containerChildren.length ? '<ul>' + containerChildren.map(function (a) { return hierarchyNodeHtml(a); }).join('') + '</ul>' : '') +
     '</li>';
+  }
+
+  // Cuando una raíz tiene varias ramas directas (ej. "Área Internacional"
+  // y "En Venezuela" bajo "Coalición con Amor a Venezuela"), cada rama se
+  // apila en su propia fila en vez de ponerse una al lado de la otra —
+  // así se ve todo sin tener que desplazarse horizontalmente. Con una
+  // sola rama (o ninguna) se dibuja todo junto, como antes.
+  function renderRootSection(root) {
+    const branches = state.hierarchy.filter(function (a) { return a.parentId === root.id; });
+    if (branches.length <= 1) {
+      return '<ul class="org-tree">' + hierarchyNodeHtml(root) + '</ul>';
+    }
+    const rootAlone = '<ul class="org-tree">' + hierarchyNodeHtml(root, true) + '</ul>';
+    const branchRows = branches.map(function (b) {
+      return '<ul class="org-tree hierarchy-branch-row">' + hierarchyNodeHtml(b) + '</ul>';
+    }).join('');
+    return rootAlone + branchRows;
   }
 
   function renderHierarchy() {
@@ -1288,7 +1305,7 @@
       return;
     }
     const roots = state.hierarchy.filter(function (a) { return !a.parentId || !findById(state.hierarchy, a.parentId); });
-    renderMarkup(dom.hierarchyTree, '<ul class="org-tree">' + roots.map(hierarchyNodeHtml).join('') + '</ul>');
+    renderMarkup(dom.hierarchyTree, roots.map(renderRootSection).join(''));
   }
 
   function openContactDetail(c) {

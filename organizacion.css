@@ -219,6 +219,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .icon-button-sm:disabled { opacity: .35; cursor: not-allowed; }
 
 .hierarchy-tree { overflow-x: auto; padding: 8px 4px 28px; }
+.hierarchy-branch-row { position: relative; margin-top: 10px; padding-top: 28px !important; }
+.hierarchy-branch-row::before { content: ''; position: absolute; top: 0; left: 50%; width: 0; height: 28px; border-left: 2px solid var(--color-neutral-300); }
 .org-tree, .org-tree ul { list-style: none; margin: 0; padding: 0; text-align: center; white-space: nowrap; }
 .org-tree { display: inline-block; min-width: 100%; }
 .org-tree ul { padding-top: 28px; position: relative; }
