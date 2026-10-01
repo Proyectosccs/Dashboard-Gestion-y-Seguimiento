@@ -483,7 +483,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .org-tree > li { padding-top: 0; }
 .org-tree > li::before, .org-tree > li::after { display: none; }
 .org-tree ul::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 2px solid var(--color-neutral-300); width: 0; height: 28px; }
-.hierarchy-node-card { display: inline-flex; flex-direction: column; gap: 6px; width: 230px; white-space: normal; text-align: left; vertical-align: top; padding: 14px 16px; border: 1px solid var(--color-neutral-300); border-top: 5px solid var(--color-accent); border-radius: 18px; background: rgba(255,255,255,.96); box-shadow: var(--shadow-sm); }
+.hierarchy-node-card { display: inline-flex; flex-direction: column; gap: 8px; width: 250px; white-space: normal; text-align: left; vertical-align: top; padding: 14px 16px; border: 1px solid var(--color-neutral-300); border-top: 5px solid var(--color-accent); border-radius: 18px; background: rgba(255,255,255,.96); box-shadow: var(--shadow-sm); }
 .hierarchy-node-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .hierarchy-node-name { font-weight: 700; font-size: 13.5px; color: var(--color-text); }
 .hierarchy-node-resp { font-size: 12px; color: var(--color-neutral-700); }
@@ -492,7 +492,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .hierarchy-node-actions { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
 .hierarchy-node-pill { width: auto; max-width: 320px; align-items: center; text-align: center; border-radius: 999px; border: 2px solid var(--color-text); padding: 14px 28px; background: #fff; box-shadow: none; }
 .hierarchy-node-pill .hierarchy-node-head { justify-content: center; }
-.hierarchy-node-pill .hierarchy-node-actions { justify-content: center; }
+.hierarchy-contacts-list { display: flex; flex-direction: column; gap: 6px; }
+.hierarchy-contact-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 1px solid var(--color-neutral-300); border-radius: 14px; background: var(--color-neutral-100); cursor: pointer; text-align: left; font: inherit; }
+.hierarchy-contact-row:hover { border-color: var(--color-accent); }
+.hierarchy-contact-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hierarchy-contact-name { font-weight: 700; font-size: 12px; color: var(--color-text); }
+.hierarchy-contact-role { font-size: 10.5px; color: var(--color-neutral-600); }
+.hierarchy-contact-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--color-neutral-400); }
+.hierarchy-contact-dot.status-contacted { background: #2f9e63; }
+.hierarchy-contact-dot.status-waiting_response { background: #d97706; }
+.hierarchy-add-contact { border: 1px dashed var(--color-neutral-400); background: transparent; border-radius: 999px; padding: 8px 14px; font-size: 12px; font-weight: 700; color: var(--color-neutral-700); cursor: pointer; }
+.hierarchy-add-contact:hover { border-color: var(--color-accent); color: var(--color-accent); }
 
 .toast-region { position: fixed; top: 16px; right: 16px; z-index: 1000; width: min(380px, calc(100vw - 32px)); display: grid; gap: 8px; }
 .toast { padding: 12px 14px; border: 1px solid var(--color-neutral-300); border-radius: 14px; background: #fff; box-shadow: var(--shadow-lg); font-size: 13px; }

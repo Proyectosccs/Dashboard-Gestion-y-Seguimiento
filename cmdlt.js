@@ -1208,31 +1208,74 @@
     toast('Área eliminada.', 'success');
   }
 
-  function hierarchyNodeHtml(area) {
+  // La jerarquía solo se "ramifica" en cajas conectadas un nivel (raíz →
+  // organizaciones) — igual que UCV. De ahí para abajo, todos los
+  // descendientes (contactos/posiciones) se listan como filas compactas
+  // dentro de la caja de su organización, sin más cajas ni líneas.
+
+  function contactRowHtml(c) {
+    const cStatus = contactStatusInfo(c);
+    const name = c.responsibleName || c.name;
+    const role = c.responsibleName ? c.name : '';
+    return '<button type="button" class="hierarchy-contact-row" data-area-id="' + safe(c.id) + '" onclick="window.cmdltAction(event)">' +
+      '<span class="hierarchy-contact-info">' +
+        '<span class="hierarchy-contact-name">' + safe(name) + '</span>' +
+        (role ? '<span class="hierarchy-contact-role">' + safe(role) + '</span>' : '') +
+      '</span>' +
+      '<span class="hierarchy-contact-dot status-' + cStatus.key + '" title="' + safe(cStatus.label) + '"></span>' +
+    '</button>';
+  }
+
+  function orgNodeHtml(area) {
     const status = contactStatusInfo(area);
-    const children = state.hierarchy.filter(function (a) { return a.parentId === area.id; });
-    // Un área raíz sin responsable propio es un rótulo/paraguas que agrupa
-    // a las demás (ej. "Coalición con Amor a Venezuela") — se dibuja como
-    // una píldora neutra, igual que "Rectorado" en UCV, en vez de la
-    // tarjeta a color normal.
-    const isRootLabel = !area.parentId && !area.responsibleName;
     const respLine = area.responsibleName
       ? '<div class="hierarchy-node-resp">👤 ' + safe(area.responsibleName) + (area.responsibleRole ? ' · ' + safe(area.responsibleRole) : '') + '</div>'
       : '';
+    const contacts = getDescendantIds(area.id).map(function (id) { return findById(state.hierarchy, id); }).filter(Boolean);
     return '<li>' +
-      '<div class="hierarchy-node-card' + (isRootLabel ? ' hierarchy-node-pill' : '') + '">' +
+      '<div class="hierarchy-node-card">' +
         '<div class="hierarchy-node-head">' +
           '<span class="hierarchy-node-name">' + safe(area.name) + '</span>' +
-          (isRootLabel ? '' : '<span class="contact-status-pill status-' + status.key + '">' + status.emoji + ' ' + safe(status.label) + '</span>') +
+          '<span class="contact-status-pill status-' + status.key + '">' + status.emoji + ' ' + safe(status.label) + '</span>' +
         '</div>' +
         respLine +
         (area.notes ? '<div class="hierarchy-node-notes">' + safe(area.notes) + '</div>' : '') +
+        (contacts.length ? '<div class="hierarchy-contacts-list">' + contacts.map(contactRowHtml).join('') + '</div>' : '') +
+        '<button type="button" class="hierarchy-add-contact" data-action="add-child-area" data-id="' + safe(area.id) + '" onclick="window.cmdltAction(event)">➕ Agregar contacto</button>' +
         '<div class="hierarchy-node-actions">' +
-          '<button type="button" class="link-button" data-action="add-child-area" data-id="' + safe(area.id) + '" onclick="window.cmdltAction(event)">➕ Sub-área</button>' +
           '<button type="button" class="icon-button icon-button-sm" data-area-id="' + safe(area.id) + '" onclick="window.cmdltAction(event)" aria-label="Editar ' + safe(area.name) + '">✏️</button>' +
         '</div>' +
       '</div>' +
-      (children.length ? '<ul>' + children.map(hierarchyNodeHtml).join('') + '</ul>' : '') +
+    '</li>';
+  }
+
+  function rootNodeHtml(root) {
+    const status = contactStatusInfo(root);
+    // Una raíz sin responsable propio es un rótulo/paraguas que agrupa a
+    // las demás (ej. "Coalición con Amor a Venezuela") — se dibuja como
+    // una píldora neutra, igual que "Rectorado" en UCV: solo el nombre,
+    // sin estado ni botones para agregar o editar.
+    const isRootLabel = !root.responsibleName;
+    const respLine = root.responsibleName
+      ? '<div class="hierarchy-node-resp">👤 ' + safe(root.responsibleName) + (root.responsibleRole ? ' · ' + safe(root.responsibleRole) : '') + '</div>'
+      : '';
+    const orgs = state.hierarchy.filter(function (a) { return a.parentId === root.id; });
+    return '<li>' +
+      '<div class="hierarchy-node-card' + (isRootLabel ? ' hierarchy-node-pill' : '') + '">' +
+        '<div class="hierarchy-node-head">' +
+          '<span class="hierarchy-node-name">' + safe(root.name) + '</span>' +
+          (isRootLabel ? '' : '<span class="contact-status-pill status-' + status.key + '">' + status.emoji + ' ' + safe(status.label) + '</span>') +
+        '</div>' +
+        (isRootLabel ? '' : respLine) +
+        (isRootLabel || !root.notes ? '' : '<div class="hierarchy-node-notes">' + safe(root.notes) + '</div>') +
+        (isRootLabel ? '' :
+          '<button type="button" class="link-button" data-action="add-child-area" data-id="' + safe(root.id) + '" onclick="window.cmdltAction(event)">➕ Agregar área</button>' +
+          '<div class="hierarchy-node-actions">' +
+            '<button type="button" class="icon-button icon-button-sm" data-area-id="' + safe(root.id) + '" onclick="window.cmdltAction(event)" aria-label="Editar ' + safe(root.name) + '">✏️</button>' +
+          '</div>'
+        ) +
+      '</div>' +
+      (orgs.length ? '<ul>' + orgs.map(orgNodeHtml).join('') + '</ul>' : '') +
     '</li>';
   }
 
@@ -1243,7 +1286,7 @@
       return;
     }
     const roots = state.hierarchy.filter(function (a) { return !a.parentId || !findById(state.hierarchy, a.parentId); });
-    renderMarkup(dom.hierarchyTree, '<ul class="org-tree">' + roots.map(hierarchyNodeHtml).join('') + '</ul>');
+    renderMarkup(dom.hierarchyTree, '<ul class="org-tree">' + roots.map(rootNodeHtml).join('') + '</ul>');
   }
 
   function openContactDetail(c) {
