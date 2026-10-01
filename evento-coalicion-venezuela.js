@@ -1989,15 +1989,15 @@
     const status = contactStatusInfo(area);
     const children = state.hierarchy.filter(function (a) { return a.parentId === area.id; });
     const respLine = area.responsibleName
-      ? '👤 ' + safe(area.responsibleName) + (area.responsibleRole ? ' · ' + safe(area.responsibleRole) : '')
-      : '<span class="hierarchy-empty">Sin responsable asignado</span>';
+      ? '<div class="hierarchy-node-resp">👤 ' + safe(area.responsibleName) + (area.responsibleRole ? ' · ' + safe(area.responsibleRole) : '') + '</div>'
+      : '';
     return '<li>' +
       '<div class="hierarchy-node-card">' +
         '<div class="hierarchy-node-head">' +
           '<span class="hierarchy-node-name">' + safe(area.name) + '</span>' +
           '<span class="contact-status-pill status-' + status.key + '">' + status.emoji + ' ' + safe(status.label) + '</span>' +
         '</div>' +
-        '<div class="hierarchy-node-resp">' + respLine + '</div>' +
+        respLine +
         (area.notes ? '<div class="hierarchy-node-notes">' + safe(area.notes) + '</div>' : '') +
         '<div class="hierarchy-node-actions">' +
           '<button type="button" class="link-button" data-action="add-child-area" data-id="' + safe(area.id) + '" onclick="window.coalicionAction(event)">➕ Sub-área</button>' +
