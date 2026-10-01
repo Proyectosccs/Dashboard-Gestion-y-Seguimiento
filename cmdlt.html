@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
   <link rel="stylesheet" href="./cmdlt.css?v=12">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./cmdlt.js?v=15" defer></script>
+  <script src="./cmdlt.js?v=17" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -312,6 +312,12 @@
         <div class="field field-full">
           <label for="field-area-name">Nombre del área</label>
           <input id="field-area-name" class="input" name="name" type="text" required placeholder="Ej. Dirección Médica, Docencia">
+        </div>
+        <div class="field field-full">
+          <label class="checkbox-chip" style="width: fit-content">
+            <input type="checkbox" id="field-area-is-label" name="is_label">
+            🏷️ Es solo un rótulo que agrupa (sin contactos propios, como "Rectorado" en UCV)
+          </label>
         </div>
         <div class="field field-full">
           <label for="field-area-parent">Área superior (opcional)</label>

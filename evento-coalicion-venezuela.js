@@ -1884,6 +1884,7 @@
     const excludeIds = record ? [record.id].concat(getDescendantIds(record.id)) : [];
     const presetParentId = record ? (item.parentId || '') : ((state.editor && state.editor.presetParentId) || '');
     return field('Nombre del área', 'name', item.name, 'text', true, '', 'field-full', 'Ej. Zona de acopio, Equipo médico') +
+      '<div class="field field-full"><label class="checkbox-chip" style="width:fit-content"><input type="checkbox" id="field-is_label" name="is_label"' + (item.isLabel ? ' checked' : '') + '> 🏷️ Es solo un rótulo que agrupa (sin contactos propios, como "Rectorado" en UCV)</label></div>' +
       selectField('Área superior (opcional)', 'parent_id', presetParentId, areaParentOptions(excludeIds), 'field-full') +
       selectField('Autocompletar desde un contacto existente (opcional)', 'contact_link', '', areaContactLinkOptions(), 'field-full') +
       field('Responsable — Nombre', 'responsible_name', item.responsibleName, 'text', false, '', 'field-full') +
@@ -1918,6 +1919,7 @@
     const areaPayload = {
       id: existing ? existing.id : uid(),
       name: fields.name,
+      isLabel: fields.is_label === 'on' || fields.is_label === '1',
       parentId: fields.parent_id || '',
       responsibleName: fields.responsible_name,
       responsiblePhone: fields.responsible_phone,
@@ -2003,12 +2005,39 @@
     '</button>';
   }
 
-  function orgNodeHtml(area) {
+  // Un área es "contenedora" si tiene sus propios hijos — esas se dibujan
+  // como cajas conectadas (se ramifican). Un área sin hijos es un contacto
+  // suelto — se lista como fila compacta dentro de la caja de su área
+  // superior, en vez de ser una caja aparte.
+  function isContainerArea(area) {
+    return state.hierarchy.some(function (a) { return a.parentId === area.id; });
+  }
+
+  function hierarchyNodeHtml(area) {
     const status = contactStatusInfo(area);
+    // Un área marcada explícitamente como "rótulo" (ej. "Coalición con
+    // Amor a Venezuela") se dibuja como una píldora neutra, igual que
+    // "Rectorado" en UCV: solo el nombre, sin estado, notas, contactos ni
+    // botones — sus hijos siempre se ramifican como cajas propias, nunca
+    // se listan como contactos sueltos. Es una elección explícita del
+    // usuario (la casilla del formulario), no algo que se infiera de si
+    // tiene o no un responsable — un área real puede no tener un
+    // responsable único y aun así necesitar varios contactos propios.
+    const isLabel = !!area.isLabel;
+    const directChildren = state.hierarchy.filter(function (a) { return a.parentId === area.id; });
+    if (isLabel) {
+      return '<li>' +
+        '<div class="hierarchy-node-card hierarchy-node-pill">' +
+          '<div class="hierarchy-node-head"><span class="hierarchy-node-name">' + safe(area.name) + '</span></div>' +
+        '</div>' +
+        (directChildren.length ? '<ul>' + directChildren.map(hierarchyNodeHtml).join('') + '</ul>' : '') +
+      '</li>';
+    }
     const respLine = area.responsibleName
       ? '<div class="hierarchy-node-resp">👤 ' + safe(area.responsibleName) + (area.responsibleRole ? ' · ' + safe(area.responsibleRole) : '') + '</div>'
       : '';
-    const contacts = getDescendantIds(area.id).map(function (id) { return findById(state.hierarchy, id); }).filter(Boolean);
+    const leafChildren = directChildren.filter(function (a) { return !isContainerArea(a); });
+    const containerChildren = directChildren.filter(isContainerArea);
     return '<li>' +
       '<div class="hierarchy-node-card">' +
         '<div class="hierarchy-node-head">' +
@@ -2017,42 +2046,13 @@
         '</div>' +
         respLine +
         (area.notes ? '<div class="hierarchy-node-notes">' + safe(area.notes) + '</div>' : '') +
-        (contacts.length ? '<div class="hierarchy-contacts-list">' + contacts.map(contactRowHtml).join('') + '</div>' : '') +
+        (leafChildren.length ? '<div class="hierarchy-contacts-list">' + leafChildren.map(contactRowHtml).join('') + '</div>' : '') +
         '<button type="button" class="hierarchy-add-contact" data-action="add-child-area" data-id="' + safe(area.id) + '" onclick="window.coalicionAction(event)">➕ Agregar contacto</button>' +
         '<div class="hierarchy-node-actions">' +
           '<button type="button" class="icon-button icon-button-sm" data-action="edit-area" data-id="' + safe(area.id) + '" onclick="window.coalicionAction(event)" aria-label="Editar ' + safe(area.name) + '">✏️</button>' +
         '</div>' +
       '</div>' +
-    '</li>';
-  }
-
-  function rootNodeHtml(root) {
-    const status = contactStatusInfo(root);
-    // Una raíz sin responsable propio es un rótulo/paraguas que agrupa a
-    // las demás (ej. "Coalición con Amor a Venezuela") — se dibuja como
-    // una píldora neutra, igual que "Rectorado" en UCV: solo el nombre,
-    // sin estado ni botones para agregar o editar.
-    const isRootLabel = !root.responsibleName;
-    const respLine = root.responsibleName
-      ? '<div class="hierarchy-node-resp">👤 ' + safe(root.responsibleName) + (root.responsibleRole ? ' · ' + safe(root.responsibleRole) : '') + '</div>'
-      : '';
-    const orgs = state.hierarchy.filter(function (a) { return a.parentId === root.id; });
-    return '<li>' +
-      '<div class="hierarchy-node-card' + (isRootLabel ? ' hierarchy-node-pill' : '') + '">' +
-        '<div class="hierarchy-node-head">' +
-          '<span class="hierarchy-node-name">' + safe(root.name) + '</span>' +
-          (isRootLabel ? '' : '<span class="contact-status-pill status-' + status.key + '">' + status.emoji + ' ' + safe(status.label) + '</span>') +
-        '</div>' +
-        (isRootLabel ? '' : respLine) +
-        (isRootLabel || !root.notes ? '' : '<div class="hierarchy-node-notes">' + safe(root.notes) + '</div>') +
-        (isRootLabel ? '' :
-          '<button type="button" class="link-button" data-action="add-child-area" data-id="' + safe(root.id) + '" onclick="window.coalicionAction(event)">➕ Agregar área</button>' +
-          '<div class="hierarchy-node-actions">' +
-            '<button type="button" class="icon-button icon-button-sm" data-action="edit-area" data-id="' + safe(root.id) + '" onclick="window.coalicionAction(event)" aria-label="Editar ' + safe(root.name) + '">✏️</button>' +
-          '</div>'
-        ) +
-      '</div>' +
-      (orgs.length ? '<ul>' + orgs.map(orgNodeHtml).join('') + '</ul>' : '') +
+      (containerChildren.length ? '<ul>' + containerChildren.map(hierarchyNodeHtml).join('') + '</ul>' : '') +
     '</li>';
   }
 
@@ -2063,7 +2063,7 @@
       return;
     }
     const roots = state.hierarchy.filter(function (a) { return !a.parentId || !findById(state.hierarchy, a.parentId); });
-    renderMarkup(dom.hierarchyTree, '<ul class="org-tree">' + roots.map(rootNodeHtml).join('') + '</ul>');
+    renderMarkup(dom.hierarchyTree, '<ul class="org-tree">' + roots.map(hierarchyNodeHtml).join('') + '</ul>');
   }
 
   function jornadaTypeFieldMarkup(item) {
