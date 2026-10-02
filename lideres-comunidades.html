@@ -6,9 +6,9 @@
   <meta name="description" content="Contactos de líderes comunitarios agrupados por comunidad y tablero operativo de seguimiento.">
   <title>Líderes de Comunidades — Contactos y seguimiento</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./lideres-comunidades.css?v=9">
+  <link rel="stylesheet" href="./lideres-comunidades.css?v=10">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./lideres-comunidades.js?v=9" defer></script>
+  <script src="./lideres-comunidades.js?v=10" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -26,11 +26,6 @@
       </div>
     </header>
 
-    <nav class="tab-nav" aria-label="Secciones">
-      <button class="tab-button" type="button" data-view="contacts" aria-current="page" onclick="window.lideresAction(event)">👥 Contactos</button>
-      <button class="tab-button" type="button" data-view="board" onclick="window.lideresAction(event)">🗂️ Tablero operativo</button>
-    </nav>
-
     <div id="connectivity-banner" class="notice notice-warning page-notice" role="status" hidden>
       No pudimos actualizar los datos. Conservamos la última información visible. <button id="retry-load" type="button" onclick="window.lideresAction(event)">Reintentar</button>
     </div>
@@ -40,7 +35,7 @@
       <p>Cargando líderes de comunidades…</p>
     </section>
 
-    <section id="contacts-view" class="view" aria-labelledby="contacts-title" hidden>
+    <section id="contacts-view" class="view" aria-labelledby="contacts-title">
       <div id="community-pill-strip" class="kpi-strip contacts-kpi-strip" aria-label="Líderes por comunidad"></div>
       <div class="view-heading">
         <div>
@@ -67,19 +62,12 @@
         <button id="filters-clear" class="link-button" type="button" onclick="window.lideresAction(event)">Limpiar</button>
         <p id="contact-result-count" class="result-count" aria-live="polite"></p>
       </div>
+      <nav class="tab-nav contacts-view-toggle" aria-label="Vista de contactos">
+        <button class="tab-button" type="button" data-contacts-view="list" aria-current="page" onclick="window.lideresAction(event)">📇 Lista</button>
+        <button class="tab-button" type="button" data-contacts-view="kanban" onclick="window.lideresAction(event)">🗂️ Kanban</button>
+      </nav>
       <div id="contacts-groups" class="contact-grid"></div>
-    </section>
-
-    <section id="board-view" class="view" aria-labelledby="board-title" hidden>
-      <div class="view-heading">
-        <div>
-          <p class="eyebrow">🗂️ Seguimiento</p>
-          <h2 id="board-title">Tablero operativo</h2>
-          <p class="view-description">Arrastra a cada líder entre columnas, o usa las flechas de su tarjeta, para actualizar el estado de la relación.</p>
-        </div>
-        <button class="btn btn-primary" type="button" data-action="new-contact" onclick="window.lideresAction(event)">➕ Agregar líder</button>
-      </div>
-      <div id="status-board" class="kanban-board"></div>
+      <div id="status-board" class="kanban-board" hidden></div>
     </section>
   </div>
 

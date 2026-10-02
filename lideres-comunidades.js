@@ -80,11 +80,11 @@
 
   const state = {
     client: null,
-    view: 'contacts',
     contacts: [],
     query: '',
     communityFilter: '',
     statusFilter: '',
+    contactsViewMode: 'list',
     editor: null,
     viewingContact: null,
     dragId: null
@@ -96,7 +96,7 @@
     event.stopPropagation();
     const target = event.currentTarget;
     if (!target) return;
-    if (target.dataset.view) return setView(target.dataset.view);
+    if (target.dataset.contactsView) return setContactsViewMode(target.dataset.contactsView);
     if (target.dataset.action === 'move-status') return moveStatus(target.dataset.id, target.dataset.status);
     if (target.dataset.communityFilter !== undefined) {
       const community = target.dataset.communityFilter;
@@ -202,15 +202,16 @@
     dom.connectivityBanner.hidden = false;
   }
 
-  function setView(viewName) {
-    state.view = viewName;
-    document.querySelectorAll('.tab-button').forEach(function (button) {
-      if (button.dataset.view === viewName) button.setAttribute('aria-current', 'page');
-      else button.removeAttribute('aria-current');
+  function setContactsViewMode(mode) {
+    if (['list', 'kanban'].indexOf(mode) === -1) return;
+    state.contactsViewMode = mode;
+    document.querySelectorAll('.contacts-view-toggle .tab-button').forEach(function (btn) {
+      if (btn.dataset.contactsView === mode) btn.setAttribute('aria-current', 'page');
+      else btn.removeAttribute('aria-current');
     });
-    document.querySelectorAll('.view').forEach(function (view) { view.hidden = true; });
-    const active = document.getElementById(viewName + '-view');
-    if (active) active.hidden = false;
+    dom.contactsGroups.hidden = mode !== 'list';
+    dom.statusBoard.hidden = mode !== 'kanban';
+    if (mode === 'kanban') renderStatusBoard();
   }
 
   async function loadContacts(showSpinner) {
@@ -228,8 +229,6 @@
     dom.loadingState.hidden = true;
     populateCommunityFilter();
     renderContacts();
-    renderStatusBoard();
-    setView(state.view);
   }
 
   function subscribeRealtime() {
@@ -285,12 +284,12 @@
       ));
       const clear = document.getElementById('empty-clear-search');
       if (clear) clear.addEventListener('click', clearFilters);
-      return;
+    } else {
+      renderMarkup(dom.contactsGroups, filtered.map(function (c) {
+        return renderContactCard(c, communityColor(c.community));
+      }).join(''));
     }
-
-    renderMarkup(dom.contactsGroups, filtered.map(function (c) {
-      return renderContactCard(c, communityColor(c.community));
-    }).join(''));
+    if (state.contactsViewMode === 'kanban') renderStatusBoard();
   }
 
   function renderContactCard(contact, color) {
@@ -379,9 +378,17 @@
 
   // ---------- Tablero operativo (estado de seguimiento) ----------
 
+  // No aplica state.statusFilter (agruparía todo en una sola columna) — sí
+  // respeta la búsqueda y el filtro de comunidad, igual que la lista.
   function renderStatusBoard() {
+    const query = normalize(state.query);
+    const contacts = state.contacts.filter(function (c) {
+      if (query && !normalize([c.name, c.role, c.community].join(' ')).includes(query)) return false;
+      if (state.communityFilter && communityLabel(c.community) !== state.communityFilter) return false;
+      return true;
+    });
     renderMarkup(dom.statusBoard, STATUSES.map(function (status) {
-      const items = state.contacts.filter(function (c) { return (c.status || 'pending') === status.key; });
+      const items = contacts.filter(function (c) { return (c.status || 'pending') === status.key; });
       return '<div class="kanban-column" data-status="' + status.key + '">' +
         '<div class="kanban-column-head"><h3>' + safe(status.emoji + ' ' + status.label) + '</h3><span class="kanban-count">' + items.length + '</span></div>' +
         (items.length ? items.map(function (c) { return renderStatusCard(c, status); }).join('') : '<div class="kanban-empty">Sin líderes</div>') +
