@@ -1381,14 +1381,19 @@
   // apila en su propia fila en vez de ponerse una al lado de la otra —
   // así se ve todo sin tener que desplazarse horizontalmente. Con una
   // sola rama (o ninguna) se dibuja todo junto, como antes.
-  function renderRootSection(root) {
-    const branches = state.hierarchy.filter(function (a) { return a.parentId === root.id; });
-    if (branches.length <= 1) {
-      return '<ul class="org-tree">' + hierarchyNodeHtml(root) + '</ul>';
+  // El árbol siempre arranca con el nombre de la organización como raíz
+  // visual (igual que UCV y Coalición), sin importar cuántas áreas de
+  // nivel superior existan realmente en los datos — esas pasan a ser sus
+  // ramas, apiladas en filas separadas si hay más de una (ver nota de
+  // renderRootSection original sobre "Área Internacional"/"En Venezuela").
+  function renderOrgRootSection(orgName, roots) {
+    const pill = '<div class="hierarchy-node-card hierarchy-node-pill"><div class="hierarchy-node-head"><span class="hierarchy-node-name">' + safe(orgName) + '</span></div></div>';
+    if (roots.length <= 1) {
+      return '<ul class="org-tree"><li>' + pill + (roots.length ? '<ul>' + hierarchyNodeHtml(roots[0]) + '</ul>' : '') + '</li></ul>';
     }
-    const rootAlone = '<ul class="org-tree">' + hierarchyNodeHtml(root, true) + '</ul>';
-    const branchRows = branches.map(function (b) {
-      return '<ul class="org-tree hierarchy-branch-row">' + hierarchyNodeHtml(b) + '</ul>';
+    const rootAlone = '<ul class="org-tree"><li>' + pill + '</li></ul>';
+    const branchRows = roots.map(function (r) {
+      return '<ul class="org-tree hierarchy-branch-row">' + hierarchyNodeHtml(r) + '</ul>';
     }).join('');
     return rootAlone + branchRows;
   }
@@ -1400,7 +1405,7 @@
       return;
     }
     const roots = state.hierarchy.filter(function (a) { return !a.parentId || !findById(state.hierarchy, a.parentId); });
-    renderMarkup(dom.hierarchyTree, roots.map(renderRootSection).join(''));
+    renderMarkup(dom.hierarchyTree, renderOrgRootSection(state.org.name, roots));
   }
 
   function openContactDetail(c) {

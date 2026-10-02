@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
   <link rel="stylesheet" href="./cmdlt.css?v=18">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./cmdlt.js?v=22" defer></script>
+  <script src="./cmdlt.js?v=23" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -120,11 +120,11 @@
       <div id="contacts-board" class="kanban-board" hidden></div>
     </section>
 
-    <section id="hierarchy-view" class="view" aria-labelledby="hierarchy-title" hidden>
+    <section id="hierarchy-view" class="view" aria-label="Jerarquía" hidden>
       <div class="view-heading">
         <div>
           <p class="eyebrow">🏛️ Estructura</p>
-          <h2 id="hierarchy-title">Jerarquía</h2>
+          <h2 id="hierarchy-title" hidden></h2>
           <p class="view-description">Áreas del CMDLT, con su responsable, en niveles como un organigrama.</p>
         </div>
         <button class="btn btn-primary" type="button" data-action="new-area" onclick="window.cmdltAction(event)">➕ Agregar área</button>
