@@ -2153,7 +2153,7 @@
     const leafChildren = directChildren.filter(function (a) { return !isContainerArea(a); });
     const containerChildren = directChildren.filter(isContainerArea);
     return '<li>' +
-      '<div class="hierarchy-node-card' + (leafChildren.length > 2 ? ' hierarchy-node-card-wide' : '') + '">' +
+      '<div class="hierarchy-node-card' + (area.name === 'Equipo de Voluntarios' ? ' hierarchy-node-card-voluntarios' : '') + '">' +
         '<div class="hierarchy-node-head">' +
           '<span class="hierarchy-node-name">' + safe(area.name) + '</span>' +
           '<span class="contact-status-pill status-' + status.key + '">' + status.emoji + ' ' + safe(status.label) + '</span>' +
