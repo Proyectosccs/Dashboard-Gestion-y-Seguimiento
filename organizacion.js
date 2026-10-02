@@ -66,9 +66,10 @@
   // Estado de contacto (contactado o no) — mismo catálogo en todos los
   // dashboards con contactos.
   const CONTACT_STATUSES = [
-    { key: 'pending', label: 'Pendiente', emoji: '○' },
-    { key: 'contacted', label: 'Contactado', emoji: '📞' },
-    { key: 'waiting_response', label: 'Esperando respuesta', emoji: '⏳' }
+    { key: 'pending', label: 'Pendiente', emoji: '○', color: '#82796a' },
+    { key: 'contacted', label: 'Contactado', emoji: '📞', color: '#2f9e63' },
+    { key: 'waiting_response', label: 'Esperando por ellos', emoji: '⏳', color: '#d97706' },
+    { key: 'waiting_on_us', label: 'Esperando por nosotros', emoji: '📥', color: '#7c3aed' }
   ];
   const CONTACT_STATUS_MAP = {};
   CONTACT_STATUSES.forEach(function (s) { CONTACT_STATUS_MAP[s.key] = s; });
@@ -169,6 +170,8 @@
     editingArea: null,
     query: '',
     contactStatusFilter: '',
+    contactsViewMode: 'list',
+    dragContactId: null,
     editingContact: null,
     viewingContact: null,
     allTasks: [],
@@ -194,6 +197,7 @@
     if (!target) return;
     if (target.dataset.view) return setView(target.dataset.view);
     if (target.dataset.calendarView) return setCalendarViewMode(target.dataset.calendarView);
+    if (target.dataset.contactsView) return setContactsViewMode(target.dataset.contactsView);
     const actionsById = {
       'retry-load': function () { loadAll(false); },
       'calendar-prev': function () { changePeriod(-1); },
@@ -260,6 +264,7 @@
     if (target.dataset.contactId) openContactDialog(findById(state.contacts, target.dataset.contactId));
     if (target.dataset.contactDetailId) openContactDetail(findById(state.contacts, target.dataset.contactDetailId));
     if (target.dataset.action === 'move-task-status') moveTaskStatus(target.dataset.id, target.dataset.status);
+    if (target.dataset.action === 'move-contact-status') moveContactStatus(target.dataset.id, target.dataset.status);
     if (target.dataset.areaId) openAreaDialog(findById(state.hierarchy, target.dataset.areaId));
     if (target.dataset.action === 'add-child-area') openAreaDialog(null, target.dataset.parentId);
   };
@@ -335,6 +340,7 @@
     dom.contactSearchClear = document.getElementById('contact-search-clear');
     dom.contactResultCount = document.getElementById('contact-result-count');
     dom.contactsList = document.getElementById('contacts-list');
+    dom.contactsBoard = document.getElementById('contacts-board');
     dom.contactDialog = document.getElementById('contact-dialog');
     dom.contactDialogTitle = document.getElementById('contact-dialog-title');
     dom.contactForm = document.getElementById('contact-form');
@@ -617,6 +623,18 @@
       else btn.removeAttribute('aria-current');
     });
     renderCalendar();
+  }
+
+  function setContactsViewMode(mode) {
+    if (['list', 'kanban'].indexOf(mode) === -1) return;
+    state.contactsViewMode = mode;
+    document.querySelectorAll('.contacts-view-toggle .tab-button').forEach(function (btn) {
+      if (btn.dataset.contactsView === mode) btn.setAttribute('aria-current', 'page');
+      else btn.removeAttribute('aria-current');
+    });
+    dom.contactsList.hidden = mode !== 'list';
+    dom.contactsBoard.hidden = mode !== 'kanban';
+    if (mode === 'kanban') renderContactsBoard();
   }
 
   function changePeriod(delta) {
@@ -1000,6 +1018,77 @@
         '<div class="contact-mini-row">✉ ' + email + '</div>' +
       '</article>';
     }).join(''));
+    if (state.contactsViewMode === 'kanban') renderContactsBoard();
+  }
+
+  // ---------- Contactos en Kanban (mismo patrón que el tablero de Tareas) ----------
+
+  function renderContactsBoard() {
+    if (!dom.contactsBoard) return;
+    const query = normalize(state.query);
+    const contacts = state.contacts.filter(function (c) {
+      return !query || normalize([c.name, c.role].join(' ')).indexOf(query) > -1;
+    });
+    renderMarkup(dom.contactsBoard, CONTACT_STATUSES.map(function (status) {
+      const items = contacts.filter(function (c) { return (c.status || 'pending') === status.key; });
+      return '<div class="kanban-column" data-status="' + status.key + '">' +
+        '<div class="kanban-column-head"><h3>' + safe(status.emoji + ' ' + status.label) + '</h3><span class="kanban-count">' + items.length + '</span></div>' +
+        (items.length ? items.map(renderContactBoardCard).join('') : '<div class="kanban-empty">Sin contactos</div>') +
+      '</div>';
+    }).join(''));
+
+    dom.contactsBoard.querySelectorAll('.kanban-card').forEach(function (card) {
+      card.addEventListener('dragstart', function () { state.dragContactId = card.dataset.id; card.classList.add('dragging'); });
+      card.addEventListener('dragend', function () { card.classList.remove('dragging'); });
+    });
+    dom.contactsBoard.querySelectorAll('.kanban-column').forEach(function (column) {
+      column.addEventListener('dragover', function (e) { e.preventDefault(); column.classList.add('drag-over'); });
+      column.addEventListener('dragleave', function () { column.classList.remove('drag-over'); });
+      column.addEventListener('drop', function (e) {
+        e.preventDefault();
+        column.classList.remove('drag-over');
+        if (state.dragContactId) moveContactStatus(state.dragContactId, column.dataset.status);
+        state.dragContactId = null;
+      });
+    });
+  }
+
+  function renderContactBoardCard(contact) {
+    const status = contactStatusInfo(contact);
+    const statusIndex = CONTACT_STATUSES.findIndex(function (s) { return s.key === status.key; });
+    const moveButtons = [];
+    if (statusIndex > 0) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-contact-status" data-id="' + safe(contact.id) + '" data-status="' + CONTACT_STATUSES[statusIndex - 1].key + '" onclick="window.orgAction(event)">← ' + safe(CONTACT_STATUSES[statusIndex - 1].label) + '</button>');
+    if (statusIndex < CONTACT_STATUSES.length - 1) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-contact-status" data-id="' + safe(contact.id) + '" data-status="' + CONTACT_STATUSES[statusIndex + 1].key + '" onclick="window.orgAction(event)">' + safe(CONTACT_STATUSES[statusIndex + 1].label) + ' →</button>');
+    return '<article class="kanban-card" draggable="true" data-id="' + safe(contact.id) + '" style="--status-color:' + safe(status.color || '#82796a') + '">' +
+      '<button type="button" style="all:unset;cursor:pointer" data-contact-detail-id="' + safe(contact.id) + '" onclick="window.orgAction(event)">' +
+        '<p class="kanban-card-title">' + safe(contact.name) + '</p>' +
+        (contact.role ? '<p class="kanban-card-notes">' + safe(contact.role) + '</p>' : '') +
+      '</button>' +
+      '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' +
+    '</article>';
+  }
+
+  // Nota: usamos renderContacts() (no solo renderContactsBoard()) para que
+  // la vista de Lista — aunque esté oculta en este momento — quede al día
+  // también, y no se vea el estado viejo si el usuario alterna de vuelta.
+  async function moveContactStatus(id, statusKey) {
+    const contact = findById(state.contacts, id);
+    if (!contact || contact.status === statusKey) return;
+    const previous = contact.status;
+    contact.status = statusKey;
+    renderContacts();
+    const next = await mutateBoardKey(CONTACTS_KEY, [], function (list) {
+      return list.map(function (c) { return c.id === id ? Object.assign({}, c, { status: statusKey }) : c; });
+    });
+    if (next === null) {
+      contact.status = previous;
+      renderContacts();
+      toast('No se pudo actualizar el estado — revisa tu conexión.', 'error');
+      return;
+    }
+    state.contacts = next;
+    renderContacts();
+    toast('Estado actualizado.', 'success');
   }
 
   function openContactDialog(existing) {
@@ -1270,7 +1359,7 @@
     const leafChildren = directChildren.filter(function (a) { return !isContainerArea(a); });
     const containerChildren = directChildren.filter(isContainerArea);
     return '<li>' +
-      '<div class="hierarchy-node-card">' +
+      '<div class="hierarchy-node-card' + (leafChildren.length > 2 ? ' hierarchy-node-card-wide' : '') + '">' +
         '<div class="hierarchy-node-head">' +
           '<span class="hierarchy-node-name">' + safe(area.name) + '</span>' +
           '<span class="contact-status-pill status-' + status.key + '">' + status.emoji + ' ' + safe(status.label) + '</span>' +

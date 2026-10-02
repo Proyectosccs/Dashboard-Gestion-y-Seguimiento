@@ -6,9 +6,9 @@
   <meta name="description" content="Contactos de líderes comunitarios agrupados por comunidad y tablero operativo de seguimiento.">
   <title>Líderes de Comunidades — Contactos y seguimiento</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./lideres-comunidades.css?v=7">
+  <link rel="stylesheet" href="./lideres-comunidades.css?v=9">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./lideres-comunidades.js?v=7" defer></script>
+  <script src="./lideres-comunidades.js?v=9" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -41,6 +41,7 @@
     </section>
 
     <section id="contacts-view" class="view" aria-labelledby="contacts-title" hidden>
+      <div id="community-pill-strip" class="kpi-strip contacts-kpi-strip" aria-label="Líderes por comunidad"></div>
       <div class="view-heading">
         <div>
           <p class="eyebrow">👥 Directorio</p>
@@ -61,14 +62,12 @@
           <input id="contact-search" type="text" placeholder="Buscar por nombre, comunidad o rol…" autocomplete="off">
           <button id="contact-search-clear" class="search-clear" type="button" aria-label="Limpiar búsqueda" onclick="window.lideresAction(event)" hidden>×</button>
         </div>
-        <label class="sr-only" for="community-filter">Filtrar por comunidad</label>
-        <select id="community-filter" class="toolbar-select"><option value="">Todas las comunidades</option></select>
         <label class="sr-only" for="status-filter">Filtrar por estado</label>
         <select id="status-filter" class="toolbar-select"><option value="">Todos los estados</option></select>
         <button id="filters-clear" class="link-button" type="button" onclick="window.lideresAction(event)">Limpiar</button>
         <p id="contact-result-count" class="result-count" aria-live="polite"></p>
       </div>
-      <div id="contacts-groups"></div>
+      <div id="contacts-groups" class="contact-grid"></div>
     </section>
 
     <section id="board-view" class="view" aria-labelledby="board-title" hidden>

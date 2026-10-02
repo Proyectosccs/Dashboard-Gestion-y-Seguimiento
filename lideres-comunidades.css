@@ -225,6 +225,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .kpi-warning { background: var(--coalition-warning-soft); color: var(--coalition-warning); }
 @media (max-width: 720px) { .kpi-grid { grid-template-columns: 1fr; } }
 
+.kpi-strip { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding: 10px 20px; margin-bottom: 14px; border-radius: 14px; background: var(--color-neutral-900); }
+.kpi-strip-chip { display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06); color: #e7e2d8; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.kpi-strip-chip strong { font-size: 13.5px; color: #fff; }
+.kpi-strip-chip:hover { background: rgba(255,255,255,.14); }
+.kpi-strip-chip[aria-pressed="true"] { background: #fff; color: var(--color-neutral-900); border-color: #fff; }
+.kpi-strip-chip[aria-pressed="true"] strong { color: var(--color-neutral-900); }
+.kpi-strip-divider { width: 1px; height: 16px; background: rgba(255,255,255,.2); }
+
 .icon-button {
   width: 40px;
   height: 40px;
@@ -279,6 +287,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .contact-status-pill { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--color-neutral-200); color: var(--color-neutral-700); }
 .contact-status-pill.status-contacted { background: color-mix(in srgb, #2f9e63 20%, white); color: #1f7a4c; }
 .contact-status-pill.status-waiting_response { background: color-mix(in srgb, #d97706 20%, white); color: #92400e; }
+.contact-status-pill.status-waiting_on_us { background: color-mix(in srgb, #7c3aed 20%, white); color: #5b21b6; }
 .contact-detail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .contact-details { display: grid; gap: 8px; font-size: 13px; }
 .contact-details a { overflow-wrap: anywhere; }

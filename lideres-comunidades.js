@@ -67,7 +67,8 @@
   const STATUSES = [
     { key: 'pending', label: 'Pendiente', emoji: '○', color: '#82796a' },
     { key: 'contacted', label: 'Contactado', emoji: '📞', color: '#4a7fd4' },
-    { key: 'waiting_response', label: 'Esperando respuesta', emoji: '⏳', color: '#c67139' }
+    { key: 'waiting_response', label: 'Esperando por ellos', emoji: '⏳', color: '#c67139' },
+    { key: 'waiting_on_us', label: 'Esperando por nosotros', emoji: '📥', color: '#7c3aed' }
   ];
   const STATUS_MAP = {};
   STATUSES.forEach(function (s) { STATUS_MAP[s.key] = s; });
@@ -97,6 +98,12 @@
     if (!target) return;
     if (target.dataset.view) return setView(target.dataset.view);
     if (target.dataset.action === 'move-status') return moveStatus(target.dataset.id, target.dataset.status);
+    if (target.dataset.communityFilter !== undefined) {
+      const community = target.dataset.communityFilter;
+      state.communityFilter = state.communityFilter === community ? '' : community;
+      renderContacts();
+      return;
+    }
     if (target.dataset.action) return handleAction(target.dataset.action, target.dataset.id);
     const actionsById = {
       'retry-load': function () { loadContacts(false); },
@@ -135,6 +142,7 @@
     dom.connectivityBanner = document.getElementById('connectivity-banner');
     dom.toastRegion = document.getElementById('toast-region');
     dom.contactsGroups = document.getElementById('contacts-groups');
+    dom.communityPillStrip = document.getElementById('community-pill-strip');
     dom.kpiIdentified = document.getElementById('kpi-identified');
     dom.kpiContacted = document.getElementById('kpi-contacted');
     dom.kpiPending = document.getElementById('kpi-pending');
@@ -150,7 +158,6 @@
     dom.contactPhoneCode = document.getElementById('field-contact-phone-code');
     dom.communitySuggestions = document.getElementById('community-suggestions');
     dom.statusSelect = document.getElementById('field-contact-status');
-    dom.communityFilter = document.getElementById('community-filter');
     dom.statusFilter = document.getElementById('status-filter');
     dom.contactDetailDialog = document.getElementById('contact-detail-dialog');
     dom.contactDetailTitle = document.getElementById('contact-detail-title');
@@ -162,10 +169,6 @@
     dom.contactDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeContactDialog(); });
     dom.contactSearch.addEventListener('input', function () {
       state.query = dom.contactSearch.value;
-      renderContacts();
-    });
-    dom.communityFilter.addEventListener('change', function () {
-      state.communityFilter = dom.communityFilter.value;
       renderContacts();
     });
     dom.statusFilter.addEventListener('change', function () {
@@ -184,14 +187,14 @@
     })).join(''));
   }
 
+  // El filtro por comunidad ahora se elige desde la franja de arriba
+  // (renderCommunityPillStrip); aquí solo se descarta si esa comunidad ya
+  // no tiene contactos.
   function populateCommunityFilter() {
-    const communities = Array.from(new Set(state.contacts.map(function (c) { return communityLabel(c.community); }))).sort(function (a, b) { return a.localeCompare(b, 'es'); });
-    const current = dom.communityFilter.value;
-    renderMarkup(dom.communityFilter, ['<option value="">Todas las comunidades</option>'].concat(communities.map(function (c) {
-      return '<option value="' + safe(c) + '">' + safe(c) + '</option>';
-    })).join(''));
-    dom.communityFilter.value = communities.indexOf(current) !== -1 ? current : '';
-    state.communityFilter = dom.communityFilter.value;
+    const current = state.communityFilter;
+    if (!current) return;
+    const labels = state.contacts.map(function (c) { return communityLabel(c.community); });
+    if (labels.indexOf(current) === -1) state.communityFilter = '';
   }
 
   function showConnectionFailure() {
@@ -258,23 +261,6 @@
     return COMMUNITY_PALETTE[hash % COMMUNITY_PALETTE.length];
   }
 
-  function groupByCommunity(contacts) {
-    const groups = new Map();
-    contacts.forEach(function (contact) {
-      const label = communityLabel(contact.community);
-      if (!groups.has(label)) groups.set(label, []);
-      groups.get(label).push(contact);
-    });
-    const unassigned = 'Sin comunidad asignada';
-    return Array.from(groups.keys())
-      .sort(function (a, b) {
-        if (a === unassigned) return 1;
-        if (b === unassigned) return -1;
-        return a.localeCompare(b, 'es');
-      })
-      .map(function (label) { return { label: label, items: groups.get(label) }; });
-  }
-
   function renderKpis() {
     const contacted = state.contacts.filter(function (c) { return c.status === 'contacted'; }).length;
     const pending = state.contacts.length - contacted;
@@ -285,6 +271,7 @@
 
   function renderContacts() {
     renderKpis();
+    renderCommunityPillStrip();
     const query = normalize(state.query);
     const filtered = state.contacts.filter(function (contact) { return matchesFilters(contact, query); });
     dom.contactResultCount.textContent = filtered.length + ' de ' + state.contacts.length + ' líderes';
@@ -301,17 +288,8 @@
       return;
     }
 
-    const groups = groupByCommunity(filtered);
-    renderMarkup(dom.contactsGroups, groups.map(function (group) {
-      const color = communityColor(group.label === 'Sin comunidad asignada' ? '' : group.label);
-      return '<section class="community-section">' +
-        '<div class="community-section-head">' +
-          '<span class="community-dot" style="--community-color:' + safe(color) + '"></span>' +
-          '<h3>' + safe(group.label) + '</h3>' +
-          '<span class="community-count">' + group.items.length + '</span>' +
-        '</div>' +
-        '<div class="contact-grid">' + group.items.map(function (c) { return renderContactCard(c, color); }).join('') + '</div>' +
-      '</section>';
+    renderMarkup(dom.contactsGroups, filtered.map(function (c) {
+      return renderContactCard(c, communityColor(c.community));
     }).join(''));
   }
 
@@ -371,9 +349,32 @@
     state.communityFilter = '';
     state.statusFilter = '';
     dom.contactSearch.value = '';
-    dom.communityFilter.value = '';
     dom.statusFilter.value = '';
     renderContacts();
+  }
+
+  // Franja de comunidades con conteo (igual que la franja de organizaciones
+  // en Networking) — clic en una comunidad filtra por ella, otro clic o
+  // clic en el total la quita. Los conteos son del total sin filtrar.
+  function renderCommunityPillStrip() {
+    if (!dom.communityPillStrip) return;
+    const counts = {};
+    state.contacts.forEach(function (c) {
+      const label = communityLabel(c.community);
+      counts[label] = (counts[label] || 0) + 1;
+    });
+    const labels = Object.keys(counts).sort(function (a, b) {
+      if (a === 'Sin comunidad asignada') return 1;
+      if (b === 'Sin comunidad asignada') return -1;
+      return counts[b] - counts[a];
+    });
+    const active = state.communityFilter || '';
+    renderMarkup(dom.communityPillStrip,
+      '<button type="button" class="kpi-strip-chip" data-community-filter="" aria-pressed="' + (active ? 'false' : 'true') + '" onclick="window.lideresAction(event)">👥 <strong>' + state.contacts.length + '</strong> ' + (state.contacts.length === 1 ? 'líder' : 'líderes') + ' en total</button>' +
+      '<span class="kpi-strip-divider" aria-hidden="true"></span>' +
+      labels.map(function (label) {
+        return '<button type="button" class="kpi-strip-chip" data-community-filter="' + safe(label) + '" aria-pressed="' + (active === label ? 'true' : 'false') + '" title="Ver solo ' + safe(label) + '" onclick="window.lideresAction(event)">📍 ' + safe(label) + ' <strong>' + counts[label] + '</strong></button>';
+      }).join(''));
   }
 
   // ---------- Tablero operativo (estado de seguimiento) ----------

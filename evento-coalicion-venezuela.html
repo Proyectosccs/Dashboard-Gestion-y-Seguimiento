@@ -6,11 +6,11 @@
   <meta name="description" content="Control operativo móvil para eventos de Coalición Venezuela y Fundación Ingenia.">
   <title>Resumen — Evento Coalición Venezuela</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./evento-coalicion-venezuela.css?v=18">
+  <link rel="stylesheet" href="./evento-coalicion-venezuela.css?v=21">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-  <script src="./evento-coalicion-venezuela.js?v=36" defer></script>
+  <script src="./evento-coalicion-venezuela.js?v=39" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -163,6 +163,10 @@
         </div>
         <button class="btn btn-primary" type="button" data-action="new-contact" onclick="window.coalicionAction(event)">➕ Agregar responsable</button>
       </div>
+      <nav id="contacts-view-toggle" class="tab-nav contacts-view-toggle" aria-label="Vista de contactos">
+        <button class="tab-button" type="button" data-contacts-view="list" aria-current="page" onclick="window.coalicionAction(event)">📇 Lista</button>
+        <button class="tab-button" type="button" data-contacts-view="kanban" onclick="window.coalicionAction(event)">🗂️ Kanban</button>
+      </nav>
       <div class="list-toolbar panel">
         <div class="search-field">
           <label class="sr-only" for="contact-search">Buscar responsables</label>
@@ -175,6 +179,7 @@
         <p id="contact-result-count" class="result-count" aria-live="polite"></p>
       </div>
       <div id="contacts-list" class="contact-grid"></div>
+      <div id="contacts-board" class="kanban-board" hidden></div>
     </section>
 
     <section id="hierarchy-view" class="view" aria-labelledby="hierarchy-title" hidden>

@@ -172,6 +172,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .contact-status-pill { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--color-neutral-200); color: var(--color-neutral-700); }
 .contact-status-pill.status-contacted { background: color-mix(in srgb, #2f9e63 20%, white); color: #1f7a4c; }
 .contact-status-pill.status-waiting_response { background: color-mix(in srgb, #d97706 20%, white); color: #92400e; }
+.contact-status-pill.status-waiting_on_us { background: color-mix(in srgb, #7c3aed 20%, white); color: #5b21b6; }
 .contact-detail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .phone-field { display: flex; gap: 6px; }
 .phone-field .phone-code { flex: 0 0 96px; padding-left: 8px; padding-right: 4px; }
@@ -244,8 +245,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .hierarchy-node-actions { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
 .hierarchy-node-pill { width: auto; max-width: 320px; align-items: center; text-align: center; border-radius: 999px; border: 2px solid var(--color-text); padding: 14px 28px; background: #fff; box-shadow: none; }
 .hierarchy-node-pill .hierarchy-node-head { justify-content: center; }
-.hierarchy-contacts-list { display: flex; flex-direction: column; gap: 6px; }
-.hierarchy-contact-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 1px solid var(--color-neutral-300); border-radius: 14px; background: var(--color-neutral-100); cursor: pointer; text-align: left; font: inherit; }
+.hierarchy-node-card-wide { width: auto; max-width: 560px; }
+.hierarchy-contacts-list { display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; }
+.hierarchy-contact-row { display: flex; align-items: center; gap: 8px; width: auto; flex: 1 1 150px; min-width: 150px; padding: 8px 10px; border: 1px solid var(--color-neutral-300); border-radius: 14px; background: var(--color-neutral-100); cursor: pointer; text-align: left; font: inherit; }
 .hierarchy-contact-row:hover { border-color: var(--org-color); }
 .hierarchy-contact-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .hierarchy-contact-name { font-weight: 700; font-size: 12px; color: var(--color-text); }
@@ -253,6 +255,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .hierarchy-contact-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--color-neutral-400); }
 .hierarchy-contact-dot.status-contacted { background: #2f9e63; }
 .hierarchy-contact-dot.status-waiting_response { background: #d97706; }
+.hierarchy-contact-dot.status-waiting_on_us { background: #7c3aed; }
 .hierarchy-add-contact { border: 1px dashed var(--color-neutral-400); background: transparent; border-radius: 999px; padding: 8px 14px; font-size: 12px; font-weight: 700; color: var(--color-neutral-700); cursor: pointer; }
 .hierarchy-add-contact:hover { border-color: var(--org-color); color: var(--org-color); }
 

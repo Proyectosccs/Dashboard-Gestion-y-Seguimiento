@@ -61,9 +61,10 @@
   // Estado de contacto (contactado o no) — mismo catálogo en todos los
   // dashboards con contactos.
   const CONTACT_STATUSES = [
-    { key: 'pending', label: 'Pendiente', emoji: '○' },
-    { key: 'contacted', label: 'Contactado', emoji: '📞' },
-    { key: 'waiting_response', label: 'Esperando respuesta', emoji: '⏳' }
+    { key: 'pending', label: 'Pendiente', emoji: '○', color: '#82796a' },
+    { key: 'contacted', label: 'Contactado', emoji: '📞', color: '#2f9e63' },
+    { key: 'waiting_response', label: 'Esperando por ellos', emoji: '⏳', color: '#d97706' },
+    { key: 'waiting_on_us', label: 'Esperando por nosotros', emoji: '📥', color: '#7c3aed' }
   ];
   const CONTACT_STATUS_MAP = {};
   CONTACT_STATUSES.forEach(function (s) { CONTACT_STATUS_MAP[s.key] = s; });
@@ -170,6 +171,8 @@
     hierarchyEditor: null,
     query: '',
     contactStatusFilter: '',
+    contactsViewMode: 'list',
+    dragContactId: null,
     teamMembers: [],
     taskResponsableFilter: '',
     calendarMonth: new Date().toISOString().slice(0, 7),
@@ -193,7 +196,9 @@
     if (!target) return;
     if (target.dataset.view) return setView(target.dataset.view);
     if (target.dataset.calendarView) return setCalendarViewMode(target.dataset.calendarView);
+    if (target.dataset.contactsView) return setContactsViewMode(target.dataset.contactsView);
     if (target.dataset.action === 'move-task') return moveTask(target.dataset.id, target.dataset.stage);
+    if (target.dataset.action === 'move-contact-status') return moveContactStatus(target.dataset.id, target.dataset.status);
     if (target.dataset.action) return handleAction(target.dataset.action, target.dataset.id);
     const actionsById = {
       'retry-load': loadAllData,
@@ -312,6 +317,7 @@
     dom.contactSearchClear = document.getElementById('contact-search-clear');
     dom.contactResultCount = document.getElementById('contact-result-count');
     dom.contactsList = document.getElementById('contacts-list');
+    dom.contactsBoard = document.getElementById('contacts-board');
     dom.contactDialog = document.getElementById('contact-dialog');
     dom.contactDialogTitle = document.getElementById('contact-dialog-title');
     dom.contactForm = document.getElementById('contact-form');
@@ -867,6 +873,18 @@
     renderCalendar();
   }
 
+  function setContactsViewMode(mode) {
+    if (['list', 'kanban'].indexOf(mode) === -1) return;
+    state.contactsViewMode = mode;
+    document.querySelectorAll('.contacts-view-toggle .tab-button').forEach(function (btn) {
+      if (btn.dataset.contactsView === mode) btn.setAttribute('aria-current', 'page');
+      else btn.removeAttribute('aria-current');
+    });
+    dom.contactsList.hidden = mode !== 'list';
+    dom.contactsBoard.hidden = mode !== 'kanban';
+    if (mode === 'kanban') renderContactsBoard();
+  }
+
   function changePeriod(delta) {
     if (state.calendarViewMode === 'week') {
       const date = new Date(state.calendarWeekStart + 'T00:00:00Z');
@@ -1206,6 +1224,82 @@
         '<div class="contact-mini-row">✉ ' + email + '</div>' +
       '</article>';
     }).join(''));
+    if (state.contactsViewMode === 'kanban') renderContactsBoard();
+  }
+
+  // ---------- Contactos en Kanban (mismo patrón que el tablero de Tareas) ----------
+
+  function renderContactsBoard() {
+    if (!dom.contactsBoard) return;
+    const query = normalizeText(state.query);
+    const contacts = state.contacts.filter(function (c) {
+      return !query || normalizeText([c.name, c.role].join(' ')).indexOf(query) > -1;
+    });
+    renderMarkup(dom.contactsBoard, CONTACT_STATUSES.map(function (status) {
+      const items = contacts.filter(function (c) { return (c.status || 'pending') === status.key; });
+      return '<div class="kanban-column" data-status="' + status.key + '">' +
+        '<div class="kanban-column-head"><h3>' + safe(status.emoji + ' ' + status.label) + '</h3><span class="kanban-count">' + items.length + '</span></div>' +
+        (items.length ? items.map(renderContactBoardCard).join('') : '<div class="kanban-empty">Sin contactos</div>') +
+      '</div>';
+    }).join(''));
+
+    dom.contactsBoard.querySelectorAll('.kanban-card').forEach(function (card) {
+      card.addEventListener('dragstart', function () {
+        state.dragContactId = card.dataset.id;
+        card.classList.add('dragging');
+      });
+      card.addEventListener('dragend', function () { card.classList.remove('dragging'); });
+    });
+    dom.contactsBoard.querySelectorAll('.kanban-column').forEach(function (column) {
+      column.addEventListener('dragover', function (e) { e.preventDefault(); column.classList.add('drag-over'); });
+      column.addEventListener('dragleave', function () { column.classList.remove('drag-over'); });
+      column.addEventListener('drop', function (e) {
+        e.preventDefault();
+        column.classList.remove('drag-over');
+        if (state.dragContactId) moveContactStatus(state.dragContactId, column.dataset.status);
+        state.dragContactId = null;
+      });
+    });
+  }
+
+  function renderContactBoardCard(contact) {
+    const status = contactStatusInfo(contact);
+    const statusIndex = CONTACT_STATUSES.findIndex(function (s) { return s.key === status.key; });
+    const moveButtons = [];
+    if (statusIndex > 0) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-contact-status" data-id="' + safe(contact.id) + '" data-status="' + CONTACT_STATUSES[statusIndex - 1].key + '" onclick="window.florangelAction(event)">← ' + safe(CONTACT_STATUSES[statusIndex - 1].label) + '</button>');
+    if (statusIndex < CONTACT_STATUSES.length - 1) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-contact-status" data-id="' + safe(contact.id) + '" data-status="' + CONTACT_STATUSES[statusIndex + 1].key + '" onclick="window.florangelAction(event)">' + safe(CONTACT_STATUSES[statusIndex + 1].label) + ' →</button>');
+    return '<article class="kanban-card" draggable="true" data-id="' + safe(contact.id) + '" style="--status-color:' + safe(status.color || '#82796a') + '">' +
+      '<button type="button" style="all:unset;cursor:pointer" data-action="view-contact" data-id="' + safe(contact.id) + '" onclick="window.florangelAction(event)">' +
+        '<p class="kanban-card-title">' + safe(contact.name) + '</p>' +
+        (contact.role ? '<p class="kanban-card-notes">' + safe(contact.role) + '</p>' : '') +
+      '</button>' +
+      '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' +
+    '</article>';
+  }
+
+  // Igual que moveTask, pero con toast de éxito (el estado de un contacto
+  // es la única acción de este tablero donde confirmamos el guardado en
+  // vivo, porque se dispara arrastrando tarjetas sin pasar por el diálogo).
+  function moveContactStatus(id, statusKey) {
+    const contact = findById(state.contacts, id);
+    if (!contact || (contact.status || 'pending') === statusKey) return;
+    const previousStatus = contact.status;
+    const change = function (list) {
+      return list.map(function (c) { return c.id === id ? Object.assign({}, c, { status: statusKey }) : c; });
+    };
+    state.contacts = change(state.contacts);
+    renderContacts();
+    mutateKey(TABLE, CONTACTS_KEY, [], change).then(function (saved) {
+      if (saved === null) {
+        state.contacts = state.contacts.map(function (c) { return c.id === id ? Object.assign({}, c, { status: previousStatus }) : c; });
+        renderContacts();
+        toast('No se pudo actualizar el estado — revisa tu conexión.', 'error');
+        return;
+      }
+      state.contacts = saved;
+      renderContacts();
+      toast('Estado actualizado.', 'success');
+    });
   }
 
   function openContactDialog(existing) {
@@ -1460,7 +1554,7 @@
     const leafChildren = directChildren.filter(function (a) { return !isContainerArea(a); });
     const containerChildren = directChildren.filter(isContainerArea);
     return '<li>' +
-      '<div class="hierarchy-node-card">' +
+      '<div class="hierarchy-node-card' + (leafChildren.length > 2 ? ' hierarchy-node-card-wide' : '') + '">' +
         '<div class="hierarchy-node-head">' +
           '<span class="hierarchy-node-name">' + safe(area.name) + '</span>' +
           '<span class="contact-status-pill status-' + status.key + '">' + status.emoji + ' ' + safe(status.label) + '</span>' +

@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=29">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=31">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=37" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=40" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -97,6 +97,7 @@
 
     <section id="contacts-view" class="view" aria-labelledby="contacts-view-title" hidden>
       <div id="contacts-kpi-strip" class="kpi-strip contacts-kpi-strip" aria-label="Contactos por organización"></div>
+      <div id="contacts-kpi-cards" class="kpi-grid"></div>
       <div class="view-heading">
         <div>
           <p class="eyebrow">🤝 Equipo</p>
@@ -116,7 +117,12 @@
         <select id="contact-status-filter" class="toolbar-select"></select>
         <p id="contact-result-count" class="result-count" aria-live="polite"></p>
       </div>
+      <nav class="tab-nav contacts-view-toggle" aria-label="Vista de contactos">
+        <button class="tab-button" type="button" data-contacts-view="list" aria-current="page" onclick="window.ingeniaAction(event)">📇 Lista</button>
+        <button class="tab-button" type="button" data-contacts-view="kanban" onclick="window.ingeniaAction(event)">🗂️ Kanban</button>
+      </nav>
       <div id="contacts-list" class="contact-grid"></div>
+      <div id="contacts-board" class="kanban-board" hidden></div>
     </section>
 
     <section id="calendar-view" class="view" hidden>
@@ -347,14 +353,15 @@
           <label for="field-event-title">Nombre del Evento</label>
           <input id="field-event-title" class="input" name="title" type="text" required>
         </div>
-        <div class="field">
+        <div class="field field-full jornada-type-field">
           <label for="field-event-jornada-type">Tipo de Jornada / Reunión</label>
           <select id="field-event-jornada-type" class="input" name="jornada_type" onchange="window.ingeniaAction(event)">
             <option value="">Sin especificar</option>
             <option value="insumos">Insumos</option>
             <option value="medica">Médica</option>
-            <option value="reunion">Reunión</option>
+            <option value="reunion">🎙️ Reunión</option>
           </select>
+          <p class="jornada-type-hint">⚠️ Marca <strong>Reunión</strong> para que este evento también aparezca en la pestaña <strong>Reuniones</strong> y puedas dictar la minuta.</p>
         </div>
         <div class="field field-full" id="event-specialties-field" hidden>
           <label>Especialidades (selección múltiple)</label>

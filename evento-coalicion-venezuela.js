@@ -420,12 +420,17 @@
 
   // Estado de contacto (contactado o no) — mismo catálogo en todos los
   // dashboards con contactos.
-  const CONTACT_STATUSES = { pending: '○ Pendiente', contacted: '📞 Contactado', waiting_response: '⏳ Esperando respuesta' };
+  const CONTACT_STATUSES = { pending: '○ Pendiente', contacted: '📞 Contactado', waiting_response: '⏳ Esperando por ellos', waiting_on_us: '📥 Esperando por nosotros' };
   const CONTACT_STATUS_INFO = {
-    pending: { key: 'pending', label: 'Pendiente', emoji: '○' },
-    contacted: { key: 'contacted', label: 'Contactado', emoji: '📞' },
-    waiting_response: { key: 'waiting_response', label: 'Esperando respuesta', emoji: '⏳' }
+    pending: { key: 'pending', label: 'Pendiente', emoji: '○', color: '#82796a' },
+    contacted: { key: 'contacted', label: 'Contactado', emoji: '📞', color: '#2f9e63' },
+    waiting_response: { key: 'waiting_response', label: 'Esperando por ellos', emoji: '⏳', color: '#d97706' },
+    waiting_on_us: { key: 'waiting_on_us', label: 'Esperando por nosotros', emoji: '📥', color: '#7c3aed' }
   };
+  // Orden fijo de columnas del Kanban de contactos — las claves del objeto
+  // ya vienen en este orden, pero se deja explícito para que no dependa del
+  // orden de inserción si alguien reordena CONTACT_STATUS_INFO más adelante.
+  const CONTACT_STATUS_ORDER = ['pending', 'contacted', 'waiting_response', 'waiting_on_us'];
   function contactStatusInfo(c) { return CONTACT_STATUS_INFO[c && c.status] || CONTACT_STATUS_INFO.pending; }
 
   function downloadVCard(c) {
@@ -497,6 +502,8 @@
     events: [],
     query: '',
     contactStatusFilter: '',
+    contactsViewMode: 'list',
+    dragContactId: null,
     editor: null,
     editorDirty: false,
     discardArmed: false,
@@ -526,7 +533,9 @@
     if (!target) return;
     if (target.dataset.view) return setView(target.dataset.view);
     if (target.dataset.calendarView) return setCalendarViewMode(target.dataset.calendarView);
+    if (target.dataset.contactsView) return setContactsViewMode(target.dataset.contactsView);
     if (target.dataset.action === 'move-task-status') { moveTaskStatus(target.dataset.id, target.dataset.status); return; }
+    if (target.dataset.action === 'move-contact-status') { moveContactStatus(target.dataset.id, target.dataset.status); return; }
     if (target.dataset.taskId) { openTaskDialog(findById(state.allTasks, target.dataset.taskId)); return; }
     if (target.dataset.action) return handleAction(target.dataset.action, target.tagName === 'SELECT' ? target.value : target.dataset.id);
     const actionsById = {
@@ -603,6 +612,8 @@
     dom.contactSearchClear = document.getElementById('contact-search-clear');
     dom.contactResultCount = document.getElementById('contact-result-count');
     dom.contactsList = document.getElementById('contacts-list');
+    dom.contactsViewToggle = document.getElementById('contacts-view-toggle');
+    dom.contactsBoard = document.getElementById('contacts-board');
     dom.hierarchyTree = document.getElementById('hierarchy-tree');
     dom.contactStatusFilter = document.getElementById('contact-status-filter');
     dom.resultsStatus = document.getElementById('results-status');
@@ -1094,31 +1105,134 @@
     };
   }
 
-  function renderContacts() {
-    renderContactsKpiStrip();
+  function filteredContacts() {
     const query = normalize(state.query);
-    const contacts = state.contacts.filter(function (contact) {
+    return state.contacts.filter(function (contact) {
       if (state.contactStatusFilter && (contact.status || 'pending') !== state.contactStatusFilter) return false;
       return !query || normalize([contact.name, contact.role, contact.belongs_to].join(' ')).includes(query);
     });
+  }
+
+  function renderContacts() {
+    renderContactsKpiStrip();
+    const contacts = filteredContacts();
     dom.contactResultCount.textContent = contacts.length + ' de ' + state.contacts.length + ' responsables';
     dom.contactSearchClear.hidden = !state.query;
     if (!contacts.length) {
       renderMarkup(dom.contactsList, emptyState(state.contacts.length ? '🔎 Sin coincidencias' : '🤝 Directorio vacío', state.contacts.length ? 'Prueba otra búsqueda o limpia el filtro.' : 'Agrega los contactos y responsables del equipo.', state.contacts.length ? '<button class="btn btn-secondary" type="button" id="empty-clear-search">Limpiar búsqueda</button>' : ''));
       const clear = document.getElementById('empty-clear-search');
       if (clear) clear.addEventListener('click', clearContactSearch);
+    } else {
+      renderMarkup(dom.contactsList, contacts.map(function (contact) {
+        const status = contactStatusInfo(contact);
+        const phone = contact.phone ? safe(contact.phone) : 'Por confirmar';
+        const email = contact.email ? safe(contact.email) : 'Por confirmar';
+        return '<article class="contact-card contact-card-compact ' + safe(affiliationClass(contact.belongs_to)) + '" data-action="view-contact" data-id="' + safe(contact.id) + '" tabindex="0" role="button" aria-label="Ver detalle de ' + safe(contact.name) + '">' +
+          '<div class="contact-card-header"><div class="contact-avatar" aria-hidden="true">' + safe(initials(contact.name)) + '</div><div><h3>' + safe(contact.name) + '</h3><span class="contact-status-pill status-' + safe(status.key) + '">' + safe(status.emoji) + ' ' + safe(status.label) + '</span></div></div>' +
+          '<div class="contact-mini-row">📱 ' + phone + '</div>' +
+          '<div class="contact-mini-row">✉ ' + email + '</div>' +
+        '</article>';
+      }).join(''));
+    }
+    if (state.contactsViewMode === 'kanban') renderContactsBoard(contacts);
+  }
+
+  function setContactsViewMode(mode) {
+    if (['list', 'kanban'].indexOf(mode) === -1) return;
+    state.contactsViewMode = mode;
+    if (dom.contactsViewToggle) {
+      dom.contactsViewToggle.querySelectorAll('[data-contacts-view]').forEach(function (btn) {
+        if (btn.dataset.contactsView === mode) btn.setAttribute('aria-current', 'page');
+        else btn.removeAttribute('aria-current');
+      });
+    }
+    dom.contactsList.hidden = mode !== 'list';
+    dom.contactsBoard.hidden = mode !== 'kanban';
+    if (mode === 'kanban') renderContactsBoard();
+  }
+
+  function renderContactsBoard(contacts) {
+    const list = contacts || filteredContacts();
+    renderMarkup(dom.contactsBoard, CONTACT_STATUS_ORDER.map(function (key) {
+      const info = CONTACT_STATUS_INFO[key];
+      const items = list.filter(function (c) { return (c.status || 'pending') === key; });
+      return '<div class="kanban-column" data-status="' + key + '">' +
+        '<div class="kanban-column-head"><h3>' + safe(info.emoji) + ' ' + safe(info.label) + '</h3><span class="kanban-count">' + items.length + '</span></div>' +
+        (items.length ? items.map(renderContactCard).join('') : '<div class="kanban-empty">Sin contactos</div>') +
+      '</div>';
+    }).join(''));
+
+    dom.contactsBoard.querySelectorAll('.kanban-card').forEach(function (card) {
+      card.addEventListener('dragstart', function () { state.dragContactId = card.dataset.id; card.classList.add('dragging'); });
+      card.addEventListener('dragend', function () { card.classList.remove('dragging'); });
+    });
+    dom.contactsBoard.querySelectorAll('.kanban-column').forEach(function (column) {
+      column.addEventListener('dragover', function (e) { e.preventDefault(); column.classList.add('drag-over'); });
+      column.addEventListener('dragleave', function () { column.classList.remove('drag-over'); });
+      column.addEventListener('drop', function (e) {
+        e.preventDefault();
+        column.classList.remove('drag-over');
+        if (state.dragContactId) moveContactStatus(state.dragContactId, column.dataset.status);
+        state.dragContactId = null;
+      });
+    });
+  }
+
+  function renderContactCard(contact) {
+    const statusIndex = CONTACT_STATUS_ORDER.indexOf(contact.status || 'pending');
+    const info = CONTACT_STATUS_INFO[CONTACT_STATUS_ORDER[statusIndex]] || CONTACT_STATUS_INFO.pending;
+    const moveButtons = [];
+    if (statusIndex > 0) {
+      const prevKey = CONTACT_STATUS_ORDER[statusIndex - 1];
+      moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-contact-status" data-id="' + safe(contact.id) + '" data-status="' + prevKey + '" onclick="window.coalicionAction(event)">← ' + safe(CONTACT_STATUS_INFO[prevKey].label) + '</button>');
+    }
+    if (statusIndex > -1 && statusIndex < CONTACT_STATUS_ORDER.length - 1) {
+      const nextKey = CONTACT_STATUS_ORDER[statusIndex + 1];
+      moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-contact-status" data-id="' + safe(contact.id) + '" data-status="' + nextKey + '" onclick="window.coalicionAction(event)">' + safe(CONTACT_STATUS_INFO[nextKey].label) + ' →</button>');
+    }
+    const phone = contact.phone ? safe(contact.phone) : 'Por confirmar';
+    return '<article class="kanban-card" draggable="true" data-id="' + safe(contact.id) + '" style="--status-color:' + safe(info.color) + '">' +
+      '<button type="button" style="all:unset;cursor:pointer" data-action="view-contact" data-id="' + safe(contact.id) + '" onclick="window.coalicionAction(event)">' +
+        '<p class="kanban-card-title">' + safe(contact.name) + '</p>' +
+        (contact.role ? '<p class="kanban-card-notes">' + safe(contact.role) + '</p>' : '') +
+        (contact.belongs_to ? '<span class="responsable-tag">🏷️ ' + safe(contact.belongs_to) + '</span>' : '') +
+        '<span class="responsable-tag">📱 ' + phone + '</span>' +
+      '</button>' +
+      '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' +
+    '</article>';
+  }
+
+  // Igual que moveTaskStatus: actualiza primero en pantalla (optimista) y
+  // recién después intenta guardar — pero aquí el guardado pasa por el edge
+  // function coalicion-editor (la tabla de contactos no acepta escrituras
+  // directas del anon), preservando el resto de los campos del contacto tal
+  // como están, igual que hace saveResponsibleAsContact.
+  async function moveContactStatus(id, status) {
+    const contact = findById(state.contacts, id);
+    if (!contact || contact.status === status) return;
+    const previous = contact.status;
+    contact.status = status;
+    renderContactsBoard();
+    renderContactsKpiStrip();
+    const payload = {
+      name: contact.name,
+      role: contact.role || 'Responsable',
+      belongs_to: contact.belongs_to,
+      national_id: contact.national_id || '',
+      phone: contact.phone,
+      email: contact.email,
+      status: status,
+      notes: contact.notes || ''
+    };
+    const result = await callEditorApi('save', { entity: 'contact', payload: payload, id: contact.id });
+    if (result.error) {
+      contact.status = previous;
+      renderContactsBoard();
+      renderContactsKpiStrip();
+      toast('No se pudo actualizar el estado — revisa tu conexión.', 'error');
       return;
     }
-    renderMarkup(dom.contactsList, contacts.map(function (contact) {
-      const status = contactStatusInfo(contact);
-      const phone = contact.phone ? safe(contact.phone) : 'Por confirmar';
-      const email = contact.email ? safe(contact.email) : 'Por confirmar';
-      return '<article class="contact-card contact-card-compact ' + safe(affiliationClass(contact.belongs_to)) + '" data-action="view-contact" data-id="' + safe(contact.id) + '" tabindex="0" role="button" aria-label="Ver detalle de ' + safe(contact.name) + '">' +
-        '<div class="contact-card-header"><div class="contact-avatar" aria-hidden="true">' + safe(initials(contact.name)) + '</div><div><h3>' + safe(contact.name) + '</h3><span class="contact-status-pill status-' + safe(status.key) + '">' + safe(status.emoji) + ' ' + safe(status.label) + '</span></div></div>' +
-        '<div class="contact-mini-row">📱 ' + phone + '</div>' +
-        '<div class="contact-mini-row">✉ ' + email + '</div>' +
-      '</article>';
-    }).join(''));
+    toast('Estado actualizado.', 'success');
   }
 
   function renderContactDetails(contact) {
@@ -2039,7 +2153,7 @@
     const leafChildren = directChildren.filter(function (a) { return !isContainerArea(a); });
     const containerChildren = directChildren.filter(isContainerArea);
     return '<li>' +
-      '<div class="hierarchy-node-card">' +
+      '<div class="hierarchy-node-card' + (leafChildren.length > 2 ? ' hierarchy-node-card-wide' : '') + '">' +
         '<div class="hierarchy-node-head">' +
           '<span class="hierarchy-node-name">' + safe(area.name) + '</span>' +
           '<span class="contact-status-pill status-' + status.key + '">' + status.emoji + ' ' + safe(status.label) + '</span>' +
