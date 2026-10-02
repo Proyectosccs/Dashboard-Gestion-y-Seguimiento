@@ -1598,10 +1598,11 @@
       return '<ul class="org-tree"><li>' + pill + (roots.length ? '<ul>' + hierarchyNodeHtml(roots[0]) + '</ul>' : '') + '</li></ul>';
     }
     const rootAlone = '<ul class="org-tree"><li>' + pill + '</li></ul>';
-    const branchRows = roots.map(function (r) {
-      return '<ul class="org-tree hierarchy-branch-row">' + hierarchyNodeHtml(r) + '</ul>';
-    }).join('');
-    return rootAlone + branchRows;
+    // Muchas especialidades clínicas debajo de "Dra Florangel" — se
+    // acomodan en una cuadrícula de hasta 6 por fila en vez de una
+    // debajo de otra, para que se vea todo sin tener que bajar tanto.
+    const grid = '<ul class="hierarchy-branch-grid">' + roots.map(function (r) { return hierarchyNodeHtml(r); }).join('') + '</ul>';
+    return rootAlone + grid;
   }
 
   function renderHierarchy() {

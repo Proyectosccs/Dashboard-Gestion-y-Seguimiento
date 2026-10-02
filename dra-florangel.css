@@ -472,6 +472,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .hierarchy-tree { overflow-x: auto; padding: 8px 4px 28px; }
 .hierarchy-branch-row { position: relative; margin-top: 10px; padding-top: 28px !important; }
 .hierarchy-branch-row::before { content: ''; position: absolute; top: 0; left: 50%; width: 0; height: 28px; border-left: 2px solid var(--color-neutral-300); }
+
+/* Muchas especialidades clínicas bajo "Dra Florangel" — cuadrícula de
+   hasta 6 por fila en vez de una debajo de otra (sin las líneas de
+   conexión individuales del árbol clásico, con una sola línea bajando
+   hacia el grupo). */
+.hierarchy-branch-grid { list-style: none; margin: 28px auto 0; padding: 0; position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 18px 14px; max-width: min(96vw, 1300px); }
+.hierarchy-branch-grid::before { content: ''; position: absolute; top: -28px; left: 50%; width: 0; height: 28px; border-left: 2px solid var(--color-neutral-300); }
+.hierarchy-branch-grid > li { display: block; padding: 0; margin: 0; list-style: none; text-align: left; }
+.hierarchy-branch-grid > li::before, .hierarchy-branch-grid > li::after { display: none; content: none; }
+.hierarchy-branch-grid .hierarchy-node-card { width: 100%; }
+@media (max-width: 1100px) { .hierarchy-branch-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .hierarchy-branch-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .org-tree, .org-tree ul { list-style: none; margin: 0; padding: 0; text-align: center; white-space: nowrap; }
 .org-tree { display: inline-block; min-width: 100%; }
 .org-tree ul { padding-top: 28px; position: relative; }
