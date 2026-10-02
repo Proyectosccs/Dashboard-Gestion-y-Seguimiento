@@ -1541,12 +1541,24 @@
     const isLabel = !!area.isLabel;
     const directChildren = skipChildren ? [] : state.hierarchy.filter(function (a) { return a.parentId === area.id; });
     if (isLabel) {
-      return '<li>' +
-        '<div class="hierarchy-node-card hierarchy-node-pill">' +
-          '<div class="hierarchy-node-head"><span class="hierarchy-node-name">' + safe(area.name) + '</span></div>' +
-        '</div>' +
-        (directChildren.length ? '<ul>' + directChildren.map(function (a) { return hierarchyNodeHtml(a); }).join('') + '</ul>' : '') +
-      '</li>';
+      const pill = '<div class="hierarchy-node-card hierarchy-node-pill"><div class="hierarchy-node-head"><span class="hierarchy-node-name">' + safe(area.name) + '</span></div></div>';
+      // Igual que a nivel raíz: si el rótulo tiene varias ramas directas
+      // (ej. "Facultad de Medicina" con muchas especialidades), cada una
+      // se apila en su propia fila en vez de ponerse una al lado de la
+      // otra — para no obligar a desplazarse horizontalmente.
+      if (directChildren.length <= 1) {
+        return '<li>' + pill + (directChildren.length ? '<ul>' + hierarchyNodeHtml(directChildren[0]) + '</ul>' : '') + '</li>';
+      }
+      // Sin la clase "org-tree" acá (a diferencia del nivel raíz): este
+      // <ul> ya es descendiente del árbol raíz, así que hereda sus
+      // selectores por cascada; repetir "org-tree" (que trae
+      // "min-width:100%" pensado para el contenedor de más afuera) hacía
+      // que el ancho se calculara mal y el árbol se fuera kilómetros a la
+      // derecha cuando este rótulo estaba anidado dentro de otro.
+      const branchRows = directChildren.map(function (a) {
+        return '<ul class="hierarchy-branch-row">' + hierarchyNodeHtml(a) + '</ul>';
+      }).join('');
+      return '<li>' + pill + branchRows + '</li>';
     }
     const respLine = area.responsibleName
       ? '<div class="hierarchy-node-resp">👤 ' + safe(area.responsibleName) + (area.responsibleRole ? ' · ' + safe(area.responsibleRole) : '') + '</div>'
