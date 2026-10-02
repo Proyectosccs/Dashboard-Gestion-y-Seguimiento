@@ -238,6 +238,10 @@
 
   const UI_KEY = 'ingenia-ui-v1';
 
+  // Borrador local (solo este navegador, no Supabase) del formulario de
+  // evento — ver "Borrador local del evento" más abajo.
+  const EVENT_DRAFT_KEY = 'ingenia-event-draft-v1';
+
   // Modo edición: textos y orden personalizables, igual que en el tablero
   // UCV — pero sin los controles de tamaño de burbuja/título, porque este
   // sitio usa una hoja de estilos fija en vez de estilos calculados en JS.
@@ -480,6 +484,8 @@
   function init() {
     cacheDom();
     dom.eventForm.addEventListener('submit', onEventSubmit);
+    dom.eventForm.addEventListener('input', scheduleDraftSave);
+    dom.eventForm.addEventListener('change', scheduleDraftSave);
     dom.eventDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeEventDialog(); });
     dom.eventSourceSelect.addEventListener('change', onSourceChange);
     dom.contactForm.addEventListener('submit', onContactSubmit);
@@ -1488,9 +1494,98 @@
     const focusName = options && options.focusField;
     const focusEl = focusName && dom.eventForm.elements[focusName];
     (focusEl || dom.eventForm.elements.title).focus();
+    maybeRestoreEventDraft();
   }
 
   function closeEventDialog() { stopMinutaRecording(); dom.eventDialog.close(); state.editingEvent = null; }
+
+  // ---------- Borrador local del evento (localStorage) ----------
+  // Mientras el diálogo de evento está abierto, cada cambio se guarda acá
+  // (solo en este navegador, nunca en Supabase) — así, si la pestaña se
+  // cierra sola, el navegador falla, o el guardado en Supabase no
+  // funciona, lo escrito (sobre todo la minuta y los pendientes de una
+  // reunión larga) no se pierde: al volver a abrir ese mismo evento (o
+  // "Agregar evento") se ofrece recuperarlo. Se borra solo al guardar con
+  // éxito o si el usuario decide no recuperarlo.
+  let draftSaveTimer = null;
+
+  function eventDraftIdentity() {
+    return state.editingEvent ? (state.editingEvent.source + ':' + state.editingEvent.rawId) : 'new';
+  }
+
+  function persistEventDraft() {
+    if (!dom.eventDialog.open) return;
+    try {
+      const f = dom.eventForm.elements;
+      const draft = {
+        identity: eventDraftIdentity(),
+        savedAt: new Date().toISOString(),
+        fields: {
+          source: f.source.value, new_calendar_name: f.new_calendar_name.value, title: f.title.value,
+          jornada_type: f.jornada_type.value, custom_specialties: f.custom_specialties.value,
+          minuta: f.minuta.value, event_date: f.event_date.value, start_time: f.start_time.value,
+          end_time: f.end_time.value, participates_ingenia: f.participates_ingenia.value,
+          location: f.location.value, status: f.status.value, notes: f.notes.value
+        },
+        collaboratingOrgs: readCollaboratingOrgs(),
+        specialties: dom.eventSpecialtiesField.hidden ? [] : Array.from(dom.eventSpecialtiesList.querySelectorAll('.event-specialty-checkbox:checked')).map(function (cb) { return cb.value; }),
+        participants: readParticipants(),
+        pendientesDraft: state.pendientesDraft,
+        minutaFilesDraft: state.minutaFilesDraft
+      };
+      localStorage.setItem(EVENT_DRAFT_KEY, JSON.stringify(draft));
+    } catch (_err) { /* localStorage no disponible (modo privado, cuota llena…) — no es crítico */ }
+  }
+
+  function scheduleDraftSave() {
+    window.clearTimeout(draftSaveTimer);
+    draftSaveTimer = window.setTimeout(persistEventDraft, 500);
+  }
+
+  function clearEventDraft() {
+    window.clearTimeout(draftSaveTimer);
+    try { localStorage.removeItem(EVENT_DRAFT_KEY); } catch (_err) { /* no crítico */ }
+  }
+
+  function readEventDraft() {
+    try {
+      const raw = localStorage.getItem(EVENT_DRAFT_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_err) { return null; }
+  }
+
+  // Solo ofrece recuperar si el borrador es de ESTE MISMO evento (o de
+  // "evento nuevo") y tiene contenido real — evita mezclar el borrador de
+  // una reunión con el de otra, o molestar con un borrador vacío.
+  function maybeRestoreEventDraft() {
+    const draft = readEventDraft();
+    if (!draft || draft.identity !== eventDraftIdentity()) return;
+    const hasContent = (draft.fields && (draft.fields.minuta || '').trim()) ||
+      (draft.pendientesDraft || []).some(function (p) { return p.text && p.text.trim(); });
+    if (!hasContent) { clearEventDraft(); return; }
+    const when = draft.savedAt ? new Date(draft.savedAt).toLocaleString('es-VE') : 'antes';
+    const restore = window.confirm('Encontramos un borrador sin guardar de este formulario (guardado ' + when + '), seguramente de un cierre inesperado. ¿Quieres recuperarlo?');
+    if (!restore) { clearEventDraft(); return; }
+    applyEventDraft(draft);
+  }
+
+  function applyEventDraft(draft) {
+    const f = dom.eventForm.elements;
+    Object.keys(draft.fields || {}).forEach(function (key) {
+      if (f[key] !== undefined) f[key].value = draft.fields[key];
+    });
+    dom.newCalendarField.hidden = f.source.value !== NEW_CALENDAR_VALUE;
+    dom.eventSpecialtiesField.hidden = f.jornada_type.value !== 'medica';
+    populateSpecialtiesList(f.jornada_type.value === 'medica' ? (draft.specialties || []) : []);
+    populateCollaboratorsList(draft.collaboratingOrgs || []);
+    refreshParticipantsList(draft.participants || []);
+    dom.eventMeetingField.hidden = f.jornada_type.value !== 'reunion';
+    state.pendientesDraft = (draft.pendientesDraft || []).map(function (p) { return Object.assign({}, p); });
+    renderPendientesList();
+    state.minutaFilesDraft = (draft.minutaFilesDraft || []).map(function (file) { return Object.assign({}, file); });
+    renderMinutaFilesList();
+    toast('Borrador recuperado — revisa que todo esté bien antes de guardar.', 'success');
+  }
 
   function refreshCalendarsAfterChange(eventDate) {
     if (eventDate) state.selectedDay = eventDate;
@@ -1557,6 +1652,7 @@
       btn.addEventListener('click', function () {
         state.pendientesDraft = state.pendientesDraft.filter(function (p) { return p.id !== btn.dataset.id; });
         renderPendientesList();
+        persistEventDraft();
       });
     });
   }
@@ -1564,6 +1660,7 @@
   function addPendiente() {
     state.pendientesDraft.push({ id: uid(), text: '', done: false, taskId: null });
     renderPendientesList();
+    persistEventDraft();
     const inputs = dom.eventPendientesList.querySelectorAll('.pendiente-text');
     const last = inputs[inputs.length - 1];
     if (last) last.focus();
@@ -1605,6 +1702,10 @@
       if (!finalChunk) return;
       const current = dom.eventForm.elements.minuta.value;
       dom.eventForm.elements.minuta.value = current && !/\s$/.test(current) ? current + ' ' + finalChunk : current + finalChunk;
+      // El dictado pone el texto por código (no escribiendo), así que no
+      // dispara el evento "input" del formulario — hay que guardar el
+      // borrador a mano para no perder lo dictado si algo falla después.
+      scheduleDraftSave();
     };
     recognition.onerror = function (event) {
       if (event.error === 'no-speech' || event.error === 'aborted') return;
@@ -1718,6 +1819,7 @@
       const publicUrl = state.client.storage.from(MINUTA_FILES_BUCKET).getPublicUrl(path).data.publicUrl;
       state.minutaFilesDraft.push({ name: fileName, path: path, url: publicUrl, size: blob.size, uploaded_at: now.toISOString(), autoGenerated: true });
       renderMinutaFilesList();
+      persistEventDraft();
       toast('Transcripción guardada como archivo adjunto.', 'success');
       previousAuto.forEach(function (f) {
         state.client.storage.from(MINUTA_FILES_BUCKET).remove([f.path]).catch(function () { /* no crítico */ });
@@ -1742,6 +1844,7 @@
       const publicUrl = state.client.storage.from(MINUTA_FILES_BUCKET).getPublicUrl(path).data.publicUrl;
       state.minutaFilesDraft.push({ name: file.name, path: path, url: publicUrl, size: file.size, uploaded_at: new Date().toISOString() });
       renderMinutaFilesList();
+      persistEventDraft();
       dom.eventMinutaFileStatus.hidden = true;
     } catch (_err) {
       dom.eventMinutaFileStatus.textContent = 'No se pudo subir el archivo — revisa tu conexión.';
@@ -1753,6 +1856,7 @@
   async function removeMinutaFile(path) {
     state.minutaFilesDraft = state.minutaFilesDraft.filter(function (f) { return f.path !== path; });
     renderMinutaFilesList();
+    persistEventDraft();
     try { await state.client.storage.from(MINUTA_FILES_BUCKET).remove([path]); } catch (_err) { /* no crítico */ }
   }
 
@@ -1787,6 +1891,10 @@
   async function onEventSubmit(e) {
     e.preventDefault();
     hideError(dom.eventError);
+    // Asegura que el borrador local quede con el texto más reciente antes
+    // de intentar guardar — si algo falla más abajo (red, un error
+    // inesperado), lo escrito sigue recuperable desde localStorage.
+    persistEventDraft();
     let source = dom.eventForm.elements.source.value;
     const title = dom.eventForm.elements.title.value.trim();
     const eventDate = dom.eventForm.elements.event_date.value;
@@ -1816,37 +1924,55 @@
     const submitBtn = dom.eventForm.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     let ok = false;
-    const fields = {
-      title: title, event_date: eventDate, start_time: startTime, end_time: endTime,
-      location: location, status: status, notes: notes,
-      participatesIngenia: participatesIngenia, jornadaType: jornadaType, specialties: specialties,
-      collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, pendientes: pendientes,
-      minutaFiles: minutaFiles
-    };
-    let existing = state.editingEvent;
+    // Todo lo que sigue va en try/catch: si algo inesperado falla a mitad
+    // de camino, el formulario no debe quedar congelado ni en blanco sin
+    // explicación — y como persistEventDraft() ya corrió arriba, lo
+    // escrito queda recuperable la próxima vez que se abra este evento.
+    try {
+      const fields = {
+        title: title, event_date: eventDate, start_time: startTime, end_time: endTime,
+        location: location, status: status, notes: notes,
+        participatesIngenia: participatesIngenia, jornadaType: jornadaType, specialties: specialties,
+        collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, pendientes: pendientes,
+        minutaFiles: minutaFiles
+      };
+      let existing = state.editingEvent;
 
-    if (existing && source !== NEW_CALENDAR_VALUE && source !== existing.source) {
-      const moved = await deleteEventFromSource(existing);
-      if (!moved) { submitBtn.disabled = false; showError(dom.eventError, 'No se pudo mover el evento de organización — revisa tu conexión.'); return; }
-      existing = null;
+      if (existing && source !== NEW_CALENDAR_VALUE && source !== existing.source) {
+        const moved = await deleteEventFromSource(existing);
+        if (!moved) { showError(dom.eventError, 'No se pudo mover el evento de organización — revisa tu conexión.'); return; }
+        existing = null;
+      }
+
+      if (source === NEW_CALENDAR_VALUE) {
+        const created = await createCustomCalendar(newCalendarName);
+        if (created) { source = created.id; ok = await saveIngeniaEvent('ingenia-custom-' + created.id + '-events-v1', fields, null); }
+      }
+      else if (source === 'coalicion') ok = await saveCoalicionEvent(fields, existing);
+      else if (source === 'florangel') ok = await saveFlorangelEvent(fields, existing);
+      else if (source === 'ucv') ok = await saveUcvEvent(fields, existing);
+      else if (source === 'networking') ok = await saveIngeniaEvent('ingenia-networking-events-v1', fields, existing);
+      else if (source === 'otros') ok = await saveIngeniaEvent('ingenia-otros-events-v1', fields, existing);
+      else ok = await saveIngeniaEvent('ingenia-custom-' + source + '-events-v1', fields, existing);
+
+      if (!ok) { showError(dom.eventError, 'No se pudo guardar — revisa tu conexión e intenta de nuevo. Tu información quedó en un borrador local: no se perdió.'); return; }
+      // Ya se guardó en Supabase — de acá para abajo solo es refrescar la
+      // pantalla. Un error acá ya NO es pérdida de datos, así que se separa
+      // del try principal: se avisa con un toast en vez de un error que el
+      // usuario nunca vería (el diálogo ya está cerrado).
+      clearEventDraft();
+      closeEventDialog();
+      try {
+        await loadAll();
+        refreshCalendarsAfterChange(eventDate);
+      } catch (refreshErr) {
+        toast('Se guardó, pero hubo un problema mostrando la lista — recarga la página (Ctrl+Shift+R).', 'error');
+      }
+    } catch (err) {
+      showError(dom.eventError, 'Ocurrió un error guardando. Tu información quedó guardada como borrador local en este navegador — recupérala reabriendo este mismo formulario. Detalle técnico: ' + (err && err.message ? err.message : String(err)));
+    } finally {
+      submitBtn.disabled = false;
     }
-
-    if (source === NEW_CALENDAR_VALUE) {
-      const created = await createCustomCalendar(newCalendarName);
-      if (created) { source = created.id; ok = await saveIngeniaEvent('ingenia-custom-' + created.id + '-events-v1', fields, null); }
-    }
-    else if (source === 'coalicion') ok = await saveCoalicionEvent(fields, existing);
-    else if (source === 'florangel') ok = await saveFlorangelEvent(fields, existing);
-    else if (source === 'ucv') ok = await saveUcvEvent(fields, existing);
-    else if (source === 'networking') ok = await saveIngeniaEvent('ingenia-networking-events-v1', fields, existing);
-    else if (source === 'otros') ok = await saveIngeniaEvent('ingenia-otros-events-v1', fields, existing);
-    else ok = await saveIngeniaEvent('ingenia-custom-' + source + '-events-v1', fields, existing);
-    submitBtn.disabled = false;
-
-    if (!ok) { showError(dom.eventError, 'No se pudo guardar — revisa tu conexión e intenta de nuevo.'); return; }
-    closeEventDialog();
-    await loadAll();
-    refreshCalendarsAfterChange(eventDate);
   }
 
   // Borra del bucket los archivos adjuntos de la minuta (si tenía) antes de
