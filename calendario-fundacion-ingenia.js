@@ -1570,7 +1570,7 @@
   // ---------- Dictado en vivo de la minuta (Web Speech API) ----------
 
   function toggleMinutaRecording() {
-    if (state.isRecordingMinuta) { stopMinutaRecording(); attachMinutaTranscriptFile(); }
+    if (state.isRecordingMinuta) stopMinutaRecording();
     else startMinutaRecording();
   }
 
@@ -1600,7 +1600,16 @@
     recognition.onend = function () {
       // Algunos navegadores cortan el reconocimiento tras un silencio —
       // si seguimos "grabando" según el estado, lo reiniciamos solos.
-      if (state.isRecordingMinuta) { try { recognition.start(); } catch (_err) { /* ya iniciado */ } }
+      if (state.isRecordingMinuta) { try { recognition.start(); } catch (_err) { /* ya iniciado */ } return; }
+      // Fin real del dictado (el usuario le dio a "Detener"). "stop()" es
+      // asíncrono — el navegador puede entregar el último resultado final
+      // DESPUÉS de llamarlo, justo antes de este evento "end". Por eso el
+      // adjunto se genera acá, no justo al llamar stop(), para no perder
+      // la última frase dictada por una carrera de tiempos.
+      if (state.minutaRecognition === recognition) {
+        state.minutaRecognition = null;
+        attachMinutaTranscriptFile();
+      }
     };
     try {
       recognition.start();
@@ -1615,9 +1624,11 @@
 
   function stopMinutaRecording() {
     state.isRecordingMinuta = false;
+    // No se limpia state.minutaRecognition acá — su propio "onend" (que
+    // llega después de stop(), una vez el navegador entrega el último
+    // resultado final) es quien la limpia y dispara el adjunto.
     if (state.minutaRecognition) {
       try { state.minutaRecognition.stop(); } catch (_err) { /* no crítico */ }
-      state.minutaRecognition = null;
     }
     updateMinutaRecordUI();
   }
