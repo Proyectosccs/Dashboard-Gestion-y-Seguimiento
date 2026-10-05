@@ -338,6 +338,8 @@
     kpiOffset: 0,
     kpiOrgFilter: '',
     reunionOrgFilter: '',
+    reunionesViewMode: 'list',
+    dragReunionId: null,
     ucvVolunteers: [],
     pendientesDraft: [],
     minutaFilesDraft: [],
@@ -360,6 +362,7 @@
     if (target.dataset.view) return setView(target.dataset.view);
     if (target.dataset.calendarView) return setCalendarViewMode(target.dataset.calendarView);
     if (target.dataset.contactsView) return setContactsViewMode(target.dataset.contactsView);
+    if (target.dataset.reunionesView) return setReunionesViewMode(target.dataset.reunionesView);
     if (target.dataset.kpiPeriod) return setKpiPeriod(target.dataset.kpiPeriod);
     const actionsById = {
       'retry-load': loadAll,
@@ -452,6 +455,10 @@
     }
     if (target.dataset.action === 'move-contact-status') {
       moveContactStatus(target.dataset.id, target.dataset.status);
+      return;
+    }
+    if (target.dataset.action === 'move-reunion-status') {
+      moveReunionStatus(target.dataset.id, target.dataset.status);
       return;
     }
     if (target.dataset.action === 'move-task-status') {
@@ -680,6 +687,7 @@
     dom.eventMinutaRecordStatus = document.getElementById('event-minuta-record-status');
     dom.reunionesOrgFilter = document.getElementById('reuniones-org-filter');
     dom.reunionesList = document.getElementById('reuniones-list');
+    dom.reunionesBoard = document.getElementById('reuniones-board');
     dom.contactSearch = document.getElementById('contact-search');
     dom.contactSearchClear = document.getElementById('contact-search-clear');
     dom.contactResultCount = document.getElementById('contact-result-count');
@@ -2485,6 +2493,119 @@
       return;
     }
     renderMarkup(dom.reunionesList, reuniones.map(reunionCardHtml).join(''));
+    if (state.reunionesViewMode === 'kanban') renderReunionesBoard();
+  }
+
+  function setReunionesViewMode(mode) {
+    if (['list', 'kanban'].indexOf(mode) === -1) return;
+    state.reunionesViewMode = mode;
+    document.querySelectorAll('#reuniones-view .contacts-view-toggle .tab-button').forEach(function (btn) {
+      if (btn.dataset.reunionesView === mode) btn.setAttribute('aria-current', 'page');
+      else btn.removeAttribute('aria-current');
+    });
+    dom.reunionesList.hidden = mode !== 'list';
+    dom.reunionesBoard.hidden = mode !== 'kanban';
+    if (mode === 'kanban') renderReunionesBoard();
+  }
+
+  // ---------- Reuniones en Kanban (mismo patrón que Contactos/Tareas) ----------
+
+  function renderReunionesBoard() {
+    if (!dom.reunionesBoard) return;
+    const orgFilter = state.reunionOrgFilter || null;
+    const reuniones = state.events.filter(function (e) {
+      const extra = readEventExtra(e.source, e.raw);
+      return extra.jornadaType === 'reunion' && (!orgFilter || e.source === orgFilter);
+    }).sort(function (a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+    const statusKeys = Object.keys(EVENT_STATUS);
+    renderMarkup(dom.reunionesBoard, statusKeys.map(function (key) {
+      const items = reuniones.filter(function (e) { return readEventExtra(e.source, e.raw).status === key; });
+      return '<div class="kanban-column" data-status="' + key + '">' +
+        '<div class="kanban-column-head"><h3>' + safe(EVENT_STATUS[key]) + '</h3><span class="kanban-count">' + items.length + '</span></div>' +
+        (items.length ? items.map(renderReunionBoardCard).join('') : '<div class="kanban-empty">Sin reuniones</div>') +
+      '</div>';
+    }).join(''));
+
+    dom.reunionesBoard.querySelectorAll('.kanban-card[draggable="true"]').forEach(function (card) {
+      card.addEventListener('dragstart', function () { state.dragReunionId = card.dataset.id; card.classList.add('dragging'); });
+      card.addEventListener('dragend', function () { card.classList.remove('dragging'); });
+    });
+    dom.reunionesBoard.querySelectorAll('.kanban-column').forEach(function (column) {
+      column.addEventListener('dragover', function (e) { e.preventDefault(); column.classList.add('drag-over'); });
+      column.addEventListener('dragleave', function () { column.classList.remove('drag-over'); });
+      column.addEventListener('drop', function (e) {
+        e.preventDefault();
+        column.classList.remove('drag-over');
+        if (state.dragReunionId) moveReunionStatus(state.dragReunionId, column.dataset.status);
+        state.dragReunionId = null;
+      });
+    });
+  }
+
+  const STATUS_COLOR = { planned: '#82796a', confirmed: '#2563eb', in_progress: '#0f766e', completed: '#0f7a3d', cancelled: '#a02525' };
+
+  function renderReunionBoardCard(e) {
+    const extra = readEventExtra(e.source, e.raw);
+    const info = sourceInfo(e.source);
+    const statusKeys = Object.keys(EVENT_STATUS);
+    const statusIndex = statusKeys.indexOf(extra.status);
+    const moveButtons = [];
+    if (statusIndex > 0) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-reunion-status" data-id="' + safe(e.id) + '" data-status="' + statusKeys[statusIndex - 1] + '" onclick="window.ingeniaAction(event)">← ' + safe(EVENT_STATUS[statusKeys[statusIndex - 1]]) + '</button>');
+    if (statusIndex < statusKeys.length - 1) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-reunion-status" data-id="' + safe(e.id) + '" data-status="' + statusKeys[statusIndex + 1] + '" onclick="window.ingeniaAction(event)">' + safe(EVENT_STATUS[statusKeys[statusIndex + 1]]) + ' →</button>');
+    return '<article class="kanban-card" draggable="true" data-id="' + safe(e.id) + '" style="--status-color:' + safe(STATUS_COLOR[extra.status] || '#82796a') + '">' +
+      '<button type="button" style="all:unset;cursor:pointer;display:block;width:100%" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)">' +
+        '<p class="kanban-card-title">' + safe(e.title) + '</p>' +
+        '<p style="font-size:12px;color:var(--color-neutral-600);margin:4px 0">' + safe(info.label) + ' · ' + safe(formatDate(e.date)) + '</p>' +
+        (extra.motivo ? '<p style="font-size:12px;color:var(--color-neutral-700);margin:0 0 6px">' + safe(extra.motivo) + '</p>' : '') +
+      '</button>' +
+      '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' +
+    '</article>';
+  }
+
+  // Reconstruye el "fields" que esperan saveCoalicionEvent/saveFlorangelEvent/
+  // saveUcvEvent/saveIngeniaEvent a partir de los datos YA guardados del
+  // evento (no del formulario) — para cambiar SOLO el estado desde el
+  // Kanban sin pasar por el diálogo completo. Coalición hace un UPDATE con
+  // TODOS los campos del payload (no un merge parcial), así que es clave
+  // mandar los valores actuales tal cual, no solo el estado nuevo.
+  function fieldsFromEvent(e) {
+    const extra = readEventExtra(e.source, e.raw);
+    return {
+      title: e.title || '', event_date: e.date || '', start_time: e.time || '', end_time: extra.endTime || '',
+      location: e.location || '', status: extra.status, notes: e.notes || '',
+      participatesIngenia: readParticipatesIngenia(e.raw) === 'si', jornadaType: extra.jornadaType,
+      specialties: extra.specialties, collaboratingOrgs: extra.collaboratingOrgs, participants: extra.participants,
+      minuta: extra.minuta, motivo: extra.motivo, pendientes: extra.pendientes, minutaFiles: extra.minutaFiles
+    };
+  }
+
+  async function moveReunionStatus(id, newStatus) {
+    const e = findById(state.events, id);
+    if (!e) return;
+    const extra = readEventExtra(e.source, e.raw);
+    if (extra.status === newStatus) return;
+    const previousStatus = extra.status;
+    e.raw = Object.assign({}, e.raw, { status: e.source === 'ucv' ? (SHARED_STATUS_TO_UCV[newStatus] || 'planned') : newStatus });
+    renderReunionesBoard();
+    renderReunionesView();
+    const fields = fieldsFromEvent(e);
+    fields.status = newStatus;
+    let ok = false;
+    if (e.source === 'coalicion') ok = await saveCoalicionEvent(fields, e);
+    else if (e.source === 'florangel') ok = await saveFlorangelEvent(fields, e);
+    else if (e.source === 'ucv') ok = await saveUcvEvent(fields, e);
+    else if (e.source === 'networking') ok = await saveIngeniaEvent('ingenia-networking-events-v1', fields, e);
+    else if (e.source === 'otros') ok = await saveIngeniaEvent('ingenia-otros-events-v1', fields, e);
+    else ok = await saveIngeniaEvent('ingenia-custom-' + e.source + '-events-v1', fields, e);
+    if (ok) {
+      toast('Estado actualizado.', 'success');
+      await loadAll(true);
+    } else {
+      e.raw = Object.assign({}, e.raw, { status: e.source === 'ucv' ? (SHARED_STATUS_TO_UCV[previousStatus] || 'planned') : previousStatus });
+      renderReunionesBoard();
+      renderReunionesView();
+      toast('No se pudo actualizar el estado — revisa tu conexión.', 'error');
+    }
   }
 
   function addReunionToGoogleCalendar(id) {

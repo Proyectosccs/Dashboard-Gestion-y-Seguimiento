@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
   <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=33">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=50" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=51" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -98,7 +98,12 @@
           <button class="btn btn-primary" type="button" id="new-reunion-btn" onclick="window.ingeniaAction(event)">➕ Agregar reunión</button>
         </div>
       </div>
+      <nav class="tab-nav contacts-view-toggle" aria-label="Vista de reuniones">
+        <button class="tab-button" type="button" data-reuniones-view="list" aria-current="page" onclick="window.ingeniaAction(event)">📇 Lista</button>
+        <button class="tab-button" type="button" data-reuniones-view="kanban" onclick="window.ingeniaAction(event)">🗂️ Kanban</button>
+      </nav>
       <div id="reuniones-list" class="reuniones-list"></div>
+      <div id="reuniones-board" class="kanban-board" hidden></div>
     </section>
 
     <section id="contacts-view" class="view" aria-labelledby="contacts-view-title" hidden>
