@@ -335,6 +335,7 @@
     taskOrgFilter: '',
     taskResponsableFilter: '',
     kpiPeriod: 'month',
+    kpiOffset: 0,
     kpiOrgFilter: '',
     reunionOrgFilter: '',
     ucvVolunteers: [],
@@ -402,6 +403,9 @@
         dom.tasksResponsableFilter.value = '';
         refreshTaskBoards();
       },
+      'resumen-period-prev': function () { changeKpiPeriod(-1); },
+      'resumen-period-next': function () { changeKpiPeriod(1); },
+      'resumen-period-today': function () { state.kpiOffset = 0; renderResumenView(); },
       'new-org-btn': openOrgDialog,
       'org-dialog-close': closeOrgDialog,
       'org-dialog-cancel': closeOrgDialog,
@@ -656,6 +660,10 @@
     dom.kpiStripParticipacion = document.getElementById('kpi-strip-participacion');
     dom.kpiStripCanceladas = document.getElementById('kpi-strip-canceladas');
     dom.resumenOrgFilter = document.getElementById('resumen-org-filter');
+    dom.resumenPeriodPrev = document.getElementById('resumen-period-prev');
+    dom.resumenPeriodNext = document.getElementById('resumen-period-next');
+    dom.resumenPeriodToday = document.getElementById('resumen-period-today');
+    dom.resumenPeriodLabel = document.getElementById('resumen-period-label');
     dom.resumenKpiGrid = document.getElementById('resumen-kpi-grid');
     dom.resumenOrgBreakdown = document.getElementById('resumen-org-breakdown');
     dom.resumenUpcoming = document.getElementById('resumen-upcoming');
@@ -2232,20 +2240,44 @@
 
   // ---------- Resumen / KPIs ----------
 
-  function periodRange(period) {
+  // "offset" mueve el período hacia atrás/adelante en unidades del propio
+  // período (meses si es "month", trimestres si es "quarter", años si es
+  // "year") — así se puede ver, por ejemplo, el trimestre jul-sep aunque
+  // ya estemos en oct-dic. offset 0 = el período actual.
+  function periodRange(period, offset) {
+    offset = offset || 0;
     const now = new Date();
-    const y = now.getFullYear();
-    const m = now.getMonth();
-    if (period === 'year') return { start: y + '-01-01', end: y + '-12-31' };
+    if (period === 'year') {
+      const y = now.getFullYear() + offset;
+      return { start: y + '-01-01', end: y + '-12-31' };
+    }
     if (period === 'quarter') {
-      const qStartMonth = Math.floor(m / 3) * 3;
+      const totalQuarters = Math.floor(now.getMonth() / 3) + offset;
+      const y = now.getFullYear() + Math.floor(totalQuarters / 4);
+      const q = ((totalQuarters % 4) + 4) % 4;
+      const qStartMonth = q * 3;
       const start = new Date(Date.UTC(y, qStartMonth, 1));
       const end = new Date(Date.UTC(y, qStartMonth + 3, 0));
       return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
     }
+    const totalMonths = now.getFullYear() * 12 + now.getMonth() + offset;
+    const y = Math.floor(totalMonths / 12);
+    const m = ((totalMonths % 12) + 12) % 12;
     const start = new Date(Date.UTC(y, m, 1));
     const end = new Date(Date.UTC(y, m + 1, 0));
     return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+  }
+
+  function periodLabel(period, offset, range) {
+    const start = new Date(range.start + 'T00:00:00');
+    if (period === 'year') return String(start.getFullYear());
+    if (period === 'quarter') {
+      const end = new Date(range.end + 'T00:00:00');
+      const cap = function (s) { return s.charAt(0).toUpperCase() + s.slice(1, 3); };
+      return cap(MONTHS[start.getMonth()]) + ' - ' + cap(MONTHS[end.getMonth()]) + ' ' + start.getFullYear();
+    }
+    const cap = function (s) { return s.charAt(0).toUpperCase() + s.slice(1); };
+    return cap(MONTHS[start.getMonth()]) + ' ' + start.getFullYear();
   }
 
   // Solo cuenta jornadas (insumos/médica) — las reuniones quedan fuera de
@@ -2284,10 +2316,20 @@
 
   function setKpiPeriod(period) {
     state.kpiPeriod = period;
+    // Cambiar de mes/trimestre/año siempre vuelve al período actual — si
+    // el usuario ya se había movido a otro, no tendría sentido arrastrar
+    // ese desplazamiento a una unidad distinta (ej. "+2" en trimestre no
+    // significa lo mismo en año).
+    state.kpiOffset = 0;
     document.querySelectorAll('#resumen-period-switcher [data-kpi-period]').forEach(function (btn) {
       if (btn.dataset.kpiPeriod === period) btn.setAttribute('aria-current', 'page');
       else btn.removeAttribute('aria-current');
     });
+    renderResumenView();
+  }
+
+  function changeKpiPeriod(delta) {
+    state.kpiOffset += delta;
     renderResumenView();
   }
 
@@ -2305,7 +2347,9 @@
   }
 
   function renderResumenView() {
-    const range = periodRange(state.kpiPeriod);
+    const range = periodRange(state.kpiPeriod, state.kpiOffset);
+    if (dom.resumenPeriodLabel) dom.resumenPeriodLabel.textContent = periodLabel(state.kpiPeriod, state.kpiOffset, range);
+    if (dom.resumenPeriodToday) dom.resumenPeriodToday.hidden = state.kpiOffset === 0;
     const orgFilter = state.kpiOrgFilter || null;
     const events = state.events.filter(function (e) {
       return e.date >= range.start && e.date <= range.end && (!orgFilter || e.source === orgFilter);
@@ -2605,13 +2649,17 @@
   }
 
   // Tarjetas KPI (identificados + uno por estado) debajo de la franja de
-  // organizaciones — mismo estilo que el resumen de UCV, pero para todo el
-  // directorio de Networking, sin importar el filtro activo.
+  // organizaciones — mismo estilo que el resumen de UCV. Se recalculan
+  // según la organización elegida en la franja de arriba (igual que en
+  // Tareas con su filtro de organización), para ver de un vistazo cómo va
+  // el directorio de esa organización en particular.
   function renderContactsKpiCards() {
     if (!dom.contactsKpiCards) return;
-    function count(key) { return state.contacts.filter(function (c) { return (c.status || 'pending') === key; }).length; }
+    const orgFilter = state.contactOrgFilter || null;
+    const scoped = state.contacts.filter(function (c) { return !orgFilter || c.source === orgFilter; });
+    function count(key) { return scoped.filter(function (c) { return (c.status || 'pending') === key; }).length; }
     const cards = [
-      { icon: '👥', value: state.contacts.length, label: 'Contactos identificados', cls: 'kpi-primary' }
+      { icon: '👥', value: scoped.length, label: 'Contactos identificados', cls: 'kpi-primary' }
     ].concat(CONTACT_STATUSES.map(function (s) {
       const CLASS_BY_STATUS = { pending: 'kpi-neutral', contacted: 'kpi-good', waiting_response: 'kpi-sky', waiting_on_us: 'kpi-indigo' };
       return { icon: s.emoji, value: count(s.key), label: s.label, cls: CLASS_BY_STATUS[s.key] || 'kpi-neutral' };
