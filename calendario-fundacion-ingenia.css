@@ -372,6 +372,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .pendiente-task-badge { font-size: 11px; font-weight: 700; color: var(--coalition-good); white-space: nowrap; }
 .pendiente-create-task, .pendiente-remove { border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 6px 10px; font-size: 11.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .pendiente-remove { padding: 6px 9px; }
+.reminders-list { display: flex; flex-direction: column; gap: 8px; }
+.reminder-row { display: flex; align-items: center; gap: 8px; }
+.reminder-row .reminder-offset { flex: 1; }
+.reminder-sent-badge { font-size: 11px; font-weight: 700; color: var(--coalition-good, #0f7a3d); white-space: nowrap; }
+.reminder-remove { border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 6px 9px; font-size: 11.5px; font-weight: 700; cursor: pointer; }
+.due-reminders-panel { margin-bottom: 14px; padding: 12px 16px; border: 1px solid #fbbf24; border-radius: 16px; background: #fffbeb; }
+.due-reminders-panel h3 { margin: 0 0 8px; font-size: 14px; }
+.due-reminder-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid #fde68a; }
+.due-reminder-row:first-of-type { border-top: 0; }
+.due-reminder-info { display: flex; flex-direction: column; font-size: 12.5px; }
+.due-reminder-info span { color: var(--color-neutral-600); font-size: 11.5px; }
+.due-reminder-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.due-reminder-nophone { font-size: 11.5px; color: var(--color-neutral-500); font-style: italic; align-self: center; }
 .minuta-files-list { display: flex; flex-direction: column; gap: 6px; }
 .minuta-file-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 12px; border: 1px solid var(--color-neutral-300); border-radius: 14px; background: #fff; font-size: 12.5px; }
 .minuta-file-row a { overflow-wrap: anywhere; color: inherit; }
@@ -577,6 +590,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .responsable-manage-row button { border: 0; background: transparent; font-size: 15px; cursor: pointer; }
 .responsable-manage-row button[data-action="delete-responsable-only"] { color: var(--coalition-danger, #a02525); }
 .responsable-manage-row-editing input { flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid var(--color-accent-400); border-radius: 10px; font-size: 13.5px; font-weight: 600; }
+.responsable-contact-results { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; margin-top: 8px; }
+.responsable-contact-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border: 1px solid var(--color-neutral-300); border-radius: 14px; background: #fff; font-size: 13px; }
+.responsable-contact-linked { font-size: 12px; font-weight: 700; color: #0f7a3d; white-space: nowrap; }
+.responsable-contact-empty { font-size: 12.5px; color: var(--color-neutral-600); margin: 8px 0 0; }
 .responsables-empty { padding: 14px; text-align: center; color: var(--color-neutral-500); font-size: 12.5px; }
 
 /* ---------- Organizaciones ---------- */

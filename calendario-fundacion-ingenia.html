@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=35">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=36">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=54" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=55" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -98,6 +98,7 @@
           <button class="btn btn-primary" type="button" id="new-reunion-btn" onclick="window.ingeniaAction(event)">➕ Agregar reunión</button>
         </div>
       </div>
+      <div id="reuniones-due-reminders"></div>
       <nav class="tab-nav contacts-view-toggle" aria-label="Vista de reuniones">
         <button class="tab-button" type="button" data-reuniones-view="list" aria-current="page" onclick="window.ingeniaAction(event)">📇 Lista</button>
         <button class="tab-button" type="button" data-reuniones-view="kanban" onclick="window.ingeniaAction(event)">🗂️ Kanban</button>
@@ -413,6 +414,9 @@
           <p id="event-minuta-file-status" class="result-count" hidden></p>
           <label for="event-minuta-file-input" class="btn btn-secondary" style="margin-top: 8px; width: fit-content; cursor: pointer">📎 Adjuntar archivo</label>
           <input id="event-minuta-file-input" type="file" accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,image/*" style="position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0">
+          <label style="margin-top: 10px">Recordatorios (se preparan listos para enviar por WhatsApp)</label>
+          <div id="event-reminders-list" class="reminders-list"></div>
+          <button type="button" id="event-reminder-add" class="btn btn-secondary" style="margin-top: 8px" onclick="window.ingeniaAction(event)">➕ Agregar recordatorio</button>
         </div>
         <div class="field">
           <label for="field-event-date">Fecha</label>
@@ -564,6 +568,11 @@
             <input id="field-new-responsable-only-name" class="input" type="text" placeholder="Ej. Andrea Pérez">
             <button id="responsable-add-only" class="btn btn-primary" type="button" onclick="window.ingeniaAction(event)">Agregar</button>
           </div>
+        </div>
+        <div class="field field-full">
+          <label for="field-responsable-contact-search">🔗 O vincular desde un contacto ya guardado</label>
+          <input id="field-responsable-contact-search" class="input" type="text" placeholder="Buscar por nombre…">
+          <div id="responsable-contact-results" class="responsable-contact-results"></div>
         </div>
       </div>
       <div class="dialog-actions">

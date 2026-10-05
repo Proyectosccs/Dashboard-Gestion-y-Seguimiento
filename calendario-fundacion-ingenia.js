@@ -342,6 +342,7 @@
     dragReunionId: null,
     ucvVolunteers: [],
     pendientesDraft: [],
+    remindersDraft: [],
     minutaFilesDraft: [],
     minutaFileUploading: false,
     minutaRecognition: null,
@@ -384,6 +385,7 @@
       'field-event-jornada-type': onJornadaTypeChange,
       'field-event-specialty-other': onSpecialtyOtherChange,
       'event-pendiente-add': addPendiente,
+      'event-reminder-add': addReminder,
       'event-minuta-record': toggleMinutaRecording,
       'new-contact-btn': openContactDialog,
       'contact-dialog-close': closeContactDialog,
@@ -459,6 +461,14 @@
     }
     if (target.dataset.action === 'move-reunion-status') {
       moveReunionStatus(target.dataset.id, target.dataset.status);
+      return;
+    }
+    if (target.dataset.action === 'link-responsable-contact') {
+      addResponsableFromContact(target.dataset.id);
+      return;
+    }
+    if (target.dataset.action === 'mark-reminder-sent') {
+      markReminderSent(target.dataset.eventId, target.dataset.reminderId);
       return;
     }
     if (target.dataset.action === 'move-task-status') {
@@ -554,6 +564,7 @@
       renderReunionesView();
     });
     dom.responsableChecklist.addEventListener('change', onResponsableChecklistChange);
+    dom.responsableContactSearch.addEventListener('input', renderResponsableContactResults);
     dom.taskStatusSelect.addEventListener('change', onTaskStatusChange);
     dom.orgForm.addEventListener('submit', onOrgSubmit);
     dom.orgDialog.addEventListener('cancel', function (e) { e.preventDefault(); closeOrgDialog(); });
@@ -641,6 +652,8 @@
     dom.responsablesList = document.getElementById('responsables-list');
     dom.responsablesError = document.getElementById('responsables-error');
     dom.newResponsableOnlyName = document.getElementById('field-new-responsable-only-name');
+    dom.responsableContactSearch = document.getElementById('field-responsable-contact-search');
+    dom.responsableContactResults = document.getElementById('responsable-contact-results');
     dom.organizationsGrid = document.getElementById('organizations-grid');
     dom.orgDialog = document.getElementById('org-dialog');
     dom.orgForm = document.getElementById('org-form');
@@ -677,6 +690,8 @@
     dom.eventMeetingField = document.getElementById('event-meeting-field');
     dom.eventMotivoField = document.getElementById('event-motivo-field');
     dom.eventPendientesList = document.getElementById('event-pendientes-list');
+    dom.eventRemindersList = document.getElementById('event-reminders-list');
+    dom.reunionesDueReminders = document.getElementById('reuniones-due-reminders');
     dom.eventMinutaFilesList = document.getElementById('event-minuta-files-list');
     dom.eventUcvField = document.getElementById('event-ucv-field');
     dom.eventUcvChecks = document.getElementById('event-ucv-checks');
@@ -792,7 +807,7 @@
     if (!silent) dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
 
-    const [coalicionRes, coalicionContactsRes, florangelRes, florangelContactsRes, ucvRes, ucvContactsRes, ingeniaRes, ucvVolunteersRes, coalicionMotivoRes, coalicionRescheduleRes] = await Promise.all([
+    const [coalicionRes, coalicionContactsRes, florangelRes, florangelContactsRes, ucvRes, ucvContactsRes, ingeniaRes, ucvVolunteersRes, coalicionMotivoRes, coalicionRescheduleRes, coalicionRemindersRes] = await Promise.all([
       state.client.from('coalicion_events').select('id,title,event_date,start_time,end_time,location,maps_url,notes,status,jornada_type,specialties,collaborating_orgs,participants,participo_fundacion_ingenia,minuta,pendientes,minuta_files').is('archived_at', null),
       state.client.from('coalicion_contacts').select('id,name,role,belongs_to,national_id,phone,email,notes,status').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
@@ -809,6 +824,9 @@
       // columna aparte agregada por su propia migración, pedida por
       // separado para no romper la carga si aún no se ha aplicado.
       , state.client.from('coalicion_events').select('id,reschedule_history').is('archived_at', null)
+      // Igual que "motivo" y "reschedule_history": los recordatorios viven
+      // en su propia columna agregada por su propia migración.
+      , state.client.from('coalicion_events').select('id,reminders').is('archived_at', null)
     ]);
     const coalicionMotivos = {};
     if (!coalicionMotivoRes.error && Array.isArray(coalicionMotivoRes.data)) {
@@ -817,6 +835,10 @@
     const coalicionReschedules = {};
     if (!coalicionRescheduleRes.error && Array.isArray(coalicionRescheduleRes.data)) {
       coalicionRescheduleRes.data.forEach(function (r) { coalicionReschedules[r.id] = Array.isArray(r.reschedule_history) ? r.reschedule_history : []; });
+    }
+    const coalicionReminders = {};
+    if (!coalicionRemindersRes.error && Array.isArray(coalicionRemindersRes.data)) {
+      coalicionRemindersRes.data.forEach(function (r) { coalicionReminders[r.id] = Array.isArray(r.reminders) ? r.reminders : []; });
     }
     state.ucvVolunteers = (Array.isArray(ucvVolunteersRes.data && ucvVolunteersRes.data.value) ? ucvVolunteersRes.data.value : [])
       .filter(function (v) { return v && v.id && v.name; }).map(function (v) { return { id: v.id, name: v.name }; });
@@ -863,7 +885,7 @@
     }
 
     const coalicionEvents = (coalicionRes.data || []).map(function (e) {
-      return { id: 'coalicion-' + e.id, rawId: e.id, source: 'coalicion', title: e.title, date: e.event_date, time: e.start_time, location: e.location, notes: e.notes || '', raw: Object.assign({}, e, { motivo: coalicionMotivos[e.id] || '', reschedule_history: coalicionReschedules[e.id] || [] }) };
+      return { id: 'coalicion-' + e.id, rawId: e.id, source: 'coalicion', title: e.title, date: e.event_date, time: e.start_time, location: e.location, notes: e.notes || '', raw: Object.assign({}, e, { motivo: coalicionMotivos[e.id] || '', reschedule_history: coalicionReschedules[e.id] || [], reminders: coalicionReminders[e.id] || [] }) };
     });
 
     const florangelEvents = (Array.isArray(florangelRes.data && florangelRes.data.value) ? florangelRes.data.value : []).map(function (e) {
@@ -1356,8 +1378,10 @@
   function openResponsablesDialog() {
     hideError(dom.responsablesError);
     dom.newResponsableOnlyName.value = '';
+    dom.responsableContactSearch.value = '';
     state.editingResponsableId = null;
     renderResponsablesList();
+    renderResponsableContactResults();
     dom.responsablesDialog.showModal();
   }
 
@@ -1436,13 +1460,57 @@
     toast('Responsable eliminado del equipo.', 'success');
   }
 
-  async function createTeamMember(name) {
-    const entry = { id: uid(), name: name, created_at: new Date().toISOString() };
+  // "extra" permite vincular el responsable con un contacto ya existente
+  // (phone + de dónde viene) — ver addResponsableFromContact más abajo.
+  async function createTeamMember(name, extra) {
+    const entry = Object.assign({ id: uid(), name: name, created_at: new Date().toISOString() }, extra || {});
     const next = (await readBoardKey('ingenia_board_state', TEAM_MEMBERS_KEY, [])).concat(entry);
     const ok = await writeBoardKey('ingenia_board_state', TEAM_MEMBERS_KEY, next);
     if (!ok) return null;
     state.teamMembers = next;
     return entry;
+  }
+
+  // ---------- Vincular un responsable con un contacto ya guardado ----------
+  // Así, al elegirlo como responsable de una tarea o participante de una
+  // reunión, ya trae su teléfono — necesario para preparar recordatorios
+  // por WhatsApp sin tener que volver a escribir el número a mano.
+
+  function renderResponsableContactResults() {
+    const query = normalizeText(dom.responsableContactSearch.value);
+    if (!query) { renderMarkup(dom.responsableContactResults, ''); return; }
+    const linkedIds = {};
+    state.teamMembers.forEach(function (m) { if (m.linkedContactId) linkedIds[m.linkedContactId] = true; });
+    const matches = state.contacts.filter(function (c) {
+      return normalizeText(c.name).indexOf(query) > -1;
+    }).slice(0, 15);
+    if (!matches.length) {
+      renderMarkup(dom.responsableContactResults, '<p class="responsable-contact-empty">Sin coincidencias.</p>');
+      return;
+    }
+    renderMarkup(dom.responsableContactResults, matches.map(function (c) {
+      const info = sourceInfo(c.source);
+      const already = !!linkedIds[c.id];
+      return '<div class="responsable-contact-row">' +
+        '<span><strong>' + safe(c.name) + '</strong> · ' + safe(info.label) + (c.phone ? '' : ' · <em>sin teléfono</em>') + '</span>' +
+        (already
+          ? '<span class="responsable-contact-linked">✅ Ya vinculado</span>'
+          : '<button type="button" class="btn btn-secondary" data-action="link-responsable-contact" data-id="' + safe(c.id) + '" onclick="window.ingeniaAction(event)">Agregar</button>') +
+      '</div>';
+    }).join(''));
+  }
+
+  async function addResponsableFromContact(contactGlobalId) {
+    hideError(dom.responsablesError);
+    const contact = findById(state.contacts, contactGlobalId);
+    if (!contact) return;
+    if (state.teamMembers.some(function (m) { return m.linkedContactId === contact.id; })) return;
+    const created = await createTeamMember(contact.name, { phone: contact.phone || '', linkedContactId: contact.id, linkedContactSource: contact.source });
+    if (!created) { showError(dom.responsablesError, 'No se pudo guardar — revisa tu conexión.'); return; }
+    renderResponsablesList();
+    renderResponsableContactResults();
+    populateTasksResponsableFilter();
+    toast('Responsable vinculado con el contacto.', 'success');
   }
 
 
@@ -1472,7 +1540,8 @@
     const pendientes = Array.isArray(raw.pendientes) ? raw.pendientes : [];
     const minutaFiles = Array.isArray(raw.minuta_files) ? raw.minuta_files : (Array.isArray(raw.minutaFiles) ? raw.minutaFiles : []);
     const rescheduleHistory = Array.isArray(raw.reschedule_history) ? raw.reschedule_history : (Array.isArray(raw.rescheduleHistory) ? raw.rescheduleHistory : []);
-    return { status: status, endTime: endTime, jornadaType: jornadaType, specialties: specialties, collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, motivo: motivo, pendientes: pendientes, minutaFiles: minutaFiles, rescheduleHistory: rescheduleHistory };
+    const reminders = Array.isArray(raw.reminders) ? raw.reminders : [];
+    return { status: status, endTime: endTime, jornadaType: jornadaType, specialties: specialties, collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, motivo: motivo, pendientes: pendientes, minutaFiles: minutaFiles, rescheduleHistory: rescheduleHistory, reminders: reminders };
   }
 
   // Fuentes que tienen su propia lista de contactos, para ofrecerlos en
@@ -1609,6 +1678,8 @@
       dom.eventMeetingField.hidden = extra.jornadaType !== 'reunion'; dom.eventMotivoField.hidden = dom.eventMeetingField.hidden;
       state.pendientesDraft = extra.pendientes.map(function (p) { return Object.assign({}, p); });
       renderPendientesList();
+      state.remindersDraft = extra.reminders.map(function (r) { return Object.assign({}, r); });
+      renderRemindersList();
       state.minutaFilesDraft = extra.minutaFiles.map(function (f) { return Object.assign({}, f); });
       renderMinutaFilesList();
       const rawUcvEvent = existing.source === 'ucv' ? (existing.raw || {}) : {};
@@ -1626,6 +1697,8 @@
       dom.eventMeetingField.hidden = presetJornadaType !== 'reunion'; dom.eventMotivoField.hidden = dom.eventMeetingField.hidden;
       state.pendientesDraft = [];
       renderPendientesList();
+      state.remindersDraft = [];
+      renderRemindersList();
       state.minutaFilesDraft = [];
       renderMinutaFilesList();
       renderUcvEventExtras({}, []);
@@ -1671,6 +1744,7 @@
         specialties: dom.eventSpecialtiesField.hidden ? [] : Array.from(dom.eventSpecialtiesList.querySelectorAll('.event-specialty-checkbox:checked')).map(function (cb) { return cb.value; }),
         participants: readParticipants(),
         pendientesDraft: state.pendientesDraft,
+        remindersDraft: state.remindersDraft,
         minutaFilesDraft: state.minutaFilesDraft
       };
       localStorage.setItem(EVENT_DRAFT_KEY, JSON.stringify(draft));
@@ -1722,6 +1796,8 @@
     dom.eventMeetingField.hidden = f.jornada_type.value !== 'reunion'; dom.eventMotivoField.hidden = dom.eventMeetingField.hidden;
     state.pendientesDraft = (draft.pendientesDraft || []).map(function (p) { return Object.assign({}, p); });
     renderPendientesList();
+    state.remindersDraft = (draft.remindersDraft || []).map(function (r) { return Object.assign({}, r); });
+    renderRemindersList();
     state.minutaFilesDraft = (draft.minutaFilesDraft || []).map(function (file) { return Object.assign({}, file); });
     renderMinutaFilesList();
     toast('Borrador recuperado — revisa que todo esté bien antes de guardar.', 'success');
@@ -1804,6 +1880,49 @@
     const inputs = dom.eventPendientesList.querySelectorAll('.pendiente-text');
     const last = inputs[inputs.length - 1];
     if (last) last.focus();
+  }
+
+  // ---------- Recordatorios de la reunión (listos para enviar, no se
+  // envían solos — ver "Preparar, tú envías" acordado con la usuaria) ----------
+
+  function renderRemindersList() {
+    if (!state.remindersDraft.length) {
+      renderMarkup(dom.eventRemindersList, '<p style="font-size:12px;color:var(--color-neutral-600)">Sin recordatorios todavía.</p>');
+      return;
+    }
+    renderMarkup(dom.eventRemindersList, state.remindersDraft.map(function (r) {
+      return '<div class="reminder-row" data-reminder-id="' + safe(r.id) + '">' +
+        '<select class="input reminder-offset" data-id="' + safe(r.id) + '">' +
+          REMINDER_OFFSETS.map(function (o) { return '<option value="' + o.minutes + '"' + (o.minutes === r.offsetMinutes ? ' selected' : '') + '>' + safe(o.label) + '</option>'; }).join('') +
+        '</select>' +
+        (r.sent ? '<span class="reminder-sent-badge">✅ Enviado</span>' : '') +
+        '<button type="button" class="reminder-remove" data-id="' + safe(r.id) + '" aria-label="Eliminar recordatorio">🗑️</button>' +
+      '</div>';
+    }).join(''));
+    attachRemindersListeners();
+  }
+
+  function attachRemindersListeners() {
+    dom.eventRemindersList.querySelectorAll('.reminder-offset').forEach(function (select) {
+      select.addEventListener('change', function () {
+        const item = state.remindersDraft.find(function (r) { return r.id === select.dataset.id; });
+        if (item) item.offsetMinutes = Number(select.value);
+        persistEventDraft();
+      });
+    });
+    dom.eventRemindersList.querySelectorAll('.reminder-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        state.remindersDraft = state.remindersDraft.filter(function (r) { return r.id !== btn.dataset.id; });
+        renderRemindersList();
+        persistEventDraft();
+      });
+    });
+  }
+
+  function addReminder() {
+    state.remindersDraft.push({ id: uid(), offsetMinutes: REMINDER_OFFSETS[3].minutes, sent: false });
+    renderRemindersList();
+    persistEventDraft();
   }
 
   // ---------- Dictado en vivo de la minuta (Web Speech API) ----------
@@ -1898,6 +2017,22 @@
   }
 
   const MINUTA_FILES_BUCKET = 'reuniones-archivos';
+
+  // Catálogo fijo de "cuánto tiempo antes" para los recordatorios de una
+  // reunión — en vez de un selector libre de número + unidad (más difícil
+  // de acertar), unas pocas opciones típicas cubren el caso real.
+  const REMINDER_OFFSETS = [
+    { minutes: 30, label: '30 minutos antes' },
+    { minutes: 60, label: '1 hora antes' },
+    { minutes: 180, label: '3 horas antes' },
+    { minutes: 1440, label: '1 día antes' },
+    { minutes: 2880, label: '2 días antes' },
+    { minutes: 10080, label: '1 semana antes' }
+  ];
+  function reminderOffsetLabel(minutes) {
+    const found = REMINDER_OFFSETS.find(function (o) { return o.minutes === minutes; });
+    return found ? found.label : minutes + ' minutos antes';
+  }
 
   function renderMinutaFilesList() {
     if (!state.minutaFilesDraft.length) {
@@ -2051,6 +2186,7 @@
     const minuta = jornadaType === 'reunion' ? dom.eventForm.elements.minuta.value.trim() : '';
     const motivo = jornadaType === 'reunion' ? dom.eventForm.elements.motivo.value.trim() : '';
     const pendientes = jornadaType === 'reunion' ? readPendientes() : [];
+    const reminders = jornadaType === 'reunion' ? state.remindersDraft : [];
     const minutaFiles = jornadaType === 'reunion' ? state.minutaFilesDraft : [];
     if (!title || !eventDate) { showError(dom.eventError, 'Nombre del evento y fecha son obligatorios.'); return; }
     if (state.minutaFileUploading) { showError(dom.eventError, 'Espera a que termine de subirse el archivo.'); return; }
@@ -2075,7 +2211,7 @@
         location: location, status: status, notes: notes,
         participatesIngenia: participatesIngenia, jornadaType: jornadaType, specialties: specialties,
         collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, motivo: motivo, pendientes: pendientes,
-        minutaFiles: minutaFiles
+        minutaFiles: minutaFiles, reminders: reminders
       };
       if (source === 'ucv') { fields.ucvChecks = readUcvChecks(); fields.ucvAssigned = readUcvAssigned(); }
       let existing = state.editingEvent;
@@ -2520,6 +2656,7 @@
   }
 
   function renderReunionesView() {
+    renderDueReminders();
     const orgFilter = state.reunionOrgFilter || null;
     const reuniones = state.events.filter(function (e) {
       const extra = readEventExtra(e.source, e.raw);
@@ -2543,6 +2680,117 @@
     dom.reunionesList.hidden = mode !== 'list';
     dom.reunionesBoard.hidden = mode !== 'kanban';
     if (mode === 'kanban') renderReunionesBoard();
+  }
+
+  // ---------- Recordatorios pendientes de enviar (preparados, no se
+  // envían solos) ----------
+
+  // Resuelve nombre + teléfono de un participante guardado en el evento
+  // ("team:<id>" = responsable del equipo, "contact:<id>" = contacto de la
+  // organización dueña del evento) — ambos ya están en memoria desde
+  // loadAll(), no hace falta pedir nada más al servidor.
+  function resolveParticipantForEvent(key, eventSource) {
+    if (key.indexOf('team:') === 0) {
+      const m = findTeamMember(key.slice(5));
+      return m ? { name: m.name, phone: m.phone || '' } : null;
+    }
+    if (key.indexOf('contact:') === 0) {
+      const rawId = key.slice(8);
+      const c = state.contacts.find(function (x) { return x.source === eventSource && x.rawId === rawId; });
+      return c ? { name: c.name, phone: c.phone || '' } : null;
+    }
+    return null;
+  }
+
+  // Hora por defecto cuando la reunión no tiene hora de inicio — para
+  // poder calcular igual "cuánto falta" sin forzar a elegir una hora.
+  const REMINDER_DEFAULT_TIME = '09:00';
+
+  function reminderDueAt(e, offsetMinutes) {
+    const timeStr = e.time ? e.time.slice(0, 5) : REMINDER_DEFAULT_TIME;
+    const base = new Date(e.date + 'T' + timeStr + ':00');
+    return new Date(base.getTime() - offsetMinutes * 60000);
+  }
+
+  function computeDueReminders() {
+    const now = new Date();
+    const due = [];
+    state.events.forEach(function (e) {
+      const extra = readEventExtra(e.source, e.raw);
+      if (extra.jornadaType !== 'reunion' || extra.status === 'cancelled') return;
+      extra.reminders.forEach(function (r) {
+        if (r.sent) return;
+        const dueAt = reminderDueAt(e, r.offsetMinutes);
+        if (dueAt <= now) due.push({ event: e, extra: extra, reminder: r, dueAt: dueAt });
+      });
+    });
+    due.sort(function (a, b) { return a.dueAt - b.dueAt; });
+    return due;
+  }
+
+  function reminderWhatsAppLines(e, extra) {
+    return [
+      '📅 Recordatorio de reunión: ' + (e.title || ''),
+      extra.motivo ? '📝 Motivo: ' + extra.motivo : '',
+      '🗓️ ' + formatDate(e.date) + (e.time ? ' a las ' + formatTime(e.time) : ''),
+      e.location ? '📍 ' + e.location : ''
+    ].filter(Boolean);
+  }
+
+  function renderDueReminders() {
+    if (!dom.reunionesDueReminders) return;
+    const due = computeDueReminders();
+    if (!due.length) { renderMarkup(dom.reunionesDueReminders, ''); return; }
+    renderMarkup(dom.reunionesDueReminders, '<div class="due-reminders-panel">' +
+      '<h3>📣 Recordatorios listos para enviar</h3>' +
+      due.map(function (item) {
+        const e = item.event, extra = item.extra, r = item.reminder;
+        const text = reminderWhatsAppLines(e, extra).join('\n');
+        const people = extra.participants.map(function (key) { return resolveParticipantForEvent(key, e.source); }).filter(Boolean);
+        const buttons = people.map(function (p) {
+          if (!p.phone) return '<span class="due-reminder-nophone">' + safe(p.name) + ' (sin teléfono)</span>';
+          const digits = p.phone.replace(/[^0-9]/g, '');
+          return '<button type="button" class="btn btn-secondary due-reminder-send" data-phone="' + safe(digits) + '" data-text="' + safe(text) + '">📲 ' + safe(p.name) + '</button>';
+        });
+        return '<div class="due-reminder-row">' +
+          '<div class="due-reminder-info"><strong>' + safe(e.title) + '</strong><span>' + reminderOffsetLabel(r.offsetMinutes) + ' · ' + safe(formatDate(e.date)) + (e.time ? ' ' + safe(formatTime(e.time)) : '') + '</span></div>' +
+          '<div class="due-reminder-actions">' + buttons.join('') +
+            '<button type="button" class="btn btn-secondary" data-action="mark-reminder-sent" data-event-id="' + safe(e.id) + '" data-reminder-id="' + safe(r.id) + '" onclick="window.ingeniaAction(event)">✓ Marcar enviado</button>' +
+          '</div>' +
+        '</div>';
+      }).join('') +
+    '</div>');
+    dom.reunionesDueReminders.querySelectorAll('.due-reminder-send').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        window.open('https://api.whatsapp.com/send?phone=' + btn.dataset.phone + '&text=' + encodeURIComponent(btn.dataset.text), '_blank', 'noopener');
+      });
+    });
+  }
+
+  async function markReminderSent(eventId, reminderId) {
+    const e = findById(state.events, eventId);
+    if (!e) return;
+    const extra = readEventExtra(e.source, e.raw);
+    const nextReminders = extra.reminders.map(function (r) { return r.id === reminderId ? Object.assign({}, r, { sent: true }) : r; });
+    e.raw = Object.assign({}, e.raw, { reminders: nextReminders });
+    renderDueReminders();
+    renderReunionesView();
+    const fields = fieldsFromEvent(e);
+    fields.reminders = nextReminders;
+    let ok = false;
+    if (e.source === 'coalicion') ok = await saveCoalicionEvent(fields, e);
+    else if (e.source === 'florangel') ok = await saveFlorangelEvent(fields, e);
+    else if (e.source === 'ucv') ok = await saveUcvEvent(fields, e);
+    else if (e.source === 'networking') ok = await saveIngeniaEvent('ingenia-networking-events-v1', fields, e);
+    else if (e.source === 'otros') ok = await saveIngeniaEvent('ingenia-otros-events-v1', fields, e);
+    else ok = await saveIngeniaEvent('ingenia-custom-' + e.source + '-events-v1', fields, e);
+    if (ok) { toast('Recordatorio marcado como enviado.', 'success'); await loadAll(true); }
+    else {
+      e.raw = Object.assign({}, e.raw, { reminders: extra.reminders });
+      renderDueReminders();
+      renderReunionesView();
+      toast('No se pudo actualizar — revisa tu conexión.', 'error');
+    }
   }
 
   // ---------- Reuniones en Kanban (mismo patrón que Contactos/Tareas) ----------
@@ -2613,7 +2861,7 @@
       participatesIngenia: readParticipatesIngenia(e.raw) === 'si', jornadaType: extra.jornadaType,
       specialties: extra.specialties, collaboratingOrgs: extra.collaboratingOrgs, participants: extra.participants,
       minuta: extra.minuta, motivo: extra.motivo, pendientes: extra.pendientes, minutaFiles: extra.minutaFiles,
-      rescheduleHistory: extra.rescheduleHistory
+      rescheduleHistory: extra.rescheduleHistory, reminders: extra.reminders
     };
   }
 
@@ -3376,7 +3624,7 @@
             collaborating_orgs: fields.collaboratingOrgs, participants: fields.participants,
             participo_fundacion_ingenia: fields.participatesIngenia,
             minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles,
-            reschedule_history: fields.rescheduleHistory || []
+            reschedule_history: fields.rescheduleHistory || [], reminders: fields.reminders || []
           }
         })
       });
@@ -3405,7 +3653,7 @@
         participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
         specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
         minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles,
-        reschedule_history: fields.rescheduleHistory || []
+        reschedule_history: fields.rescheduleHistory || [], reminders: fields.reminders || []
       });
     });
     return writeBoardKey('florangel_board_state', 'florangel-events-v1', next);
@@ -3431,7 +3679,7 @@
           notes: fields.notes, participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
           specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
           minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles,
-          reschedule_history: fields.rescheduleHistory || []
+          reschedule_history: fields.rescheduleHistory || [], reminders: fields.reminders || []
         }, fields.ucvChecks ? { checks: fields.ucvChecks, assignedVolunteers: fields.ucvAssigned || [] } : {});
       });
       return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
@@ -3444,7 +3692,7 @@
       participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
       specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
       minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles,
-      reschedule_history: fields.rescheduleHistory || []
+      reschedule_history: fields.rescheduleHistory || [], reminders: fields.reminders || []
     });
     return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
   }
@@ -3459,7 +3707,7 @@
         participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
         specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
         minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles,
-        reschedule_history: fields.rescheduleHistory || []
+        reschedule_history: fields.rescheduleHistory || [], reminders: fields.reminders || []
       });
     });
     return writeBoardKey('ingenia_board_state', key, next);
