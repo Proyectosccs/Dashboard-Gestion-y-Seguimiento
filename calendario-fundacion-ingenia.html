@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
   <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=31">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=47" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=48" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -435,6 +435,12 @@
         <div class="field field-full">
           <label>Participantes (opcional)</label>
           <div id="event-participants-list" class="checkbox-list"></div>
+        </div>
+        <div class="field field-full" id="event-ucv-field" hidden>
+          <label>Preparación del evento (UCV)</label>
+          <div id="event-ucv-checks" class="checkbox-list"></div>
+          <label style="margin-top: 10px">Voluntarios asignados (UCV)</label>
+          <div id="event-ucv-volunteers" class="checkbox-list"></div>
         </div>
         <div class="field field-full">
           <label for="field-event-notes">Notas y Requerimientos</label>

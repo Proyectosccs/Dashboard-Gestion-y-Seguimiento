@@ -164,6 +164,16 @@
     if (/^esperando/.test(t)) return 'waiting_response';
     return 'contacted';
   }
+  // Checklist de preparación de una jornada de UCV (mismo catálogo que
+  // JOURNEY_QUESTIONS en Directorio y Agenda Relaciones UCV.dc.html; si cambia
+  // allá, actualizarlo acá).
+  const UCV_JOURNEY_CHECKS = [
+    { key: 'communication', emoji: '💬', label: 'Comunicación confirmada' },
+    { key: 'team', emoji: '👥', label: 'Asistencia del equipo definida' },
+    { key: 'materials', emoji: '🎒', label: 'Materiales por llevar definidos' },
+    { key: 'volunteers', emoji: '🙋', label: 'Voluntariado o capacitación resuelto' },
+    { key: 'data', emoji: '🗂️', label: 'Carga o procesamiento previo de data resuelto' }
+  ];
   const UCV_ROLES = [
     { id: 'Coordinador', label: '🧭 Coordinador' },
     { id: 'Enlace', label: '🔗 Enlace' },
@@ -327,6 +337,7 @@
     kpiPeriod: 'month',
     kpiOrgFilter: '',
     reunionOrgFilter: '',
+    ucvVolunteers: [],
     pendientesDraft: [],
     minutaFilesDraft: [],
     minutaFileUploading: false,
@@ -651,6 +662,9 @@
     dom.eventMeetingField = document.getElementById('event-meeting-field');
     dom.eventPendientesList = document.getElementById('event-pendientes-list');
     dom.eventMinutaFilesList = document.getElementById('event-minuta-files-list');
+    dom.eventUcvField = document.getElementById('event-ucv-field');
+    dom.eventUcvChecks = document.getElementById('event-ucv-checks');
+    dom.eventUcvVolunteers = document.getElementById('event-ucv-volunteers');
     dom.eventMinutaFileInput = document.getElementById('event-minuta-file-input');
     dom.eventMinutaFileStatus = document.getElementById('event-minuta-file-status');
     dom.eventMinutaRecordBtn = document.getElementById('event-minuta-record');
@@ -719,6 +733,33 @@
     dom.connectivityBanner.hidden = false;
   }
 
+  // Preparación y voluntarios asignados: solo existen en las jornadas de UCV.
+  function renderUcvEventExtras(checks, assigned) {
+    const isUcv = dom.eventSourceSelect.value === 'ucv';
+    dom.eventUcvField.hidden = !isUcv;
+    if (!isUcv) return;
+    checks = checks || readUcvChecks();
+    assigned = assigned || readUcvAssigned();
+    renderMarkup(dom.eventUcvChecks, UCV_JOURNEY_CHECKS.map(function (c) {
+      return '<label class="checkbox-chip"><input type="checkbox" class="event-ucv-check" value="' + safe(c.key) + '"' + (checks[c.key] ? ' checked' : '') + '>' + c.emoji + ' ' + safe(c.label) + '</label>';
+    }).join(''));
+    renderMarkup(dom.eventUcvVolunteers, state.ucvVolunteers.length
+      ? state.ucvVolunteers.map(function (v) {
+          return '<label class="checkbox-chip"><input type="checkbox" class="event-ucv-volunteer" value="' + safe(v.id) + '"' + (assigned.indexOf(v.id) > -1 ? ' checked' : '') + '>🙋 ' + safe(v.name) + '</label>';
+        }).join('')
+      : '<p style="font-size:12px;color:var(--color-neutral-600)">Todavía no hay voluntarios de UCV registrados.</p>');
+  }
+
+  function readUcvChecks() {
+    const out = {};
+    Array.from(dom.eventUcvChecks.querySelectorAll('.event-ucv-check')).forEach(function (cb) { out[cb.value] = cb.checked; });
+    return out;
+  }
+
+  function readUcvAssigned() {
+    return Array.from(dom.eventUcvVolunteers.querySelectorAll('.event-ucv-volunteer:checked')).map(function (cb) { return cb.value; });
+  }
+
   function onSourceChange() {
     const isNew = dom.eventSourceSelect.value === NEW_CALENDAR_VALUE;
     dom.newCalendarField.hidden = !isNew;
@@ -726,6 +767,7 @@
     populateCollaboratorsList();
     refreshParticipantsList();
     renderPendientesList();
+    renderUcvEventExtras();
   }
 
   async function loadAll(silent) {
@@ -733,7 +775,7 @@
     if (!silent) dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
 
-    const [coalicionRes, coalicionContactsRes, florangelRes, florangelContactsRes, ucvRes, ucvContactsRes, ingeniaRes] = await Promise.all([
+    const [coalicionRes, coalicionContactsRes, florangelRes, florangelContactsRes, ucvRes, ucvContactsRes, ingeniaRes, ucvVolunteersRes] = await Promise.all([
       state.client.from('coalicion_events').select('id,title,event_date,start_time,end_time,location,maps_url,notes,status,jornada_type,specialties,collaborating_orgs,participants,participo_fundacion_ingenia,minuta,pendientes').is('archived_at', null),
       state.client.from('coalicion_contacts').select('id,name,role,belongs_to,national_id,phone,email,notes,status').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
@@ -741,7 +783,10 @@
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-contacts-v1').maybeSingle(),
       state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', 'cmdlt-contacts-v1', 'ingenia-networking-contacts-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
+      , state.client.from('ucv_board_state').select('value').eq('key', 'ucv-volunteers-v1').maybeSingle()
     ]);
+    state.ucvVolunteers = (Array.isArray(ucvVolunteersRes.data && ucvVolunteersRes.data.value) ? ucvVolunteersRes.data.value : [])
+      .filter(function (v) { return v && v.id && v.name; }).map(function (v) { return { id: v.id, name: v.name }; });
 
     const anyFailed = coalicionRes.error && florangelRes.error && ucvRes.error && ingeniaRes.error;
     if (anyFailed) {
@@ -1517,6 +1562,8 @@
       renderPendientesList();
       state.minutaFilesDraft = extra.minutaFiles.map(function (f) { return Object.assign({}, f); });
       renderMinutaFilesList();
+      const rawUcvEvent = existing.source === 'ucv' ? (existing.raw || {}) : {};
+      renderUcvEventExtras(rawUcvEvent.checks || {}, Array.isArray(rawUcvEvent.assignedVolunteers) ? rawUcvEvent.assignedVolunteers : []);
     } else {
       dom.eventForm.elements.event_date.value = state.selectedDay || new Date().toISOString().slice(0, 10);
       dom.eventForm.elements.participates_ingenia.value = 'no';
@@ -1532,6 +1579,7 @@
       renderPendientesList();
       state.minutaFilesDraft = [];
       renderMinutaFilesList();
+      renderUcvEventExtras({}, []);
     }
     dom.eventDialog.showModal();
     const focusName = options && options.focusField;
@@ -1979,6 +2027,7 @@
         collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, pendientes: pendientes,
         minutaFiles: minutaFiles
       };
+      if (source === 'ucv') { fields.ucvChecks = readUcvChecks(); fields.ucvAssigned = readUcvAssigned(); }
       let existing = state.editingEvent;
 
       if (existing && source !== NEW_CALENDAR_VALUE && source !== existing.source) {
@@ -3152,7 +3201,7 @@
           notes: fields.notes, participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
           specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
           minuta: fields.minuta, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
-        });
+        }, fields.ucvChecks ? { checks: fields.ucvChecks, assignedVolunteers: fields.ucvAssigned || [] } : {});
       });
       return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
     }
@@ -3160,7 +3209,7 @@
       id: uid(), title: fields.title, dates: [fields.event_date], time: fields.start_time || '',
       endTime: fields.end_time, location: fields.location, status: sharedStatus,
       eventType: 'other',
-      owner: '', doctors: '', students: '', assignedVolunteers: [], checks: {}, notes: fields.notes,
+      owner: '', doctors: '', students: '', assignedVolunteers: fields.ucvAssigned || [], checks: fields.ucvChecks || {}, notes: fields.notes,
       participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
       specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
       minuta: fields.minuta, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
