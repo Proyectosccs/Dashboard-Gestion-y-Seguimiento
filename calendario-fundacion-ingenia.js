@@ -559,6 +559,10 @@
       state.kpiOrgFilter = dom.resumenOrgFilter.value;
       renderResumenView();
     });
+    dom.resumenPeriodSelect.addEventListener('change', function () {
+      state.kpiOffset = Number(dom.resumenPeriodSelect.value);
+      renderResumenView();
+    });
     dom.reunionesOrgFilter.addEventListener('change', function () {
       state.reunionOrgFilter = dom.reunionesOrgFilter.value;
       renderReunionesView();
@@ -683,7 +687,7 @@
     dom.resumenPeriodPrev = document.getElementById('resumen-period-prev');
     dom.resumenPeriodNext = document.getElementById('resumen-period-next');
     dom.resumenPeriodToday = document.getElementById('resumen-period-today');
-    dom.resumenPeriodLabel = document.getElementById('resumen-period-label');
+    dom.resumenPeriodSelect = document.getElementById('resumen-period-select');
     dom.resumenKpiGrid = document.getElementById('resumen-kpi-grid');
     dom.resumenOrgBreakdown = document.getElementById('resumen-org-breakdown');
     dom.resumenUpcoming = document.getElementById('resumen-upcoming');
@@ -1548,7 +1552,12 @@
   // "Participantes" junto con el roster compartido de Tareas de Equipo.
   // Coalición vive en una tabla real de Postgres; las demás son un arreglo
   // JSON en un board_state genérico.
-  const ORG_CONTACTS_BOARD_KEY = { cmdlt: { table: 'ingenia_board_state', key: 'cmdlt-contacts-v1' }, ucv: { table: 'ucv_board_state', key: 'ucv-contacts-v1' } };
+  const ORG_CONTACTS_BOARD_KEY = {
+    cmdlt: { table: 'ingenia_board_state', key: 'cmdlt-contacts-v1' },
+    ucv: { table: 'ucv_board_state', key: 'ucv-contacts-v1' },
+    florangel: { table: 'florangel_board_state', key: 'florangel-contacts-v1' },
+    networking: { table: 'ingenia_board_state', key: 'ingenia-networking-contacts-v1' }
+  };
 
   async function loadOrgContacts(source) {
     if (state.orgContactsCache[source]) return state.orgContactsCache[source];
@@ -2458,6 +2467,47 @@
     return cap(MONTHS[start.getMonth()]) + ' ' + start.getFullYear();
   }
 
+  // Lista de períodos para el desplegable de Resumen — cubre desde el
+  // evento más viejo hasta el más nuevo (con un poco de margen), así se
+  // puede saltar directo a "julio 2026" sin tener que darle a ‹ diez veces.
+  function periodOffsetFor(dateStr, period, now) {
+    const d = new Date(dateStr + 'T00:00:00');
+    if (period === 'year') return d.getFullYear() - now.getFullYear();
+    if (period === 'quarter') {
+      const qNow = now.getFullYear() * 4 + Math.floor(now.getMonth() / 3);
+      const qD = d.getFullYear() * 4 + Math.floor(d.getMonth() / 3);
+      return qD - qNow;
+    }
+    const mNow = now.getFullYear() * 12 + now.getMonth();
+    const mD = d.getFullYear() * 12 + d.getMonth();
+    return mD - mNow;
+  }
+
+  function periodOptions(period) {
+    const now = new Date();
+    const dates = state.events.map(function (e) { return e.date; }).filter(Boolean).sort();
+    let minOffset = 0;
+    let maxOffset = 0;
+    if (dates.length) {
+      minOffset = Math.min(0, periodOffsetFor(dates[0], period, now));
+      maxOffset = Math.max(0, periodOffsetFor(dates[dates.length - 1], period, now));
+    }
+    minOffset -= 1;
+    maxOffset += 1;
+    const options = [];
+    for (let o = maxOffset; o >= minOffset; o--) {
+      options.push({ offset: o, label: periodLabel(period, o, periodRange(period, o)) });
+    }
+    return options;
+  }
+
+  function populateResumenPeriodSelect() {
+    if (!dom.resumenPeriodSelect) return;
+    renderMarkup(dom.resumenPeriodSelect, periodOptions(state.kpiPeriod).map(function (o) {
+      return '<option value="' + o.offset + '"' + (o.offset === state.kpiOffset ? ' selected' : '') + '>' + safe(o.label) + '</option>';
+    }).join(''));
+  }
+
   // Solo cuenta jornadas (insumos/médica) — las reuniones quedan fuera de
   // estos indicadores a propósito, son un tipo de evento distinto.
   function computeJornadaStats(events) {
@@ -2526,7 +2576,7 @@
 
   function renderResumenView() {
     const range = periodRange(state.kpiPeriod, state.kpiOffset);
-    if (dom.resumenPeriodLabel) dom.resumenPeriodLabel.textContent = periodLabel(state.kpiPeriod, state.kpiOffset, range);
+    populateResumenPeriodSelect();
     if (dom.resumenPeriodToday) dom.resumenPeriodToday.hidden = state.kpiOffset === 0;
     const orgFilter = state.kpiOrgFilter || null;
     const events = state.events.filter(function (e) {

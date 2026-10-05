@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=36">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=37">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=55" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=57" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -67,7 +67,7 @@
           </div>
           <div id="resumen-period-nav" class="calendar-period-nav">
             <button id="resumen-period-prev" class="icon-button" type="button" aria-label="Período anterior" onclick="window.ingeniaAction(event)">‹</button>
-            <h3 id="resumen-period-label"></h3>
+            <select id="resumen-period-select" class="input resumen-period-select" aria-label="Elegir período"></select>
             <button id="resumen-period-next" class="icon-button" type="button" aria-label="Período siguiente" onclick="window.ingeniaAction(event)">›</button>
             <button id="resumen-period-today" class="btn btn-secondary" type="button" onclick="window.ingeniaAction(event)">Actual</button>
           </div>

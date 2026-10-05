@@ -334,7 +334,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
    selector de mes/trimestre/año y el de organización, así que sin esto
    se estiraba y empujaba al resto fuera de la vista en vez de ajustarse. */
 .resumen-filters .calendar-period-nav { flex: 0 0 auto; }
-.resumen-filters .calendar-period-nav h3 { min-width: 150px; }
+.resumen-period-select { min-width: 170px; text-align: center; text-align-last: center; font-weight: 700; cursor: pointer; }
 .resumen-kpi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
 .resumen-split-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; margin: 6px 0; }
 .resumen-columns { display: grid; grid-template-columns: 1.3fr 1fr; gap: 14px; }
