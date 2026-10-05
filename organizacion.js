@@ -116,6 +116,8 @@
     contactsTitle: 'Contactos',
     hierarchyTitle: 'Jerarquía',
     tasksTitle: 'Tareas de Equipo',
+    instagramUrl: '',
+    websiteUrl: '',
     tabOrder: ['calendar', 'contacts', 'hierarchy', 'tasks'],
     boardOrder: ['kpis', 'board']
   };
@@ -308,6 +310,9 @@
 
   function cacheDom() {
     dom.tabNav = document.getElementById('tab-nav');
+    dom.orgSocialLinks = document.getElementById('org-social-links');
+    dom.orgInstagramLink = document.getElementById('org-instagram-link');
+    dom.orgWebsiteLink = document.getElementById('org-website-link');
     dom.loadingState = document.getElementById('loading-state');
     dom.notFoundState = document.getElementById('not-found-state');
     dom.connectivityBanner = document.getElementById('connectivity-banner');
@@ -394,6 +399,8 @@
     dom.customCalendarTitle = document.getElementById('field-custom-calendar-title');
     dom.customContactsTitle = document.getElementById('field-custom-contacts-title');
     dom.customTasksTitle = document.getElementById('field-custom-tasks-title');
+    dom.customInstagram = document.getElementById('field-custom-instagram');
+    dom.customWebsite = document.getElementById('field-custom-website');
     dom.customizeTabsList = document.getElementById('customize-tabs-list');
     dom.customizeSectionsList = document.getElementById('customize-sections-list');
   }
@@ -516,6 +523,13 @@
     dom.tasksViewTitle.textContent = ui.tasksTitle;
     reorderChildren(dom.tabNav, ui.tabOrder, function (id) { return dom.tabNav.querySelector('[data-view="' + id + '"]'); });
     reorderChildren(dom.tasksBlocks, ui.boardOrder, function (id) { return document.getElementById('tasks-block-' + id); });
+    // Los íconos siempre van al final de la fila de pestañas (a la
+    // derecha), sin importar el orden de pestañas elegido arriba.
+    dom.tabNav.appendChild(dom.orgSocialLinks);
+    dom.orgInstagramLink.hidden = !ui.instagramUrl;
+    dom.orgInstagramLink.href = ui.instagramUrl || '#';
+    dom.orgWebsiteLink.hidden = !ui.websiteUrl;
+    dom.orgWebsiteLink.href = ui.websiteUrl || '#';
   }
 
   function reorderChildren(parent, order, findChild) {
@@ -532,6 +546,8 @@
     dom.customContactsTitle.value = state.customizeForm.contactsTitle;
     dom.customHierarchyTitle.value = state.customizeForm.hierarchyTitle;
     dom.customTasksTitle.value = state.customizeForm.tasksTitle;
+    dom.customInstagram.value = state.customizeForm.instagramUrl;
+    dom.customWebsite.value = state.customizeForm.websiteUrl;
     renderCustomizeLists();
     dom.customizeDialog.showModal();
   }
@@ -545,6 +561,8 @@
     dom.customContactsTitle.value = state.customizeForm.contactsTitle;
     dom.customHierarchyTitle.value = state.customizeForm.hierarchyTitle;
     dom.customTasksTitle.value = state.customizeForm.tasksTitle;
+    dom.customInstagram.value = state.customizeForm.instagramUrl;
+    dom.customWebsite.value = state.customizeForm.websiteUrl;
     renderCustomizeLists();
   }
 
@@ -595,6 +613,8 @@
       contactsTitle: dom.customContactsTitle.value.trim() || DEFAULT_UI.contactsTitle,
       hierarchyTitle: dom.customHierarchyTitle.value.trim() || DEFAULT_UI.hierarchyTitle,
       tasksTitle: dom.customTasksTitle.value.trim() || DEFAULT_UI.tasksTitle,
+      instagramUrl: dom.customInstagram.value.trim(),
+      websiteUrl: dom.customWebsite.value.trim(),
       tabOrder: state.customizeForm.tabOrder,
       boardOrder: state.customizeForm.boardOrder
     };
