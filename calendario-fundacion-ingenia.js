@@ -660,6 +660,7 @@
     dom.resumenOrgBreakdown = document.getElementById('resumen-org-breakdown');
     dom.resumenUpcoming = document.getElementById('resumen-upcoming');
     dom.eventMeetingField = document.getElementById('event-meeting-field');
+    dom.eventMotivoField = document.getElementById('event-motivo-field');
     dom.eventPendientesList = document.getElementById('event-pendientes-list');
     dom.eventMinutaFilesList = document.getElementById('event-minuta-files-list');
     dom.eventUcvField = document.getElementById('event-ucv-field');
@@ -775,8 +776,8 @@
     if (!silent) dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
 
-    const [coalicionRes, coalicionContactsRes, florangelRes, florangelContactsRes, ucvRes, ucvContactsRes, ingeniaRes, ucvVolunteersRes] = await Promise.all([
-      state.client.from('coalicion_events').select('id,title,event_date,start_time,end_time,location,maps_url,notes,status,jornada_type,specialties,collaborating_orgs,participants,participo_fundacion_ingenia,minuta,pendientes').is('archived_at', null),
+    const [coalicionRes, coalicionContactsRes, florangelRes, florangelContactsRes, ucvRes, ucvContactsRes, ingeniaRes, ucvVolunteersRes, coalicionMotivoRes] = await Promise.all([
+      state.client.from('coalicion_events').select('id,title,event_date,start_time,end_time,location,maps_url,notes,status,jornada_type,specialties,collaborating_orgs,participants,participo_fundacion_ingenia,minuta,pendientes,minuta_files').is('archived_at', null),
       state.client.from('coalicion_contacts').select('id,name,role,belongs_to,national_id,phone,email,notes,status').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-contacts-v1').maybeSingle(),
@@ -784,7 +785,15 @@
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-contacts-v1').maybeSingle(),
       state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', 'cmdlt-contacts-v1', 'ingenia-networking-contacts-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
       , state.client.from('ucv_board_state').select('value').eq('key', 'ucv-volunteers-v1').maybeSingle()
+      // «Motivo» de las reuniones de Coalición vive en una columna aparte que
+      // se agrega con una migración: se pide por separado para que, si aún no
+      // existe, no se caiga la carga de los eventos.
+      , state.client.from('coalicion_events').select('id,motivo').is('archived_at', null)
     ]);
+    const coalicionMotivos = {};
+    if (!coalicionMotivoRes.error && Array.isArray(coalicionMotivoRes.data)) {
+      coalicionMotivoRes.data.forEach(function (r) { coalicionMotivos[r.id] = r.motivo || ''; });
+    }
     state.ucvVolunteers = (Array.isArray(ucvVolunteersRes.data && ucvVolunteersRes.data.value) ? ucvVolunteersRes.data.value : [])
       .filter(function (v) { return v && v.id && v.name; }).map(function (v) { return { id: v.id, name: v.name }; });
 
@@ -830,7 +839,7 @@
     }
 
     const coalicionEvents = (coalicionRes.data || []).map(function (e) {
-      return { id: 'coalicion-' + e.id, rawId: e.id, source: 'coalicion', title: e.title, date: e.event_date, time: e.start_time, location: e.location, notes: e.notes || '', raw: e };
+      return { id: 'coalicion-' + e.id, rawId: e.id, source: 'coalicion', title: e.title, date: e.event_date, time: e.start_time, location: e.location, notes: e.notes || '', raw: Object.assign({}, e, { motivo: coalicionMotivos[e.id] || '' }) };
     });
 
     const florangelEvents = (Array.isArray(florangelRes.data && florangelRes.data.value) ? florangelRes.data.value : []).map(function (e) {
@@ -1422,9 +1431,10 @@
     const collaboratingOrgs = Array.isArray(raw.collaboratingOrgs) ? raw.collaboratingOrgs : (Array.isArray(raw.collaborating_orgs) ? raw.collaborating_orgs : []);
     const participants = Array.isArray(raw.participants) ? raw.participants : [];
     const minuta = raw.minuta || '';
+    const motivo = raw.motivo || '';
     const pendientes = Array.isArray(raw.pendientes) ? raw.pendientes : [];
     const minutaFiles = Array.isArray(raw.minuta_files) ? raw.minuta_files : (Array.isArray(raw.minutaFiles) ? raw.minutaFiles : []);
-    return { status: status, endTime: endTime, jornadaType: jornadaType, specialties: specialties, collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, pendientes: pendientes, minutaFiles: minutaFiles };
+    return { status: status, endTime: endTime, jornadaType: jornadaType, specialties: specialties, collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, motivo: motivo, pendientes: pendientes, minutaFiles: minutaFiles };
   }
 
   // Fuentes que tienen su propia lista de contactos, para ofrecerlos en
@@ -1522,7 +1532,7 @@
     const isMedica = dom.eventJornadaTypeSelect.value === 'medica';
     dom.eventSpecialtiesField.hidden = !isMedica;
     if (isMedica) populateSpecialtiesList();
-    dom.eventMeetingField.hidden = dom.eventJornadaTypeSelect.value !== 'reunion';
+    dom.eventMeetingField.hidden = dom.eventJornadaTypeSelect.value !== 'reunion'; dom.eventMotivoField.hidden = dom.eventMeetingField.hidden;
     if (dom.eventJornadaTypeSelect.value !== 'reunion') stopMinutaRecording();
   }
 
@@ -1557,7 +1567,8 @@
       populateCollaboratorsList(extra.collaboratingOrgs);
       refreshParticipantsList(extra.participants);
       dom.eventForm.elements.minuta.value = extra.minuta;
-      dom.eventMeetingField.hidden = extra.jornadaType !== 'reunion';
+      dom.eventForm.elements.motivo.value = extra.motivo;
+      dom.eventMeetingField.hidden = extra.jornadaType !== 'reunion'; dom.eventMotivoField.hidden = dom.eventMeetingField.hidden;
       state.pendientesDraft = extra.pendientes.map(function (p) { return Object.assign({}, p); });
       renderPendientesList();
       state.minutaFilesDraft = extra.minutaFiles.map(function (f) { return Object.assign({}, f); });
@@ -1574,7 +1585,7 @@
       refreshParticipantsList([]);
       const presetJornadaType = options && options.presetJornadaType;
       if (presetJornadaType) dom.eventForm.elements.jornada_type.value = presetJornadaType;
-      dom.eventMeetingField.hidden = presetJornadaType !== 'reunion';
+      dom.eventMeetingField.hidden = presetJornadaType !== 'reunion'; dom.eventMotivoField.hidden = dom.eventMeetingField.hidden;
       state.pendientesDraft = [];
       renderPendientesList();
       state.minutaFilesDraft = [];
@@ -1614,7 +1625,7 @@
         fields: {
           source: f.source.value, new_calendar_name: f.new_calendar_name.value, title: f.title.value,
           jornada_type: f.jornada_type.value, custom_specialties: f.custom_specialties.value,
-          minuta: f.minuta.value, event_date: f.event_date.value, start_time: f.start_time.value,
+          minuta: f.minuta.value, motivo: f.motivo.value, event_date: f.event_date.value, start_time: f.start_time.value,
           end_time: f.end_time.value, participates_ingenia: f.participates_ingenia.value,
           location: f.location.value, status: f.status.value, notes: f.notes.value
         },
@@ -1670,7 +1681,7 @@
     populateSpecialtiesList(f.jornada_type.value === 'medica' ? (draft.specialties || []) : []);
     populateCollaboratorsList(draft.collaboratingOrgs || []);
     refreshParticipantsList(draft.participants || []);
-    dom.eventMeetingField.hidden = f.jornada_type.value !== 'reunion';
+    dom.eventMeetingField.hidden = f.jornada_type.value !== 'reunion'; dom.eventMotivoField.hidden = dom.eventMeetingField.hidden;
     state.pendientesDraft = (draft.pendientesDraft || []).map(function (p) { return Object.assign({}, p); });
     renderPendientesList();
     state.minutaFilesDraft = (draft.minutaFilesDraft || []).map(function (file) { return Object.assign({}, file); });
@@ -2000,6 +2011,7 @@
     const collaboratingOrgs = readCollaboratingOrgs();
     const participants = readParticipants();
     const minuta = jornadaType === 'reunion' ? dom.eventForm.elements.minuta.value.trim() : '';
+    const motivo = jornadaType === 'reunion' ? dom.eventForm.elements.motivo.value.trim() : '';
     const pendientes = jornadaType === 'reunion' ? readPendientes() : [];
     const minutaFiles = jornadaType === 'reunion' ? state.minutaFilesDraft : [];
     if (!title || !eventDate) { showError(dom.eventError, 'Nombre del evento y fecha son obligatorios.'); return; }
@@ -2024,7 +2036,7 @@
         title: title, event_date: eventDate, start_time: startTime, end_time: endTime,
         location: location, status: status, notes: notes,
         participatesIngenia: participatesIngenia, jornadaType: jornadaType, specialties: specialties,
-        collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, pendientes: pendientes,
+        collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, motivo: motivo, pendientes: pendientes,
         minutaFiles: minutaFiles
       };
       if (source === 'ucv') { fields.ucvChecks = readUcvChecks(); fields.ucvAssigned = readUcvAssigned(); }
@@ -2405,6 +2417,7 @@
           '<span class="reunion-card-date">' + safe(formatDate(e.date)) + '</span>' +
         '</div>' +
         '<p class="reunion-card-title">' + safe(e.title) + '</p>' +
+        (extra.motivo ? '<p class="reunion-card-motivo"><strong>Motivo:</strong> ' + safe(extra.motivo) + '</p>' : '') +
         (minutaPreview ? '<p class="reunion-card-minuta">' + safe(minutaPreview) + '</p>' : '<p class="reunion-card-minuta reunion-card-empty">Sin minuta todavía</p>') +
         (pendientesTotal ? '<span class="reunion-card-pendientes">📋 ' + pendientesDone + '/' + pendientesTotal + ' pendientes resueltos</span>' : '') +
         (extra.minutaFiles.length ? '<span class="reunion-card-pendientes">📎 ' + extra.minutaFiles.length + ' archivo' + (extra.minutaFiles.length > 1 ? 's' : '') + ' adjunto' + (extra.minutaFiles.length > 1 ? 's' : '') + '</span>' : '') +
@@ -2456,7 +2469,7 @@
       action: 'TEMPLATE',
       text: e.title || 'Reunión',
       dates: datesParam,
-      details: extra.minuta || e.notes || '',
+      details: (extra.motivo ? 'Motivo: ' + extra.motivo + (extra.minuta || e.notes ? '\n\n' : '') : '') + (extra.minuta || e.notes || ''),
       location: e.location || ''
     });
     if (e.time) params.set('ctz', 'America/Caracas');
@@ -2467,8 +2480,10 @@
     const e = findById(state.events, id);
     if (!e) return;
     const info = sourceInfo(e.source);
+    const extra = readEventExtra(e.source, e.raw);
     const lines = [
       '📅 Recordatorio de reunión: ' + (e.title || ''),
+      extra.motivo ? '📝 Motivo: ' + extra.motivo : '',
       '🗓️ ' + formatDate(e.date) + (e.time ? ' a las ' + formatTime(e.time) : ''),
       e.location ? '📍 ' + e.location : '',
       '🏷️ ' + info.label
@@ -3147,7 +3162,7 @@
             jornada_type: fields.jornadaType, specialties: fields.specialties,
             collaborating_orgs: fields.collaboratingOrgs, participants: fields.participants,
             participo_fundacion_ingenia: fields.participatesIngenia,
-            minuta: fields.minuta, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
+            minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
           }
         })
       });
@@ -3175,7 +3190,7 @@
         location: fields.location, status: fields.status, notes: fields.notes,
         participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
         specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
-        minuta: fields.minuta, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
+        minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
       });
     });
     return writeBoardKey('florangel_board_state', 'florangel-events-v1', next);
@@ -3200,7 +3215,7 @@
           location: fields.location, status: sharedStatus,
           notes: fields.notes, participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
           specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
-          minuta: fields.minuta, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
+          minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
         }, fields.ucvChecks ? { checks: fields.ucvChecks, assignedVolunteers: fields.ucvAssigned || [] } : {});
       });
       return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
@@ -3212,7 +3227,7 @@
       owner: '', doctors: '', students: '', assignedVolunteers: fields.ucvAssigned || [], checks: fields.ucvChecks || {}, notes: fields.notes,
       participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
       specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
-      minuta: fields.minuta, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
+      minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
     });
     return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
   }
@@ -3226,7 +3241,7 @@
         location: fields.location, status: fields.status, notes: fields.notes,
         participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
         specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
-        minuta: fields.minuta, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
+        minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
       });
     });
     return writeBoardKey('ingenia_board_state', key, next);

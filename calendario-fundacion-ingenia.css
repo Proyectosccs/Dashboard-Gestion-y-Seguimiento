@@ -664,3 +664,4 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   * { scrollbar-color: auto; }
   .tab-button[aria-current="page"], .auth-mark { border: 2px solid ButtonText; }
 }
+.reunion-card-motivo { margin: 4px 0 0; font-size: 12.5px; color: var(--color-neutral-700); }
