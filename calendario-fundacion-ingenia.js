@@ -792,7 +792,7 @@
     if (!silent) dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
 
-    const [coalicionRes, coalicionContactsRes, florangelRes, florangelContactsRes, ucvRes, ucvContactsRes, ingeniaRes, ucvVolunteersRes, coalicionMotivoRes] = await Promise.all([
+    const [coalicionRes, coalicionContactsRes, florangelRes, florangelContactsRes, ucvRes, ucvContactsRes, ingeniaRes, ucvVolunteersRes, coalicionMotivoRes, coalicionRescheduleRes] = await Promise.all([
       state.client.from('coalicion_events').select('id,title,event_date,start_time,end_time,location,maps_url,notes,status,jornada_type,specialties,collaborating_orgs,participants,participo_fundacion_ingenia,minuta,pendientes,minuta_files').is('archived_at', null),
       state.client.from('coalicion_contacts').select('id,name,role,belongs_to,national_id,phone,email,notes,status').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
@@ -805,10 +805,18 @@
       // se agrega con una migración: se pide por separado para que, si aún no
       // existe, no se caiga la carga de los eventos.
       , state.client.from('coalicion_events').select('id,motivo').is('archived_at', null)
+      // Igual que "motivo": el historial de reprogramación vive en una
+      // columna aparte agregada por su propia migración, pedida por
+      // separado para no romper la carga si aún no se ha aplicado.
+      , state.client.from('coalicion_events').select('id,reschedule_history').is('archived_at', null)
     ]);
     const coalicionMotivos = {};
     if (!coalicionMotivoRes.error && Array.isArray(coalicionMotivoRes.data)) {
       coalicionMotivoRes.data.forEach(function (r) { coalicionMotivos[r.id] = r.motivo || ''; });
+    }
+    const coalicionReschedules = {};
+    if (!coalicionRescheduleRes.error && Array.isArray(coalicionRescheduleRes.data)) {
+      coalicionRescheduleRes.data.forEach(function (r) { coalicionReschedules[r.id] = Array.isArray(r.reschedule_history) ? r.reschedule_history : []; });
     }
     state.ucvVolunteers = (Array.isArray(ucvVolunteersRes.data && ucvVolunteersRes.data.value) ? ucvVolunteersRes.data.value : [])
       .filter(function (v) { return v && v.id && v.name; }).map(function (v) { return { id: v.id, name: v.name }; });
@@ -855,7 +863,7 @@
     }
 
     const coalicionEvents = (coalicionRes.data || []).map(function (e) {
-      return { id: 'coalicion-' + e.id, rawId: e.id, source: 'coalicion', title: e.title, date: e.event_date, time: e.start_time, location: e.location, notes: e.notes || '', raw: Object.assign({}, e, { motivo: coalicionMotivos[e.id] || '' }) };
+      return { id: 'coalicion-' + e.id, rawId: e.id, source: 'coalicion', title: e.title, date: e.event_date, time: e.start_time, location: e.location, notes: e.notes || '', raw: Object.assign({}, e, { motivo: coalicionMotivos[e.id] || '', reschedule_history: coalicionReschedules[e.id] || [] }) };
     });
 
     const florangelEvents = (Array.isArray(florangelRes.data && florangelRes.data.value) ? florangelRes.data.value : []).map(function (e) {
@@ -1463,7 +1471,8 @@
     const motivo = raw.motivo || '';
     const pendientes = Array.isArray(raw.pendientes) ? raw.pendientes : [];
     const minutaFiles = Array.isArray(raw.minuta_files) ? raw.minuta_files : (Array.isArray(raw.minutaFiles) ? raw.minutaFiles : []);
-    return { status: status, endTime: endTime, jornadaType: jornadaType, specialties: specialties, collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, motivo: motivo, pendientes: pendientes, minutaFiles: minutaFiles };
+    const rescheduleHistory = Array.isArray(raw.reschedule_history) ? raw.reschedule_history : (Array.isArray(raw.rescheduleHistory) ? raw.rescheduleHistory : []);
+    return { status: status, endTime: endTime, jornadaType: jornadaType, specialties: specialties, collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, motivo: motivo, pendientes: pendientes, minutaFiles: minutaFiles, rescheduleHistory: rescheduleHistory };
   }
 
   // Fuentes que tienen su propia lista de contactos, para ofrecerlos en
@@ -2071,6 +2080,18 @@
       if (source === 'ucv') { fields.ucvChecks = readUcvChecks(); fields.ucvAssigned = readUcvAssigned(); }
       let existing = state.editingEvent;
 
+      // Si la reunión/jornada estaba cancelada y se está reprogramando
+      // (cambia la fecha o deja de estar cancelada), no se pierde que
+      // existió esa cancelación: queda un historial con la fecha vieja,
+      // visible en la tarjeta ("Reagendada — cancelada antes el ..."),
+      // en vez de simplemente reemplazar la fecha sin dejar rastro.
+      const priorExtra = existing ? readEventExtra(existing.source, existing.raw) : null;
+      let rescheduleHistory = priorExtra ? priorExtra.rescheduleHistory.slice() : [];
+      if (priorExtra && priorExtra.status === 'cancelled' && (status !== 'cancelled' || eventDate !== existing.date)) {
+        rescheduleHistory = rescheduleHistory.concat([{ date: existing.date, time: existing.time || '', cancelledAt: new Date().toISOString() }]);
+      }
+      fields.rescheduleHistory = rescheduleHistory;
+
       if (existing && source !== NEW_CALENDAR_VALUE && source !== existing.source) {
         const moved = await deleteEventFromSource(existing);
         if (!moved) { showError(dom.eventError, 'No se pudo mover el evento de organización — revisa tu conexión.'); return; }
@@ -2488,6 +2509,7 @@
         (minutaPreview ? '<p class="reunion-card-minuta">' + safe(minutaPreview) + '</p>' : '<p class="reunion-card-minuta reunion-card-empty">Sin minuta todavía</p>') +
         (pendientesTotal ? '<span class="reunion-card-pendientes">📋 ' + pendientesDone + '/' + pendientesTotal + ' pendientes resueltos</span>' : '') +
         (extra.minutaFiles.length ? '<span class="reunion-card-pendientes">📎 ' + extra.minutaFiles.length + ' archivo' + (extra.minutaFiles.length > 1 ? 's' : '') + ' adjunto' + (extra.minutaFiles.length > 1 ? 's' : '') + '</span>' : '') +
+        (extra.rescheduleHistory.length ? '<p class="reunion-card-reagendada">🔁 Reagendada — cancelada antes el ' + safe(formatDate(extra.rescheduleHistory[extra.rescheduleHistory.length - 1].date)) + '</p>' : '') +
       '</button>' +
       '<div class="reunion-card-actions">' +
         '<button type="button" class="reunion-quick-btn" data-action="reunion-gcal" data-reunion-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" title="Agregar a Google Calendar">📅 Calendar</button>' +
@@ -2590,7 +2612,8 @@
       location: e.location || '', status: extra.status, notes: e.notes || '',
       participatesIngenia: readParticipatesIngenia(e.raw) === 'si', jornadaType: extra.jornadaType,
       specialties: extra.specialties, collaboratingOrgs: extra.collaboratingOrgs, participants: extra.participants,
-      minuta: extra.minuta, motivo: extra.motivo, pendientes: extra.pendientes, minutaFiles: extra.minutaFiles
+      minuta: extra.minuta, motivo: extra.motivo, pendientes: extra.pendientes, minutaFiles: extra.minutaFiles,
+      rescheduleHistory: extra.rescheduleHistory
     };
   }
 
@@ -2605,6 +2628,12 @@
     renderReunionesView();
     const fields = fieldsFromEvent(e);
     fields.status = newStatus;
+    // Igual que al reprogramar desde el diálogo: si se destraba un
+    // evento cancelado arrastrándolo en el Kanban, no se pierde que
+    // existió esa cancelación.
+    if (extra.status === 'cancelled' && newStatus !== 'cancelled') {
+      fields.rescheduleHistory = extra.rescheduleHistory.concat([{ date: e.date, time: e.time || '', cancelledAt: new Date().toISOString() }]);
+    }
     let ok = false;
     if (e.source === 'coalicion') ok = await saveCoalicionEvent(fields, e);
     else if (e.source === 'florangel') ok = await saveFlorangelEvent(fields, e);
@@ -3346,7 +3375,8 @@
             jornada_type: fields.jornadaType, specialties: fields.specialties,
             collaborating_orgs: fields.collaboratingOrgs, participants: fields.participants,
             participo_fundacion_ingenia: fields.participatesIngenia,
-            minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
+            minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles,
+            reschedule_history: fields.rescheduleHistory || []
           }
         })
       });
@@ -3374,7 +3404,8 @@
         location: fields.location, status: fields.status, notes: fields.notes,
         participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
         specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
-        minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
+        minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles,
+        reschedule_history: fields.rescheduleHistory || []
       });
     });
     return writeBoardKey('florangel_board_state', 'florangel-events-v1', next);
@@ -3399,7 +3430,8 @@
           location: fields.location, status: sharedStatus,
           notes: fields.notes, participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
           specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
-          minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
+          minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles,
+          reschedule_history: fields.rescheduleHistory || []
         }, fields.ucvChecks ? { checks: fields.ucvChecks, assignedVolunteers: fields.ucvAssigned || [] } : {});
       });
       return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
@@ -3411,7 +3443,8 @@
       owner: '', doctors: '', students: '', assignedVolunteers: fields.ucvAssigned || [], checks: fields.ucvChecks || {}, notes: fields.notes,
       participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
       specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
-      minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
+      minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles,
+      reschedule_history: fields.rescheduleHistory || []
     });
     return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
   }
@@ -3425,7 +3458,8 @@
         location: fields.location, status: fields.status, notes: fields.notes,
         participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
         specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
-        minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles
+        minuta: fields.minuta, motivo: fields.motivo, pendientes: fields.pendientes, minuta_files: fields.minutaFiles,
+        reschedule_history: fields.rescheduleHistory || []
       });
     });
     return writeBoardKey('ingenia_board_state', key, next);
