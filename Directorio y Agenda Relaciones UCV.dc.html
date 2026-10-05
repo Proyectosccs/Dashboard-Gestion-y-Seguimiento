@@ -78,6 +78,7 @@
       <button onClick="{{ toggleFollow }}" style="{{ followBtnStyle }}">⏰ Requieren seguimiento</button>
       <button onClick="{{ clearFilters }}" style="border: none; background: transparent; color: var(--color-neutral-700); font-size: 13px; cursor: pointer; text-decoration: underline; padding: 8px">Limpiar</button>
       <button onClick="{{ newContact }}" style="border: none; background: var(--color-accent-500); color: #fff; border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 700; cursor: pointer" style-hover="{{ primaryHover }}">➕ Agregar contacto</button>
+      <button onClick="{{ traerDelPanel }}" title="Trae del panel de networking lo que falte de UCV (no sobrescribe nada)" style="border: 1px solid var(--color-neutral-300); background: transparent; color: var(--color-neutral-700); border-radius: 999px; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer">⬇ Traer del panel</button>
       <div style="font-size: 13px; font-weight: 700; color: var(--color-accent-700); margin-left: auto; padding-right: 6px">{{ resultLabel }}</div>
     </div>
     </sc-if>
@@ -1943,13 +1944,15 @@ class Component extends DCLogic {
 
   componentDidMount() {
     if (!sb) return;
-    // La sincronización con el panel de networking escribe contactos: solo
-    // corre después de haber cargado la versión real de Supabase.
-    Promise.all([this._loadFromSupabase(), this._loadTeamMembers(), this._loadTasks()]).then(r => { if (r[0]) this._syncFromNetworkingPanel(); });
+    // Ya no se copia nada automáticamente desde el panel de networking: los
+    // contactos y tareas de UCV se editan aquí y desde el dashboard de
+    // Networking. Si hace falta, el botón «Traer del panel» (Contactos) lo
+    // hace a mano (ver traerDelPanel).
+    Promise.all([this._loadFromSupabase(), this._loadTeamMembers(), this._loadTasks()]);
     this._subscribeRealtime();
     this._onVisible = () => {
       if (document.visibilityState !== 'visible') return;
-      Promise.all([this._loadFromSupabase(), this._loadTeamMembers(), this._loadTasks()]).then(r => { if (r[0]) this._syncFromNetworkingPanel(); });
+      Promise.all([this._loadFromSupabase(), this._loadTeamMembers(), this._loadTasks()]);
       this._subscribeRealtime();
     };
     document.addEventListener('visibilitychange', this._onVisible);
@@ -1978,6 +1981,21 @@ class Component extends DCLogic {
     this._sharedTasksRaw = normalized;
     this.setState({ tasks: normalized.filter(t => t.org === 'ucv') });
   }
+
+  // Botón «Traer del panel»: la misma copia de antes (teléfonos/correos que
+  // falten en los contactos mapeados y tareas del panel que aún no estén),
+  // pero solo cuando alguien la pide. Nunca sobrescribe lo ya cargado ni
+  // modifica el panel.
+  traerDelPanel = async () => {
+    if (!sbNet) { window.alert('No se pudo conectar con el panel de networking.'); return; }
+    if (!window.confirm('¿Traer del panel de networking los datos de UCV que falten? No se sobrescribe nada de lo ya cargado.')) return;
+    const antes = (this._sharedTasksRaw || []).length;
+    await this._loadFromSupabase();
+    await this._loadTasks();
+    await this._syncFromNetworkingPanel();
+    const nuevas = Math.max(0, (this._sharedTasksRaw || []).length - antes);
+    window.alert('Listo: se revisó el panel de networking. Tareas nuevas traídas: ' + nuevas + '.');
+  };
 
   async _syncFromNetworkingPanel() {
     if (!sbNet) return;
@@ -3530,6 +3548,7 @@ class Component extends DCLogic {
       onTaskNextAction: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { nextAction: e.target.value }) }),
       onTaskDueDate: e => this.setState({ taskForm: Object.assign({}, s.taskForm, { dueDate: e.target.value }) }),
       newContact: this.newContact,
+      traerDelPanel: this.traerDelPanel,
       closeContactModal: this.closeContactModal,
       saveContact: this.saveContact,
       deleteCurrentContact: () => this.deleteContact(s.contactModal),
