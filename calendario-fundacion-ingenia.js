@@ -2164,7 +2164,9 @@
     if (!source || source === NEW_CALENDAR_VALUE) return;
     const payload = {
       id: uid(), org: source, title: text,
-      detail: 'Pendiente de la reunión: ' + (dom.eventForm.elements.title.value.trim() || 'Sin título'),
+      // Incluye la fecha de la reunión, no solo el título — dos reuniones
+      // distintas pueden llamarse igual, y la fecha es lo que las distingue.
+      detail: 'Pendiente de la reunión: ' + (dom.eventForm.elements.title.value.trim() || 'Sin título') + ' (' + formatDate(dom.eventForm.elements.event_date.value) + ')',
       status: 'pendiente', followupStatus: '', priority: 'media', responsable: [],
       dueDate: '', nextAction: '', created_at: new Date().toISOString()
     };
