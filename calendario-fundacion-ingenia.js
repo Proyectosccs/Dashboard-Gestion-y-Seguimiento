@@ -150,6 +150,20 @@
   // UCV usa "Rol" como catálogo fijo (no texto libre) — copiado de ROLE en
   // Directorio y Agenda Relaciones UCV.dc.html; si ese catálogo cambia allá,
   // hay que actualizarlo acá también.
+  // Funciones y estados que usa la página de UCV (mismo catálogo que PERSON_FUNCTIONS
+  // en Directorio y Agenda Relaciones UCV.dc.html; si cambia allá, actualizarlo acá).
+  const UCV_FUNCTIONS = ['Registro de datos', 'Triaje', 'Coordinación médica', 'Carga de pacientes', 'Seguimiento clínico', 'Logística', 'Inventario', 'Otra'];
+  const UCV_STATUS_SUGGESTIONS = ['Por confirmar', 'Por contactar', 'Identificada', 'Por coordinar', 'Contactado', 'Respondió', 'Información disponible', 'Esperando información', 'Esperando respuesta'];
+  // El estado de UCV es texto libre; para los indicadores y el Kanban de acá
+  // se traduce al catálogo compartido (pendiente / contactado / esperando).
+  const UCV_STATUS_FOR_SHARED = { pending: 'Por contactar', contacted: 'Contactado', waiting_response: 'Esperando respuesta' };
+  function ucvStatusToShared(text) {
+    const t = String(text || '').trim().toLowerCase();
+    if (!t || /^por (confirmar|contactar|coordinar)$/.test(t) || /^sin contactar$/.test(t) || /^identificad/.test(t)) return 'pending';
+    if (/esperando por nosotros/.test(t)) return 'contacted';
+    if (/^esperando/.test(t)) return 'waiting_response';
+    return 'contacted';
+  }
   const UCV_ROLES = [
     { id: 'Coordinador', label: '🧭 Coordinador' },
     { id: 'Enlace', label: '🔗 Enlace' },
@@ -526,6 +540,28 @@
     if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) return showConnectionFailure();
     state.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     loadAll();
+    startAutoRefresh();
+  }
+
+  // Actualización automática: lo que otra persona edite (en este dashboard,
+  // en la página de UCV o en cualquier otro tablero) aparece sin recargar.
+  // Se vuelve a leer todo cada 45 s y al volver a la pestaña, pero nunca con
+  // un formulario abierto ni a mitad de un arrastre, para no pisar lo que la
+  // persona está haciendo.
+  let refreshing = false;
+  async function refreshSilently() {
+    if (refreshing || document.visibilityState !== 'visible') return;
+    if (document.querySelector('dialog[open]')) return;
+    if (state.dragTaskId || state.dragContactId) return;
+    refreshing = true;
+    try { await loadAll(true); } catch (err) { console.error('No se pudo actualizar automáticamente', err); }
+    finally { refreshing = false; }
+  }
+
+  function startAutoRefresh() {
+    setInterval(refreshSilently, 45000);
+    document.addEventListener('visibilitychange', refreshSilently);
+    window.addEventListener('focus', refreshSilently);
   }
 
   function cacheDom() {
@@ -640,6 +676,10 @@
     dom.contactSubdivisionSelect = document.getElementById('field-contact-subdivision');
     dom.contactUcvRoleSelect = document.getElementById('field-contact-ucv-role');
     dom.contactUnitSelect = document.getElementById('field-contact-unit');
+    dom.contactUcvFunctionSelect = document.getElementById('field-contact-ucv-function');
+    dom.contactUcvStatusInput = document.getElementById('field-contact-ucv-status');
+    dom.contactUcvActionInput = document.getElementById('field-contact-ucv-action');
+    dom.contactUcvExtraUnits = document.getElementById('contact-ucv-extra-units');
     dom.contactRoleField = document.getElementById('contact-role-field');
     dom.contactNotesField = document.getElementById('contact-notes-field');
     dom.contactStatusField = document.getElementById('contact-status-field');
@@ -686,8 +726,9 @@
     renderPendientesList();
   }
 
-  async function loadAll() {
-    dom.loadingState.hidden = false;
+  async function loadAll(silent) {
+    // silent = actualización automática: sin pantalla de carga ni parpadeo.
+    if (!silent) dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
 
     const [coalicionRes, coalicionContactsRes, florangelRes, florangelContactsRes, ucvRes, ucvContactsRes, ingeniaRes] = await Promise.all([
@@ -788,7 +829,7 @@
       // texto libre "status" (más rico, ver Jerarquía/Contactos de UCV). Para
       // el filtro unificado de Networking, se traduce: "Por confirmar" (o
       // vacío) = pendiente, cualquier otro valor ya escrito = contactado.
-      return { id: 'ucv-' + c.id, rawId: c.id, source: 'ucv', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: '', status: (c.status && c.status !== 'Por confirmar') ? 'contacted' : 'pending', raw: c };
+      return { id: 'ucv-' + c.id, rawId: c.id, source: 'ucv', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: '', status: ucvStatusToShared(c.status), raw: c };
     });
     const networkingContactsRaw = ingeniaRowsEarly.find(function (r) { return r.key === 'ingenia-networking-contacts-v1'; });
     const networkingContacts = (Array.isArray(networkingContactsRaw && networkingContactsRaw.value) ? networkingContactsRaw.value : []).map(function (c) {
@@ -2553,14 +2594,14 @@
     const isUcv = contact.source === 'ucv';
     const statusIndex = CONTACT_STATUSES.findIndex(function (s) { return s.key === status.key; });
     const moveButtons = [];
-    if (!isUcv) {
+    {
       if (statusIndex > 0) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-contact-status" data-id="' + safe(contact.id) + '" data-status="' + CONTACT_STATUSES[statusIndex - 1].key + '" onclick="window.ingeniaAction(event)">← ' + safe(CONTACT_STATUSES[statusIndex - 1].label) + '</button>');
       if (statusIndex < CONTACT_STATUSES.length - 1) moveButtons.push('<button type="button" class="kanban-move-btn" data-action="move-contact-status" data-id="' + safe(contact.id) + '" data-status="' + CONTACT_STATUSES[statusIndex + 1].key + '" onclick="window.ingeniaAction(event)">' + safe(CONTACT_STATUSES[statusIndex + 1].label) + ' →</button>');
     }
-    return '<article class="kanban-card" draggable="' + (isUcv ? 'false' : 'true') + '" data-id="' + safe(contact.id) + '" style="--status-color:' + safe(status.color || '#82796a') + '">' +
+    return '<article class="kanban-card" draggable="true" data-id="' + safe(contact.id) + '" style="--status-color:' + safe(status.color || '#82796a') + '">' +
       '<button type="button" style="all:unset;cursor:pointer" data-contact-detail-id="' + safe(contact.id) + '" onclick="window.ingeniaAction(event)">' +
         '<p class="kanban-card-title">' + safe(contact.name) + '</p>' +
-        '<p class="kanban-card-notes">' + safe(info.label) + (contact.role ? ' · ' + safe(contact.role) : '') + (isUcv ? ' · 🔒 estado propio de UCV' : '') + '</p>' +
+        '<p class="kanban-card-notes">' + safe(info.label) + (contact.role ? ' · ' + safe(contact.role) : '') + (isUcv && contact.raw && contact.raw.status && contact.raw.status !== 'Por confirmar' ? ' · ' + safe(contact.raw.status) : '') + '</p>' +
       '</button>' +
       (moveButtons.length ? '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' : '') +
     '</article>';
@@ -2572,11 +2613,23 @@
   async function moveContactStatus(id, statusKey) {
     const contact = findById(state.contacts, id);
     if (!contact || contact.status === statusKey) return;
-    if (contact.source === 'ucv') { toast('Los contactos de UCV tienen su propio estado — edítalo desde su ficha.', 'error'); return; }
     const previous = contact.status;
     contact.status = statusKey;
     renderContactsBoard();
     renderContactsKpiCards();
+    if (contact.source === 'ucv') {
+      const okUcv = await setUcvContactStatusText(contact.rawId, UCV_STATUS_FOR_SHARED[statusKey] || 'Por confirmar');
+      if (!okUcv) {
+        contact.status = previous;
+        renderContactsBoard();
+        renderContactsKpiCards();
+        toast('No se pudo actualizar el estado — revisa tu conexión.', 'error');
+        return;
+      }
+      toast('Estado actualizado.', 'success');
+      await loadAll();
+      return;
+    }
     const fields = {
       name: contact.name, role: contact.role || '', phone: contact.phone || '', email: contact.email || '',
       notes: contact.notes || '', status: statusKey,
@@ -2603,6 +2656,13 @@
     populateContactOrgSelect();
     renderMarkup(dom.contactUcvRoleSelect, UCV_ROLES.map(function (r) { return '<option value="' + safe(r.id) + '">' + r.label + '</option>'; }).join(''));
     renderMarkup(dom.contactUnitSelect, UCV_UNITS.map(function (u) { return '<option value="' + safe(u.id) + '">' + safe(u.label) + '</option>'; }).join(''));
+    renderMarkup(dom.contactUcvFunctionSelect, ['<option value="">— Sin función —</option>'].concat(UCV_FUNCTIONS.map(function (f) { return '<option value="' + safe(f) + '">' + safe(f) + '</option>'; })).join(''));
+    renderMarkup(document.getElementById('ucv-status-options'), UCV_STATUS_SUGGESTIONS.map(function (x) { return '<option value="' + safe(x) + '"></option>'; }).join(''));
+    const rawUcv = existing && existing.source === 'ucv' ? (existing.raw || {}) : {};
+    const extraNow = Array.isArray(rawUcv.extraUnits) ? rawUcv.extraUnits : [];
+    renderMarkup(dom.contactUcvExtraUnits, UCV_UNITS.map(function (u) {
+      return '<label style="display:flex;gap:6px;align-items:center;font-size:12.5px"><input type="checkbox" value="' + safe(u.id) + '"' + (extraNow.indexOf(u.id) > -1 ? ' checked' : '') + '> ' + safe(u.label) + '</label>';
+    }).join(''));
     dom.contactDialogTitle.textContent = existing ? 'Editar contacto' : 'Agregar contacto';
     dom.contactDelete.hidden = !existing;
     const parsedPhone = splitPhone(existing ? existing.phone : '');
@@ -2622,12 +2682,16 @@
       if (existing.source === 'ucv') {
         dom.contactUcvRoleSelect.value = (existing.raw && existing.raw.role) || UCV_ROLES[0].id;
         dom.contactUnitSelect.value = (existing.raw && existing.raw.unit) || UCV_UNITS[0].id;
+        dom.contactUcvFunctionSelect.value = UCV_FUNCTIONS.indexOf(rawUcv.function) > -1 ? rawUcv.function : '';
+        dom.contactUcvStatusInput.value = rawUcv.status && rawUcv.status !== 'Por confirmar' ? rawUcv.status : '';
+        dom.contactUcvActionInput.value = rawUcv.action && rawUcv.action !== 'Por confirmar' ? rawUcv.action : '';
       }
       if (existing.source === 'networking') {
         dom.contactSubdivisionSelect.value = (existing.raw && existing.raw.subdivision) || NETWORKING_SUBDIVISIONS[0];
       }
     } else {
       dom.contactSubdivisionSelect.value = NETWORKING_SUBDIVISIONS[0];
+      dom.contactUcvRoleSelect.value = UCV_ROLES[UCV_ROLES.length - 1].id;
     }
     onContactOrgChange();
     dom.contactDialog.showModal();
@@ -2656,6 +2720,10 @@
       nationalId: dom.contactForm.elements.national_id.value.trim(),
       ucvRole: dom.contactForm.elements.ucv_role.value,
       unit: dom.contactForm.elements.unit.value,
+      ucvFunction: dom.contactUcvFunctionSelect.value,
+      ucvStatus: dom.contactUcvStatusInput.value.trim(),
+      ucvAction: dom.contactUcvActionInput.value.trim(),
+      ucvExtraUnits: Array.prototype.map.call(dom.contactUcvExtraUnits.querySelectorAll('input:checked'), function (i) { return i.value; }),
       subdivision: dom.contactSubdivisionSelect.value
     };
     const existing = state.editingContact;
@@ -2701,12 +2769,23 @@
       name: fields.name, role: fields.ucvRole || base.role || UCV_ROLES[UCV_ROLES.length - 1].id,
       unit: fields.unit || base.unit || UCV_UNITS[0].id,
       email: fields.email || 'Por confirmar', phone: fields.phone || 'Por confirmar',
-      status: base.status || 'Por confirmar', action: base.action || 'Por confirmar',
-      function: base.function || '', extraUnits: Array.isArray(base.extraUnits) ? base.extraUnits : []
+      status: fields.ucvStatus !== undefined ? (fields.ucvStatus || 'Por confirmar') : (base.status || 'Por confirmar'),
+      action: fields.ucvAction !== undefined ? (fields.ucvAction || 'Por confirmar') : (base.action || 'Por confirmar'),
+      function: fields.ucvFunction !== undefined ? fields.ucvFunction : (base.function || ''),
+      extraUnits: (Array.isArray(fields.ucvExtraUnits) ? fields.ucvExtraUnits : (Array.isArray(base.extraUnits) ? base.extraUnits : [])).filter(function (u) { return u !== (fields.unit || base.unit); })
     });
     const next = existing
       ? current.map(function (c) { return c.id === existing.rawId ? payload : c; })
       : current.concat(payload);
+    return writeBoardKey('ucv_board_state', 'ucv-contacts-v1', next);
+  }
+
+  // Cambia solo el texto de «estado» de un contacto de UCV (Kanban), sin
+  // tocar ningún otro campo.
+  async function setUcvContactStatusText(rawId, text) {
+    const current = await readBoardKey('ucv_board_state', 'ucv-contacts-v1', []);
+    if (!current.some(function (c) { return c.id === rawId; })) return false;
+    const next = current.map(function (c) { return c.id === rawId ? Object.assign({}, c, { status: text }) : c; });
     return writeBoardKey('ucv_board_state', 'ucv-contacts-v1', next);
   }
 
@@ -2796,6 +2875,10 @@
       '<div class="contact-row"><span class="contact-row-label">◉ Teléfono</span><span class="contact-row-value">' + (c.phone ? '<a href="tel:' + safe(c.phone) + '">' + safe(c.phone) + '</a>' : 'Por confirmar') + '</span></div>' +
       '<div class="contact-row"><span class="contact-row-label">✉ Correo</span><span class="contact-row-value">' + (c.email ? '<a href="mailto:' + safe(c.email) + '">' + safe(c.email) + '</a>' : 'Por confirmar') + '</span></div>' +
       '<div class="contact-row"><span class="contact-row-label">Estado</span><span class="contact-row-value">' + safe(status.emoji) + ' ' + safe(status.label) + '</span></div>' +
+      (c.source === 'ucv' && c.raw ? ('<div class="contact-row"><span class="contact-row-label">🏛️ Unidad</span><span class="contact-row-value">' + safe((UCV_UNITS.filter(function (u) { return u.id === c.raw.unit; })[0] || { label: 'Por ubicar' }).label) + '</span></div>' +
+        (c.raw.function ? '<div class="contact-row"><span class="contact-row-label">🧩 Función</span><span class="contact-row-value">' + safe(c.raw.function) + '</span></div>' : '') +
+        (c.raw.status && c.raw.status !== 'Por confirmar' ? '<div class="contact-row"><span class="contact-row-label">Estado en UCV</span><span class="contact-row-value">' + safe(c.raw.status) + '</span></div>' : '') +
+        (c.raw.action && c.raw.action !== 'Por confirmar' ? '<div class="contact-row"><span class="contact-row-label">↳ Próxima acción</span><span class="contact-row-value">' + safe(c.raw.action) + '</span></div>' : '')) : '') +
       (c.source === 'networking' && c.raw && c.raw.subdivision ? '<div class="contact-row"><span class="contact-row-label">🧩 Subdivisión</span><span class="contact-row-value">' + safe(c.raw.subdivision) + '</span></div>' : '') +
       (c.notes ? '<div class="contact-row"><span class="contact-row-label">↳ Notas</span><span class="contact-row-value">' + safe(c.notes) + '</span></div>' : '')
     );
