@@ -647,6 +647,15 @@
       .sort(function (a, b) { return (a.start_time || '99:99').localeCompare(b.start_time || '99:99'); });
   }
 
+  // Para que un evento cancelado se note de un vistazo en cualquier parte
+  // del calendario (día, semana, año, agenda), no solo abriendo el evento.
+  function eventIsCancelled(e) {
+    return e.status === 'cancelled';
+  }
+  function cancelledBadgeHtml(e) {
+    return eventIsCancelled(e) ? '<span class="event-cancelled-badge">❌ Cancelada</span>' : '';
+  }
+
   function renderCalendar() {
     const mode = state.calendarViewMode;
     dom.calendarMonthView.hidden = mode !== 'month';
@@ -678,7 +687,7 @@
       markup += '<button type="button" class="calendar-day' + (iso === today ? ' is-today' : '') + (isSelected ? ' is-selected' : '') + '" data-day="' + iso + '" onclick="window.cmdltAction(event)" style="text-align:left;font:inherit;cursor:pointer">' +
         '<span class="calendar-number">' + day + '</span>' +
         dayEvents.map(function (e) {
-          return '<span class="calendar-event" data-event-id="' + safe(e.id) + '" onclick="window.cmdltAction(event)">' + safe(e.title) + '</span>';
+          return '<span class="calendar-event' + (eventIsCancelled(e) ? ' is-cancelled' : '') + '" data-event-id="' + safe(e.id) + '" onclick="window.cmdltAction(event)">' + (eventIsCancelled(e) ? '❌ ' : '') + safe(e.title) + '</span>';
         }).join('') +
       '</button>';
     }
@@ -708,7 +717,7 @@
         '<div class="calendar-week-events">' +
           (dayEvents.length ? dayEvents.map(function (e) {
             const timeLabel = e.start_time ? formatTime(e.start_time) : '';
-            return '<button type="button" class="calendar-event" data-event-id="' + safe(e.id) + '" onclick="window.cmdltAction(event)" style="white-space:normal;height:auto">' + (timeLabel ? safe(timeLabel) + ' · ' : '') + safe(e.title) + '</button>';
+            return '<button type="button" class="calendar-event' + (eventIsCancelled(e) ? ' is-cancelled' : '') + '" data-event-id="' + safe(e.id) + '" onclick="window.cmdltAction(event)" style="white-space:normal;height:auto">' + (timeLabel ? safe(timeLabel) + ' · ' : '') + (eventIsCancelled(e) ? '❌ ' : '') + safe(e.title) + '</button>';
           }).join('') : '<span style="font-size:11px;color:var(--color-neutral-500)">Sin eventos</span>') +
         '</div>' +
       '</div>';
@@ -730,7 +739,8 @@
       for (let day = 1; day <= lastDay; day += 1) {
         const iso = year + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
         const dayEvents = eventsOnDay(iso);
-        days += '<button type="button" class="calendar-year-day' + (iso === today ? ' is-today' : '') + '" data-year-day="' + iso + '" onclick="window.cmdltAction(event)">' +
+        const anyCancelled = dayEvents.some(eventIsCancelled);
+        days += '<button type="button" class="calendar-year-day' + (iso === today ? ' is-today' : '') + (anyCancelled ? ' has-cancelled' : '') + '" data-year-day="' + iso + '" onclick="window.cmdltAction(event)" title="' + (anyCancelled ? 'Incluye un evento cancelado' : '') + '">' +
           '<span>' + day + '</span>' +
           '<span class="calendar-year-day-dots">' + (dayEvents.length ? '<span class="calendar-year-day-dot"></span>' : '') + '</span>' +
         '</button>';
@@ -762,10 +772,11 @@
         '<h4 class="calendar-agenda-group-label">' + safe(formatDate(g.date)) + '</h4>' +
         '<div class="agenda-list">' + g.items.map(function (e) {
           const timeLabel = e.start_time ? formatTime(e.start_time) : 'Hora por confirmar';
-          return '<button type="button" class="agenda-row" data-event-id="' + safe(e.id) + '" onclick="window.cmdltAction(event)" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
+          return '<button type="button" class="agenda-row' + (eventIsCancelled(e) ? ' is-cancelled' : '') + '" data-event-id="' + safe(e.id) + '" onclick="window.cmdltAction(event)" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
             '<div>' +
               '<p class="agenda-row-title">' + safe(e.title) + '</p>' +
               '<p class="agenda-row-meta">◷ ' + safe(timeLabel) + (e.location ? ' · ⌖ ' + safe(e.location) : '') + '</p>' +
+              cancelledBadgeHtml(e) +
             '</div>' +
           '</button>';
         }).join('') + '</div>' +
@@ -783,10 +794,11 @@
     }
     renderMarkup(dom.agendaList, dayEvents.map(function (e) {
       const timeLabel = e.start_time ? formatTime(e.start_time) : 'Hora por confirmar';
-      return '<button type="button" class="agenda-row" data-event-id="' + safe(e.id) + '" onclick="window.cmdltAction(event)" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
+      return '<button type="button" class="agenda-row' + (eventIsCancelled(e) ? ' is-cancelled' : '') + '" data-event-id="' + safe(e.id) + '" onclick="window.cmdltAction(event)" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
         '<div>' +
           '<p class="agenda-row-title">' + safe(e.title) + '</p>' +
           '<p class="agenda-row-meta">◷ ' + safe(timeLabel) + (e.location ? ' · ⌖ ' + safe(e.location) : '') + '</p>' +
+          cancelledBadgeHtml(e) +
         '</div>' +
       '</button>';
     }).join(''));

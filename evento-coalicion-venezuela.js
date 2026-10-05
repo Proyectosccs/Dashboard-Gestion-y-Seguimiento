@@ -908,9 +908,10 @@
     }
     const sorted = state.events.slice().sort(function (a, b) { return (a.event_date || '').localeCompare(b.event_date || ''); });
     renderMarkup(dom.summaryJornadasList, sorted.map(function (e) {
-      return '<button type="button" class="jornada-card" data-action="edit-event" data-id="' + safe(e.id) + '">' +
-        '<span class="jornada-card-title">' + safe(e.title) + '</span>' +
+      return '<button type="button" class="jornada-card' + (eventIsCancelled(e) ? ' is-cancelled' : '') + '" data-action="edit-event" data-id="' + safe(e.id) + '">' +
+        '<span class="jornada-card-title' + (eventIsCancelled(e) ? ' is-cancelled' : '') + '">' + safe(e.title) + '</span>' +
         '<span class="jornada-card-meta">📅 ' + safe(formatDate(e.event_date)) + (e.location ? ' · 📍 ' + safe(e.location) : '') + '</span>' +
+        cancelledBadgeHtml(e) +
       '</button>';
     }).join(''));
   }
@@ -952,6 +953,15 @@
       .sort(function (a, b) { return (a.start_time || '99:99').localeCompare(b.start_time || '99:99'); });
   }
 
+  // Para que un evento cancelado se note de un vistazo en cualquier parte
+  // del calendario (día, semana, año, agenda), no solo abriendo el evento.
+  function eventIsCancelled(e) {
+    return e.status === 'cancelled';
+  }
+  function cancelledBadgeHtml(e) {
+    return eventIsCancelled(e) ? '<span class="event-cancelled-badge">❌ Cancelada</span>' : '';
+  }
+
   function renderCalendar() {
     const mode = state.calendarViewMode;
     dom.calendarMonthView.hidden = mode !== 'month';
@@ -982,7 +992,7 @@
       markup += '<div class="calendar-day' + (iso === today ? ' is-today' : '') + '">' +
         '<span class="calendar-number">' + day + '</span>' +
         dayEvents.map(function (item) {
-          return '<button class="calendar-event" type="button" data-action="edit-event" data-id="' + safe(item.id) + '">' + safe(formatTime(item.start_time) + ' · ' + item.title) + '</button>';
+          return '<button class="calendar-event' + (eventIsCancelled(item) ? ' is-cancelled' : '') + '" type="button" data-action="edit-event" data-id="' + safe(item.id) + '">' + safe((eventIsCancelled(item) ? '❌ ' : '') + formatTime(item.start_time) + ' · ' + item.title) + '</button>';
         }).join('') + '</div>';
     }
     renderMarkup(dom.calendarGrid, markup);
@@ -1009,7 +1019,7 @@
         '<div class="calendar-week-day-number">' + d.getUTCDate() + '</div>' +
         '<div class="calendar-week-events">' +
           (dayEvents.length ? dayEvents.map(function (item) {
-            return '<button class="calendar-event" type="button" data-action="edit-event" data-id="' + safe(item.id) + '" style="white-space:normal;height:auto">' + safe(formatTime(item.start_time) + ' · ' + item.title) + '</button>';
+            return '<button class="calendar-event' + (eventIsCancelled(item) ? ' is-cancelled' : '') + '" type="button" data-action="edit-event" data-id="' + safe(item.id) + '" style="white-space:normal;height:auto">' + safe((eventIsCancelled(item) ? '❌ ' : '') + formatTime(item.start_time) + ' · ' + item.title) + '</button>';
           }).join('') : '<span style="font-size:11px;color:var(--color-neutral-500)">Sin eventos</span>') +
         '</div>' +
       '</div>';
@@ -1031,7 +1041,8 @@
       for (let day = 1; day <= lastDay; day += 1) {
         const iso = year + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
         const dayEvents = eventsOnDay(iso);
-        days += '<button type="button" class="calendar-year-day' + (iso === today ? ' is-today' : '') + '" data-action="calendar-year-day" data-id="' + iso + '">' +
+        const anyCancelled = dayEvents.some(eventIsCancelled);
+        days += '<button type="button" class="calendar-year-day' + (iso === today ? ' is-today' : '') + (anyCancelled ? ' has-cancelled' : '') + '" data-action="calendar-year-day" data-id="' + iso + '" title="' + (anyCancelled ? 'Incluye un evento cancelado' : '') + '">' +
           '<span>' + day + '</span>' +
           '<span class="calendar-year-day-dots">' + (dayEvents.length ? '<span class="calendar-year-day-dot"></span>' : '') + '</span>' +
         '</button>';
@@ -1063,10 +1074,11 @@
         '<h4 class="calendar-agenda-group-label">' + safe(formatDate(g.date)) + '</h4>' +
         '<div class="agenda-list">' + g.items.map(function (e) {
           const timeLabel = e.start_time ? formatTime(e.start_time) : 'Hora por confirmar';
-          return '<button type="button" class="agenda-row" data-action="edit-event" data-id="' + safe(e.id) + '" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
+          return '<button type="button" class="agenda-row' + (eventIsCancelled(e) ? ' is-cancelled' : '') + '" data-action="edit-event" data-id="' + safe(e.id) + '" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
             '<div>' +
               '<p class="agenda-row-title">' + safe(e.title) + '</p>' +
               '<p class="agenda-row-meta">◷ ' + safe(timeLabel) + (e.location ? ' · ⌖ ' + safe(e.location) : '') + '</p>' +
+              cancelledBadgeHtml(e) +
             '</div>' +
           '</button>';
         }).join('') + '</div>' +
