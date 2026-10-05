@@ -7,7 +7,13 @@
   const SUPABASE_URL = 'https://hcylkagvwfncdaaizutn.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_E-cV9DiNK9rctFCxzondvA_7OppBD7Y';
   const TABLE = 'florangel_board_state';
-  const TASKS_KEY = 'florangel-tasks-v1';
+  // Las tareas viven en la lista compartida de Tareas de Equipo
+  // (ingenia_board_state › ingenia-team-tasks-v1, con org 'florangel'), igual
+  // que CMD LT, Coalición y las demás organizaciones — así se ven también
+  // en Networking › Tareas de Equipo. 'florangel-tasks-v1' fue la lista propia
+  // anterior: se conserva como respaldo, ya no se lee ni se escribe.
+  const TEAM_TASKS_KEY = 'ingenia-team-tasks-v1';
+  const ORG_ID = 'florangel';
   const EVENTS_KEY = 'florangel-events-v1';
   const CONTACTS_KEY = 'florangel-contacts-v1';
   const HIERARCHY_KEY = 'florangel-hierarchy-v1';
@@ -444,6 +450,46 @@
     return null;
   }
 
+  const STAGE_TO_STATUS = { todo: 'pendiente', doing: 'en_proceso', done: 'listo', blocked: 'bloqueada' };
+  const STATUS_TO_STAGE = { pendiente: 'todo', en_proceso: 'doing', listo: 'done', bloqueada: 'blocked' };
+  function taskToLocal(t) {
+    return Object.assign({}, t, { stage: STATUS_TO_STAGE[t.status] || 'todo', responsable: normalizeResponsableList(t.responsable) });
+  }
+  function taskToShared(t) {
+    const out = Object.assign({}, t, { org: ORG_ID, status: STAGE_TO_STATUS[t.stage] || 'pendiente' });
+    delete out.stage;
+    return out;
+  }
+
+  // Igual que applyChange, pero sobre la lista compartida de tareas: `change`
+  // recibe y devuelve solo las tareas de Florangel (en formato del tablero);
+  // las de las demás organizaciones se conservan tal cual y en su lugar.
+  function applyTaskChange(change) {
+    state.tasks = change(state.tasks);
+    renderKanban();
+    mutateKey(SHARED_TABLE, TEAM_TASKS_KEY, [], function (all) {
+      const mine = all.filter(function (t) { return t.org === ORG_ID; }).map(taskToLocal);
+      const next = change(mine).map(taskToShared);
+      const byId = {};
+      next.forEach(function (t) { byId[t.id] = t; });
+      const out = [];
+      all.forEach(function (t) {
+        if (t.org !== ORG_ID) { out.push(t); return; }
+        if (byId[t.id]) { out.push(byId[t.id]); delete byId[t.id]; }
+      });
+      next.forEach(function (t) { if (byId[t.id]) out.push(t); });
+      return out;
+    }).then(function (saved) {
+      if (saved === null) {
+        toast('No se pudo guardar — revisa tu conexión.', 'error');
+        loadAllData(true);
+        return;
+      }
+      state.tasks = saved.filter(function (t) { return t.org === ORG_ID; }).map(taskToLocal);
+      renderKanban();
+    });
+  }
+
   // Aplica `change` al instante en pantalla y lo guarda con mutateKey; al
   // terminar, la pantalla queda con lo que realmente quedó guardado
   // (incluido lo que otra persona haya agregado mientras tanto).
@@ -465,6 +511,14 @@
 
   // El roster de responsables vive en la tabla compartida (SHARED_TABLE),
   // no en la propia de este tablero — por eso no reusa readKey/writeKey.
+  async function loadSharedTasks() {
+    if (!state.client) return [];
+    const res = await state.client.from(SHARED_TABLE).select('value').eq('key', TEAM_TASKS_KEY).maybeSingle();
+    if (res.error) { state.loadFailed = true; return []; }
+    const all = res.data && Array.isArray(res.data.value) ? res.data.value : [];
+    return all.filter(function (t) { return t.org === ORG_ID; });
+  }
+
   async function loadTeamMembers() {
     if (!state.client) return [];
     const res = await state.client.from(SHARED_TABLE).select('value').eq('key', TEAM_MEMBERS_KEY).maybeSingle();
@@ -485,7 +539,7 @@
     state.loadFailed = false;
 
     const [tasksValue, eventsValue, contactsValue, hierarchyValue, teamMembers, uiValue] = await Promise.all([
-      readKey(TASKS_KEY, null),
+      loadSharedTasks(),
       readKey(EVENTS_KEY, null),
       readKey(CONTACTS_KEY, null),
       readKey(HIERARCHY_KEY, null),
@@ -501,16 +555,15 @@
 
     // Primera vez que se abre este tablero: siembra un evento de ejemplo
     // este fin de semana para que el calendario no arranque vacío.
-    if (tasksValue === null && eventsValue === null && !state.loadFailed) {
+    if (eventsValue === null && !state.loadFailed) {
       events = [{
         id: uid(), title: 'Jornadas', event_date: upcomingWeekendDate(), start_time: '',
         location: '', notes: '', created_at: new Date().toISOString()
       }];
       await writeKey(EVENTS_KEY, events);
-      await writeKey(TASKS_KEY, []);
     }
 
-    state.tasks = tasks.map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); });
+    state.tasks = tasks.map(taskToLocal);
     state.events = events;
     state.contacts = Array.isArray(contactsValue) ? contactsValue : [];
     state.hierarchy = Array.isArray(hierarchyValue) ? hierarchyValue : [];
@@ -786,9 +839,11 @@
   function moveTask(id, stage) {
     const task = findById(state.tasks, id);
     if (!task || task.stage === stage) return;
-    applyChange(TASKS_KEY, 'tasks', function (list) {
-      return list.map(function (t) { return t.id === id ? Object.assign({}, t, { stage: stage }) : t; });
-    }, renderKanban);
+    applyTaskChange(function (list) {
+      return list.map(function (t) {
+        return t.id === id ? Object.assign({}, t, { stage: stage, followupStatus: stage === 'doing' ? t.followupStatus : '' }) : t;
+      });
+    });
   }
 
   function openTaskDialog(task) {
@@ -838,10 +893,10 @@
       created_at: new Date().toISOString()
     };
     const editId = state.taskEditor;
-    applyChange(TASKS_KEY, 'tasks', function (list) {
+    applyTaskChange(function (list) {
       if (!editId) return list.concat(payload);
       return list.map(function (t) { return t.id === editId ? Object.assign({}, t, payload, { created_at: t.created_at }) : t; });
-    }, renderKanban);
+    });
     closeTaskDialog();
     toast('Tarea guardada.', 'success');
   }
@@ -849,7 +904,7 @@
   function deleteEditingTask() {
     if (!state.taskEditor) return;
     const delId = state.taskEditor;
-    applyChange(TASKS_KEY, 'tasks', function (list) { return list.filter(function (t) { return t.id !== delId; }); }, renderKanban);
+    applyTaskChange(function (list) { return list.filter(function (t) { return t.id !== delId; }); });
     closeTaskDialog();
     toast('Tarea eliminada.', 'success');
   }
