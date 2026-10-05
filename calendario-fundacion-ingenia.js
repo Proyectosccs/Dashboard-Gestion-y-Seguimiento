@@ -9,7 +9,7 @@
 
   const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-  const SOURCE_LABELS = { coalicion: 'Coalición Venezuela', florangel: 'Dra Florangel', ucv: 'UCV', cmdlt: 'Centro Médico Docente de La Trinidad', networking: 'Fundación Ingenia', otros: 'Otros' };
+  const SOURCE_LABELS = { coalicion: 'Coalición con Amor a Venezuela', florangel: 'Dra Florangel', ucv: 'UCV', cmdlt: 'Centro Médico Docente de La Trinidad', networking: 'Fundación Ingenia', otros: 'Otros' };
   // Deben coincidir exactamente con --source-<clave> en
   // calendario-fundacion-ingenia.css (ahí pinta la leyenda y los eventos;
   // aquí solo se usa para la tarjeta de cada organización en "Organizaciones").
@@ -2032,7 +2032,7 @@
     const minutaFiles = jornadaType === 'reunion' ? state.minutaFilesDraft : [];
     if (!title || !eventDate) { showError(dom.eventError, 'Nombre del evento y fecha son obligatorios.'); return; }
     if (state.minutaFileUploading) { showError(dom.eventError, 'Espera a que termine de subirse el archivo.'); return; }
-    if (source === 'coalicion' && !location) { showError(dom.eventError, 'Coalición Venezuela necesita una ubicación.'); return; }
+    if (source === 'coalicion' && !location) { showError(dom.eventError, 'Coalición con Amor a Venezuela necesita una ubicación.'); return; }
 
     let newCalendarName = '';
     if (source === NEW_CALENDAR_VALUE) {

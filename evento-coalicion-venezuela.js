@@ -26,9 +26,9 @@
   // UCV — pero sin los controles de tamaño de burbuja/título, porque este
   // sitio usa una hoja de estilos fija en vez de estilos calculados en JS.
   const DEFAULT_UI = {
-    pageTitle: 'Evento Coalición Venezuela',
-    pageSubtitle: 'Control compartido de responsables, calendario, tareas y resultados con Coalición Venezuela.',
-    summaryTitle: 'Resumen de Coalición Venezuela',
+    pageTitle: 'Evento Coalición con Amor a Venezuela',
+    pageSubtitle: 'Control compartido de responsables, calendario, tareas y resultados con Coalición con Amor a Venezuela.',
+    summaryTitle: 'Resumen de Coalición con Amor a Venezuela',
     resultsTitle: '📊 Resultados de la jornada',
     calendarTitle: '🗓️ Calendario del evento',
     tasksTitle: 'Tareas de Equipo',
@@ -784,11 +784,11 @@
   function setView(viewName) {
     state.view = viewName;
     const titles = {
-      summary: 'Resumen — Evento Coalición Venezuela',
-      calendar: 'Calendario — Evento Coalición Venezuela',
-      tasks: 'Tareas de Equipo — Evento Coalición Venezuela',
-      contacts: 'Contactos — Evento Coalición Venezuela',
-      results: 'Resultados — Evento Coalición Venezuela'
+      summary: 'Resumen — Evento Coalición con Amor a Venezuela',
+      calendar: 'Calendario — Evento Coalición con Amor a Venezuela',
+      tasks: 'Tareas de Equipo — Evento Coalición con Amor a Venezuela',
+      contacts: 'Contactos — Evento Coalición con Amor a Venezuela',
+      results: 'Resultados — Evento Coalición con Amor a Venezuela'
     };
     document.querySelectorAll('.tab-button').forEach(function (button) {
       if (button.dataset.view === viewName) button.setAttribute('aria-current', 'page');
