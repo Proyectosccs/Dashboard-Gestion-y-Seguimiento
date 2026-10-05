@@ -251,6 +251,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   box-shadow: var(--shadow-sm);
   scrollbar-gutter: stable;
 }
+/* Íconos de Instagram/página web de Fundación Ingenia -- en la misma fila
+   de pestañas, pegados a la derecha, para identificarlos fácil. Solo se
+   muestran si se guardó un enlace. */
+.org-social-links { display: flex; align-items: center; gap: 6px; margin-left: auto; padding-left: 8px; flex: 0 0 auto; }
+.org-social-link { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-sm); font-size: 17px; text-decoration: none; flex: 0 0 auto; }
+.org-social-link:hover { background: var(--color-accent-100); }
 .tab-button, .tab-link {
   flex: none;
   min-height: 40px;
@@ -595,6 +601,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .responsable-contact-linked { font-size: 12px; font-weight: 700; color: #0f7a3d; white-space: nowrap; }
 .responsable-contact-empty { font-size: 12.5px; color: var(--color-neutral-600); margin: 8px 0 0; }
 .field-hint { margin: 4px 0 0; font-size: 11.5px; color: var(--color-neutral-600); }
+.extra-org-rows { display: flex; flex-direction: column; gap: 6px; }
+.extra-org-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.extra-org-row .contact-extra-org-role { flex: 1; min-width: 160px; }
 .responsables-empty { padding: 14px; text-align: center; color: var(--color-neutral-500); font-size: 12.5px; }
 
 /* ---------- Organizaciones ---------- */

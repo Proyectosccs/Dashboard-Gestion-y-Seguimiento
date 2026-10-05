@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=38">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=40">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=60" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=62" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -33,6 +33,10 @@
       <button class="tab-button" type="button" data-view="tasks" onclick="window.ingeniaAction(event)">📋 Tareas de Equipo</button>
       <button class="tab-button" type="button" data-view="organizations" onclick="window.ingeniaAction(event)">🏢 Organizaciones</button>
       <button class="tab-button" type="button" data-view="leaders" onclick="window.ingeniaAction(event)">🧑‍🤝‍🧑 Líderes de Comunidades</button>
+      <div id="org-social-links" class="org-social-links">
+        <a id="org-instagram-link" class="org-social-link" href="#" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram" hidden>📷</a>
+        <a id="org-website-link" class="org-social-link" href="#" target="_blank" rel="noopener" aria-label="Página web" title="Página web" hidden>🌐</a>
+      </div>
     </nav>
 
     <div id="kpi-strip" class="kpi-strip" hidden>
@@ -278,6 +282,10 @@
             <input id="field-contact-phone-number" class="input phone-number" name="phone_number" type="tel" placeholder="4141234567">
           </div>
         </div>
+        <div class="field field-full">
+          <label>También pertenece a estas organizaciones (opcional)</label>
+          <div id="contact-extra-orgs-list" class="extra-org-rows"></div>
+        </div>
         <div class="field field-full" id="contact-coalicion-fields" hidden>
           <label for="field-contact-belongs-to">Pertenece a (dentro de Coalición)</label>
           <select id="field-contact-belongs-to" class="input" name="belongs_to">
@@ -322,10 +330,6 @@
         <div class="field field-full" id="contact-notes-field">
           <label for="field-contact-notes">Notas</label>
           <textarea id="field-contact-notes" class="input" name="notes"></textarea>
-        </div>
-        <div class="field field-full">
-          <label>También pertenece a estas organizaciones (opcional)</label>
-          <div id="contact-extra-orgs-list" class="checkbox-list"></div>
         </div>
         <div class="field field-full">
           <label class="checkbox-chip" style="width:fit-content"><input type="checkbox" id="field-contact-is-responsable"> 🔗 Marcar como responsable de su organización</label>
@@ -641,6 +645,14 @@
         <div class="field">
           <label for="field-custom-leaders-title">Título de líderes</label>
           <input id="field-custom-leaders-title" class="input" name="leadersTitle" type="text">
+        </div>
+        <div class="field">
+          <label for="field-custom-instagram">📷 Instagram (enlace)</label>
+          <input id="field-custom-instagram" class="input" name="instagramUrl" type="url" placeholder="https://instagram.com/...">
+        </div>
+        <div class="field">
+          <label for="field-custom-website">🌐 Página web (enlace)</label>
+          <input id="field-custom-website" class="input" name="websiteUrl" type="url" placeholder="https://...">
         </div>
       </div>
       <div class="customize-grid">

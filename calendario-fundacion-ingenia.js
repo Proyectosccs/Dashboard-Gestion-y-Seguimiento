@@ -275,6 +275,8 @@
     tasksTitle: 'Tareas de Equipo',
     organizationsTitle: 'Organizaciones',
     leadersTitle: 'Líderes de Comunidades',
+    instagramUrl: '',
+    websiteUrl: '',
     tabOrder: ['resumen', 'calendar', 'reuniones', 'contacts', 'tasks', 'organizations', 'leaders'],
     boardOrder: ['kpis', 'board']
   };
@@ -666,6 +668,9 @@
     dom.pageTitle = document.getElementById('page-title');
     dom.pageSubtitle = document.getElementById('page-subtitle');
     dom.tabNav = document.getElementById('tab-nav');
+    dom.orgSocialLinks = document.getElementById('org-social-links');
+    dom.orgInstagramLink = document.getElementById('org-instagram-link');
+    dom.orgWebsiteLink = document.getElementById('org-website-link');
     dom.tasksBlocks = document.getElementById('tasks-blocks');
     dom.tasksViewTitle = document.getElementById('tasks-view-title');
     dom.organizationsViewTitle = document.getElementById('organizations-view-title');
@@ -677,6 +682,8 @@
     dom.customTasksTitle = document.getElementById('field-custom-tasks-title');
     dom.customOrganizationsTitle = document.getElementById('field-custom-organizations-title');
     dom.customLeadersTitle = document.getElementById('field-custom-leaders-title');
+    dom.customInstagram = document.getElementById('field-custom-instagram');
+    dom.customWebsite = document.getElementById('field-custom-website');
     dom.customizeTabsList = document.getElementById('customize-tabs-list');
     dom.customizeSectionsList = document.getElementById('customize-sections-list');
     dom.kpiStrip = document.getElementById('kpi-strip');
@@ -990,6 +997,11 @@
     dom.leadersViewTitle.textContent = ui.leadersTitle;
     reorderChildren(dom.tabNav, ui.tabOrder, function (id) { return dom.tabNav.querySelector('[data-view="' + id + '"]'); });
     reorderChildren(dom.tasksBlocks, ui.boardOrder, function (id) { return document.getElementById('tasks-block-' + id); });
+    dom.tabNav.appendChild(dom.orgSocialLinks);
+    dom.orgInstagramLink.hidden = !ui.instagramUrl;
+    dom.orgInstagramLink.href = ui.instagramUrl || '#';
+    dom.orgWebsiteLink.hidden = !ui.websiteUrl;
+    dom.orgWebsiteLink.href = ui.websiteUrl || '#';
   }
 
   function reorderChildren(parent, order, findChild) {
@@ -1006,6 +1018,8 @@
     dom.customTasksTitle.value = state.customizeForm.tasksTitle;
     dom.customOrganizationsTitle.value = state.customizeForm.organizationsTitle;
     dom.customLeadersTitle.value = state.customizeForm.leadersTitle;
+    dom.customInstagram.value = state.customizeForm.instagramUrl;
+    dom.customWebsite.value = state.customizeForm.websiteUrl;
     renderCustomizeLists();
     dom.customizeDialog.showModal();
   }
@@ -1019,6 +1033,8 @@
     dom.customTasksTitle.value = state.customizeForm.tasksTitle;
     dom.customOrganizationsTitle.value = state.customizeForm.organizationsTitle;
     dom.customLeadersTitle.value = state.customizeForm.leadersTitle;
+    dom.customInstagram.value = state.customizeForm.instagramUrl;
+    dom.customWebsite.value = state.customizeForm.websiteUrl;
     renderCustomizeLists();
   }
 
@@ -1069,6 +1085,8 @@
       tasksTitle: dom.customTasksTitle.value.trim() || DEFAULT_UI.tasksTitle,
       organizationsTitle: dom.customOrganizationsTitle.value.trim() || DEFAULT_UI.organizationsTitle,
       leadersTitle: dom.customLeadersTitle.value.trim() || DEFAULT_UI.leadersTitle,
+      instagramUrl: dom.customInstagram.value.trim(),
+      websiteUrl: dom.customWebsite.value.trim(),
       tabOrder: state.customizeForm.tabOrder,
       boardOrder: state.customizeForm.boardOrder
     };
@@ -1572,9 +1590,15 @@
   // (pasó con Dra Florangel y Fundación Ingenia), y de paso incluye a los
   // contactos marcados con esta organización como "también pertenece a"
   // (ver extraOrgs en el formulario de contacto).
+  // extraOrgs es un arreglo de {org, role} — un contacto puede "también
+  // pertenecer" a varias organizaciones, cada una con su propio rol ahí.
+  function contactHasExtraOrg(c, org) {
+    return Array.isArray(c.extraOrgs) && c.extraOrgs.some(function (e) { return (e && e.org) === org; });
+  }
+
   function orgContactsFor(source) {
     return state.contacts.filter(function (c) {
-      return c.source === source || (Array.isArray(c.extraOrgs) && c.extraOrgs.indexOf(source) > -1);
+      return c.source === source || contactHasExtraOrg(c, source);
     }).map(function (c) { return { id: c.rawId, name: c.name }; });
   }
 
@@ -3065,15 +3089,41 @@
     if (!dom.contactExtraOrgsList) return;
     const primary = dom.contactOrgSelect.value;
     const existing = state.editingContact;
-    const current = existing && existing.source === primary ? (existing.extraOrgs || []) : [];
-    renderMarkup(dom.contactExtraOrgsList, CONTACT_ORGS.filter(function (org) { return org !== primary; }).map(function (org) {
-      const checked = current.indexOf(org) > -1 ? ' checked' : '';
-      return '<label class="checkbox-chip"><input type="checkbox" class="contact-extra-org-checkbox" value="' + safe(org) + '"' + checked + '>' + FIXED_SOURCE_EMOJI[org] + ' ' + safe(SOURCE_LABELS[org]) + '</label>';
+    // "current" trae lo guardado solo si no cambiamos de organización
+    // principal en este mismo formulario — si se cambió, no tiene sentido
+    // arrastrar roles de la combinación anterior.
+    const current = existing && existing.source === primary ? normalizeExtraOrgs(existing.extraOrgs) : [];
+    // contactOrgOptions() ya incluye las 5 organizaciones fijas MÁS todas
+    // las creadas al vuelo ("Otra organización") — antes esta lista solo
+    // mostraba las 5 fijas.
+    renderMarkup(dom.contactExtraOrgsList, contactOrgOptions().filter(function (o) { return o.id !== primary; }).map(function (o) {
+      const found = current.find(function (e) { return e.org === o.id; });
+      return '<div class="extra-org-row">' +
+        '<label class="checkbox-chip"><input type="checkbox" class="contact-extra-org-checkbox" value="' + safe(o.id) + '"' + (found ? ' checked' : '') + '>' + o.emoji + ' ' + safe(o.label) + '</label>' +
+        '<input type="text" class="input contact-extra-org-role" data-org="' + safe(o.id) + '" placeholder="Rol en ' + safe(o.label) + '" value="' + safe(found ? found.role : '') + '"' + (found ? '' : ' hidden') + '>' +
+      '</div>';
     }).join(''));
+    dom.contactExtraOrgsList.querySelectorAll('.contact-extra-org-checkbox').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        const roleInput = dom.contactExtraOrgsList.querySelector('.contact-extra-org-role[data-org="' + cb.value + '"]');
+        if (roleInput) { roleInput.hidden = !cb.checked; if (cb.checked) roleInput.focus(); }
+      });
+    });
+  }
+
+  // Acepta tanto el formato viejo (arreglo de strings, antes de pedir el
+  // rol en la otra organización) como el actual (arreglo de {org, role}).
+  function normalizeExtraOrgs(value) {
+    return (Array.isArray(value) ? value : []).map(function (e) {
+      return typeof e === 'string' ? { org: e, role: '' } : { org: e.org, role: e.role || '' };
+    }).filter(function (e) { return !!e.org; });
   }
 
   function readContactExtraOrgs() {
-    return Array.from(dom.contactExtraOrgsList.querySelectorAll('.contact-extra-org-checkbox:checked')).map(function (cb) { return cb.value; });
+    return Array.from(dom.contactExtraOrgsList.querySelectorAll('.contact-extra-org-checkbox:checked')).map(function (cb) {
+      const roleInput = dom.contactExtraOrgsList.querySelector('.contact-extra-org-role[data-org="' + cb.value + '"]');
+      return { org: cb.value, role: roleInput ? roleInput.value.trim() : '' };
+    });
   }
 
   function handleContactSearch(e) {
@@ -3095,7 +3145,7 @@
   // registro, o si lo marcaron como "también pertenece a" esa otra
   // organización (ver extraOrgs en el formulario de contacto).
   function contactMatchesOrg(c, org) {
-    return c.source === org || (Array.isArray(c.extraOrgs) && c.extraOrgs.indexOf(org) > -1);
+    return c.source === org || contactHasExtraOrg(c, org);
   }
 
   function renderContactsKpiStrip() {
@@ -3103,7 +3153,7 @@
     const counts = {};
     state.contacts.forEach(function (c) {
       counts[c.source] = (counts[c.source] || 0) + 1;
-      (c.extraOrgs || []).forEach(function (org) { counts[org] = (counts[org] || 0) + 1; });
+      (c.extraOrgs || []).forEach(function (e) { if (e && e.org) counts[e.org] = (counts[e.org] || 0) + 1; });
     });
     const orgs = contactOrgOptions()
       .map(function (o) { return Object.assign({ n: counts[o.id] || 0 }, o); })
