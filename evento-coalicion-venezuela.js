@@ -32,6 +32,8 @@
     resultsTitle: '📊 Resultados de la jornada',
     calendarTitle: '🗓️ Calendario del evento',
     tasksTitle: 'Tareas de Equipo',
+    instagramUrl: '',
+    websiteUrl: '',
     tabOrder: ['summary', 'results', 'contacts', 'hierarchy', 'calendar', 'tasks'],
     boardOrder: ['kpis', 'board']
   };
@@ -666,6 +668,9 @@
     dom.pageTitle = document.getElementById('page-title');
     dom.pageSubtitle = document.getElementById('page-subtitle');
     dom.tabNav = document.getElementById('tab-nav');
+    dom.orgSocialLinks = document.getElementById('org-social-links');
+    dom.orgInstagramLink = document.getElementById('org-instagram-link');
+    dom.orgWebsiteLink = document.getElementById('org-website-link');
     dom.tasksBlocks = document.getElementById('tasks-blocks');
     dom.summaryTitle = document.getElementById('summary-title');
     dom.resultsTitle = document.getElementById('results-title');
@@ -679,6 +684,8 @@
     dom.customResultsTitle = document.getElementById('field-custom-results-title');
     dom.customCalendarTitle = document.getElementById('field-custom-calendar-title');
     dom.customTasksTitle = document.getElementById('field-custom-tasks-title');
+    dom.customInstagram = document.getElementById('field-custom-instagram');
+    dom.customWebsite = document.getElementById('field-custom-website');
     dom.customizeTabsList = document.getElementById('customize-tabs-list');
     dom.customizeSectionsList = document.getElementById('customize-sections-list');
   }
@@ -2560,6 +2567,11 @@
     dom.tasksTitle.textContent = ui.tasksTitle;
     reorderChildren(dom.tabNav, ui.tabOrder, function (id) { return dom.tabNav.querySelector('[data-view="' + id + '"]'); });
     reorderChildren(dom.tasksBlocks, ui.boardOrder, function (id) { return document.getElementById('tasks-block-' + id); });
+    dom.tabNav.appendChild(dom.orgSocialLinks);
+    dom.orgInstagramLink.hidden = !ui.instagramUrl;
+    dom.orgInstagramLink.href = ui.instagramUrl || '#';
+    dom.orgWebsiteLink.hidden = !ui.websiteUrl;
+    dom.orgWebsiteLink.href = ui.websiteUrl || '#';
   }
 
   function reorderChildren(parent, order, findChild) {
@@ -2577,6 +2589,8 @@
     dom.customResultsTitle.value = state.customizeForm.resultsTitle;
     dom.customCalendarTitle.value = state.customizeForm.calendarTitle;
     dom.customTasksTitle.value = state.customizeForm.tasksTitle;
+    dom.customInstagram.value = state.customizeForm.instagramUrl;
+    dom.customWebsite.value = state.customizeForm.websiteUrl;
     renderCustomizeLists();
     dom.customizeDialog.showModal();
   }
@@ -2591,6 +2605,8 @@
     dom.customResultsTitle.value = state.customizeForm.resultsTitle;
     dom.customCalendarTitle.value = state.customizeForm.calendarTitle;
     dom.customTasksTitle.value = state.customizeForm.tasksTitle;
+    dom.customInstagram.value = state.customizeForm.instagramUrl;
+    dom.customWebsite.value = state.customizeForm.websiteUrl;
     renderCustomizeLists();
   }
 
@@ -2642,6 +2658,8 @@
       resultsTitle: dom.customResultsTitle.value.trim() || DEFAULT_UI.resultsTitle,
       calendarTitle: dom.customCalendarTitle.value.trim() || DEFAULT_UI.calendarTitle,
       tasksTitle: dom.customTasksTitle.value.trim() || DEFAULT_UI.tasksTitle,
+      instagramUrl: dom.customInstagram.value.trim(),
+      websiteUrl: dom.customWebsite.value.trim(),
       tabOrder: state.customizeForm.tabOrder,
       boardOrder: state.customizeForm.boardOrder
     };

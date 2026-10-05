@@ -6,9 +6,9 @@
   <meta name="description" content="Tareas y calendario de jornadas — Dra Florangel.">
   <title>Dra Florangel — Tareas y jornadas</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./dra-florangel.css?v=29">
+  <link rel="stylesheet" href="./dra-florangel.css?v=30">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./dra-florangel.js?v=37" defer></script>
+  <script src="./dra-florangel.js?v=38" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -30,6 +30,10 @@
       <button class="tab-button" type="button" data-view="calendar" onclick="window.florangelAction(event)">🗓️ Calendario</button>
       <button class="tab-button" type="button" data-view="contacts" onclick="window.florangelAction(event)">🤝 Contactos</button>
       <button class="tab-button" type="button" data-view="hierarchy" onclick="window.florangelAction(event)">🏛️ Jerarquía</button>
+      <div id="org-social-links" class="org-social-links">
+        <a id="org-instagram-link" class="org-social-link" href="#" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram" hidden>📷</a>
+        <a id="org-website-link" class="org-social-link" href="#" target="_blank" rel="noopener" aria-label="Página web" title="Página web" hidden>🌐</a>
+      </div>
     </nav>
 
     <div id="connectivity-banner" class="notice notice-warning page-notice" role="status" hidden>
@@ -478,6 +482,14 @@
         <div class="field">
           <label for="field-custom-hierarchy-title">Título de jerarquía</label>
           <input id="field-custom-hierarchy-title" class="input" name="hierarchyTitle" type="text">
+        </div>
+        <div class="field">
+          <label for="field-custom-instagram">📷 Instagram (enlace)</label>
+          <input id="field-custom-instagram" class="input" name="instagramUrl" type="url" placeholder="https://instagram.com/...">
+        </div>
+        <div class="field">
+          <label for="field-custom-website">🌐 Página web (enlace)</label>
+          <input id="field-custom-website" class="input" name="websiteUrl" type="url" placeholder="https://...">
         </div>
       </div>
       <div class="customize-grid">

@@ -211,6 +211,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   box-shadow: var(--shadow-sm);
   scrollbar-gutter: stable;
 }
+/* Íconos de Instagram/página web de la organización -- en la misma fila
+   de pestañas, pegados a la derecha, para identificarlos fácil en
+   cualquier organización. Solo se muestran si se guardó un enlace. */
+.org-social-links { display: flex; align-items: center; gap: 6px; margin-left: auto; padding-left: 8px; flex: 0 0 auto; }
+.org-social-link { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-sm); font-size: 17px; text-decoration: none; flex: 0 0 auto; }
+.org-social-link:hover { background: var(--color-accent-100); }
 .tab-button, .tab-link {
   flex: none;
   min-height: 40px;

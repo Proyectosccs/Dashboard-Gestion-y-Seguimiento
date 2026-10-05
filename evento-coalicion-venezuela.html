@@ -6,11 +6,11 @@
   <meta name="description" content="Control operativo móvil para eventos de Coalición con Amor a Venezuela y Fundación Ingenia.">
   <title>Resumen — Evento Coalición con Amor a Venezuela</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./evento-coalicion-venezuela.css?v=25">
+  <link rel="stylesheet" href="./evento-coalicion-venezuela.css?v=26">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-  <script src="./evento-coalicion-venezuela.js?v=45" defer></script>
+  <script src="./evento-coalicion-venezuela.js?v=46" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -35,6 +35,10 @@
       <button class="tab-button" type="button" data-view="calendar" onclick="window.coalicionAction(event)">🗓️ Calendario</button>
       <button class="tab-button" type="button" data-view="tasks" onclick="window.coalicionAction(event)">📋 Tareas de Equipo</button>
       <a class="tab-link" href="./" target="_blank" rel="noopener noreferrer" aria-label="Abrir Tablero UCV en otra pestaña" hidden>🎓 Tablero UCV ↗</a>
+      <div id="org-social-links" class="org-social-links">
+        <a id="org-instagram-link" class="org-social-link" href="#" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram" hidden>📷</a>
+        <a id="org-website-link" class="org-social-link" href="#" target="_blank" rel="noopener" aria-label="Página web" title="Página web" hidden>🌐</a>
+      </div>
     </nav>
 
     <div id="connectivity-banner" class="notice notice-warning page-notice" role="status" hidden>
@@ -405,6 +409,14 @@
         <div class="field">
           <label for="field-custom-tasks-title">Título de tareas</label>
           <input id="field-custom-tasks-title" class="input" name="tasksTitle" type="text">
+        </div>
+        <div class="field">
+          <label for="field-custom-instagram">📷 Instagram (enlace)</label>
+          <input id="field-custom-instagram" class="input" name="instagramUrl" type="url" placeholder="https://instagram.com/...">
+        </div>
+        <div class="field">
+          <label for="field-custom-website">🌐 Página web (enlace)</label>
+          <input id="field-custom-website" class="input" name="websiteUrl" type="url" placeholder="https://...">
         </div>
       </div>
       <div class="customize-grid">

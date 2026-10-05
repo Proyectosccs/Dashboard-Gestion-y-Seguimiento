@@ -112,6 +112,8 @@
     calendarTitle: '🗓️ Calendario de jornadas',
     contactsTitle: 'Contactos',
     hierarchyTitle: 'Jerarquía',
+    instagramUrl: '',
+    websiteUrl: '',
     tabOrder: ['tasks', 'calendar', 'contacts', 'hierarchy'],
     boardOrder: ['kpis', 'board']
   };
@@ -352,6 +354,9 @@
     dom.pageTitle = document.getElementById('page-title');
     dom.pageSubtitle = document.getElementById('page-subtitle');
     dom.tabNav = document.getElementById('tab-nav');
+    dom.orgSocialLinks = document.getElementById('org-social-links');
+    dom.orgInstagramLink = document.getElementById('org-instagram-link');
+    dom.orgWebsiteLink = document.getElementById('org-website-link');
     dom.tasksBlocks = document.getElementById('tasks-blocks');
     dom.tasksTitle = document.getElementById('tasks-title');
     dom.calendarTitle = document.getElementById('calendar-title');
@@ -362,6 +367,8 @@
     dom.customTasksTitle = document.getElementById('field-custom-tasks-title');
     dom.customCalendarTitle = document.getElementById('field-custom-calendar-title');
     dom.customContactsTitle = document.getElementById('field-custom-contacts-title');
+    dom.customInstagram = document.getElementById('field-custom-instagram');
+    dom.customWebsite = document.getElementById('field-custom-website');
     dom.customizeTabsList = document.getElementById('customize-tabs-list');
     dom.customizeSectionsList = document.getElementById('customize-sections-list');
   }
@@ -595,6 +602,11 @@
     dom.hierarchyViewTitle.textContent = ui.hierarchyTitle;
     reorderChildren(dom.tabNav, ui.tabOrder, function (id) { return dom.tabNav.querySelector('[data-view="' + id + '"]'); });
     reorderChildren(dom.tasksBlocks, ui.boardOrder, function (id) { return document.getElementById('tasks-block-' + id); });
+    dom.tabNav.appendChild(dom.orgSocialLinks);
+    dom.orgInstagramLink.hidden = !ui.instagramUrl;
+    dom.orgInstagramLink.href = ui.instagramUrl || '#';
+    dom.orgWebsiteLink.hidden = !ui.websiteUrl;
+    dom.orgWebsiteLink.href = ui.websiteUrl || '#';
   }
 
   function reorderChildren(parent, order, findChild) {
@@ -612,6 +624,8 @@
     dom.customCalendarTitle.value = state.customizeForm.calendarTitle;
     dom.customContactsTitle.value = state.customizeForm.contactsTitle;
     dom.customHierarchyTitle.value = state.customizeForm.hierarchyTitle;
+    dom.customInstagram.value = state.customizeForm.instagramUrl;
+    dom.customWebsite.value = state.customizeForm.websiteUrl;
     renderCustomizeLists();
     dom.customizeDialog.showModal();
   }
@@ -626,6 +640,8 @@
     dom.customCalendarTitle.value = state.customizeForm.calendarTitle;
     dom.customContactsTitle.value = state.customizeForm.contactsTitle;
     dom.customHierarchyTitle.value = state.customizeForm.hierarchyTitle;
+    dom.customInstagram.value = state.customizeForm.instagramUrl;
+    dom.customWebsite.value = state.customizeForm.websiteUrl;
     renderCustomizeLists();
   }
 
@@ -677,6 +693,8 @@
       calendarTitle: dom.customCalendarTitle.value.trim() || DEFAULT_UI.calendarTitle,
       contactsTitle: dom.customContactsTitle.value.trim() || DEFAULT_UI.contactsTitle,
       hierarchyTitle: dom.customHierarchyTitle.value.trim() || DEFAULT_UI.hierarchyTitle,
+      instagramUrl: dom.customInstagram.value.trim(),
+      websiteUrl: dom.customWebsite.value.trim(),
       tabOrder: state.customizeForm.tabOrder,
       boardOrder: state.customizeForm.boardOrder
     };

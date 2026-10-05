@@ -96,6 +96,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .customize-btn:hover { background: var(--color-neutral-100); }
 
 .tab-nav { max-width: 1560px; margin: 18px auto 0; display: flex; gap: 7px; overflow-x: auto; padding: 8px; border-radius: 999px; background: var(--color-neutral-100); box-shadow: var(--shadow-sm); scrollbar-gutter: stable; }
+/* Íconos de Instagram/página web de la organización -- en la misma fila
+   de pestañas, pegados a la derecha, para identificarlos fácil en
+   cualquier organización. Solo se muestran si se guardó un enlace. */
+.org-social-links { display: flex; align-items: center; gap: 6px; margin-left: auto; padding-left: 8px; flex: 0 0 auto; }
+.org-social-link { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-sm); font-size: 17px; text-decoration: none; flex: 0 0 auto; }
+.org-social-link:hover { background: var(--color-accent-100); }
 .tab-button { flex: none; min-height: 40px; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: 0; border-radius: 999px; background: transparent; color: var(--color-neutral-800); font-size: 13px; font-weight: 700; cursor: pointer; }
 .tab-button:hover { background: var(--color-neutral-200); color: var(--color-text); }
 .tab-button[aria-current="page"] { background: var(--color-neutral-900); color: #fff; }
