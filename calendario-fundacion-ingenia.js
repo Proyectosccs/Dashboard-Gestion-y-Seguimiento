@@ -1078,6 +1078,16 @@
       .sort(function (a, b) { return (a.time || '99:99').localeCompare(b.time || '99:99'); });
   }
 
+  // Para que una jornada/reunión cancelada se note de un vistazo en
+  // cualquier parte del calendario (día, semana, agenda), no solo
+  // abriendo el evento.
+  function eventIsCancelled(e) {
+    return readEventExtra(e.source, e.raw).status === 'cancelled';
+  }
+  function cancelledBadgeHtml(e) {
+    return eventIsCancelled(e) ? '<span class="event-cancelled-badge">❌ Cancelada</span>' : '';
+  }
+
   function renderCalendar() {
     renderLegend();
     const mode = state.calendarViewMode;
@@ -1111,7 +1121,7 @@
         '<span class="calendar-number">' + day + '</span>' +
         dayEvents.slice(0, 3).map(function (e) {
           const cs = sourceClassStyle(e.source);
-          return '<span class="calendar-event ' + cs.cls + '" ' + cs.style + ' data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)">' + safe(e.title) + '</span>';
+          return '<span class="calendar-event ' + cs.cls + (eventIsCancelled(e) ? ' is-cancelled' : '') + '" ' + cs.style + ' data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)">' + (eventIsCancelled(e) ? '❌ ' : '') + safe(e.title) + '</span>';
         }).join('') +
         (dayEvents.length > 3 ? '<span class="calendar-event">+' + (dayEvents.length - 3) + ' más</span>' : '') +
       '</button>';
@@ -1143,7 +1153,7 @@
           (dayEvents.length ? dayEvents.map(function (e) {
             const cs = sourceClassStyle(e.source);
             const timeLabel = e.time ? formatTime(e.time) : '';
-            return '<button type="button" class="calendar-event ' + cs.cls + '" ' + cs.style + ' data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" style="white-space:normal;height:auto">' + (timeLabel ? safe(timeLabel) + ' · ' : '') + safe(e.title) + '</button>';
+            return '<button type="button" class="calendar-event ' + cs.cls + (eventIsCancelled(e) ? ' is-cancelled' : '') + '" ' + cs.style + ' data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" style="white-space:normal;height:auto">' + (timeLabel ? safe(timeLabel) + ' · ' : '') + (eventIsCancelled(e) ? '❌ ' : '') + safe(e.title) + '</button>';
           }).join('') : '<span style="font-size:11px;color:var(--color-neutral-500)">Sin eventos</span>') +
         '</div>' +
       '</div>';
@@ -1167,7 +1177,8 @@
         const dayEvents = eventsOnDay(iso);
         const sources = [];
         dayEvents.forEach(function (e) { if (sources.indexOf(e.source) === -1) sources.push(e.source); });
-        days += '<button type="button" class="calendar-year-day' + (iso === today ? ' is-today' : '') + '" data-year-day="' + iso + '" onclick="window.ingeniaAction(event)">' +
+        const anyCancelled = dayEvents.some(eventIsCancelled);
+        days += '<button type="button" class="calendar-year-day' + (iso === today ? ' is-today' : '') + (anyCancelled ? ' has-cancelled' : '') + '" data-year-day="' + iso + '" onclick="window.ingeniaAction(event)" title="' + (anyCancelled ? 'Incluye un evento cancelado' : '') + '">' +
           '<span>' + day + '</span>' +
           '<span class="calendar-year-day-dots">' + sources.slice(0, 4).map(function (s) { return sourceDotHtml(s); }).join('') + '</span>' +
         '</button>';
@@ -1201,12 +1212,13 @@
           const timeLabel = e.time ? formatTime(e.time) : (e.timeText || 'Hora por confirmar');
           const info = sourceInfo(e.source);
           const cs = sourceClassStyle(e.source);
-          return '<button type="button" class="agenda-row" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
+          return '<button type="button" class="agenda-row' + (eventIsCancelled(e) ? ' is-cancelled' : '') + '" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
             sourceDotHtml(e.source) +
             '<div>' +
               '<p class="agenda-row-title">' + safe(e.title) + '</p>' +
               '<p class="agenda-row-meta">◷ ' + safe(timeLabel) + (e.location ? ' · ⌖ ' + safe(e.location) : '') + '</p>' +
               '<span class="agenda-row-source ' + cs.cls + '" ' + cs.style + '>' + safe(info.label) + '</span>' +
+              cancelledBadgeHtml(e) +
             '</div>' +
           '</button>';
         }).join('') + '</div>' +
@@ -1226,12 +1238,13 @@
       const timeLabel = e.time ? formatTime(e.time) : (e.timeText || 'Hora por confirmar');
       const info = sourceInfo(e.source);
       const cs = sourceClassStyle(e.source);
-      return '<button type="button" class="agenda-row" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
+      return '<button type="button" class="agenda-row' + (eventIsCancelled(e) ? ' is-cancelled' : '') + '" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
         sourceDotHtml(e.source) +
         '<div>' +
           '<p class="agenda-row-title">' + safe(e.title) + '</p>' +
           '<p class="agenda-row-meta">◷ ' + safe(timeLabel) + (e.location ? ' · ⌖ ' + safe(e.location) : '') + '</p>' +
           '<span class="agenda-row-source ' + cs.cls + '" ' + cs.style + '>' + safe(info.label) + '</span>' +
+          cancelledBadgeHtml(e) +
         '</div>' +
       '</button>';
     }).join(''));
@@ -2428,12 +2441,13 @@
         const cs = sourceClassStyle(e.source);
         const extra = readEventExtra(e.source, e.raw);
         const typeLabel = JORNADA_TYPES[extra.jornadaType] || '';
-        return '<button type="button" class="agenda-row" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
+        return '<button type="button" class="agenda-row' + (eventIsCancelled(e) ? ' is-cancelled' : '') + '" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
           sourceDotHtml(e.source) +
           '<div>' +
             '<p class="agenda-row-title">' + safe(e.title) + (typeLabel ? ' — ' + safe(typeLabel) : '') + '</p>' +
             '<p class="agenda-row-meta">' + safe(formatDate(e.date)) + '</p>' +
             '<span class="agenda-row-source ' + cs.cls + '" ' + cs.style + '>' + safe(info.label) + '</span>' +
+            cancelledBadgeHtml(e) +
           '</div>' +
         '</button>';
       }).join(''));
@@ -2467,8 +2481,9 @@
         '<div class="reunion-card-head">' +
           '<span class="agenda-row-source ' + cs.cls + '" ' + cs.style + '>' + safe(info.label) + '</span>' +
           '<span class="reunion-card-date">' + safe(formatDate(e.date)) + '</span>' +
+          cancelledBadgeHtml(e) +
         '</div>' +
-        '<p class="reunion-card-title">' + safe(e.title) + '</p>' +
+        '<p class="reunion-card-title' + (eventIsCancelled(e) ? ' is-cancelled' : '') + '">' + safe(e.title) + '</p>' +
         (extra.motivo ? '<p class="reunion-card-motivo"><strong>Motivo:</strong> ' + safe(extra.motivo) + '</p>' : '') +
         (minutaPreview ? '<p class="reunion-card-minuta">' + safe(minutaPreview) + '</p>' : '<p class="reunion-card-minuta reunion-card-empty">Sin minuta todavía</p>') +
         (pendientesTotal ? '<span class="reunion-card-pendientes">📋 ' + pendientesDone + '/' + pendientesTotal + ' pendientes resueltos</span>' : '') +
