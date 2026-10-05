@@ -723,6 +723,8 @@
     dom.contactCoalicionFields = document.getElementById('contact-coalicion-fields');
     dom.contactUcvFields = document.getElementById('contact-ucv-fields');
     dom.contactNetworkingFields = document.getElementById('contact-networking-fields');
+    dom.contactExtraOrgsList = document.getElementById('contact-extra-orgs-list');
+    dom.contactIsResponsable = document.getElementById('field-contact-is-responsable');
     dom.contactSubdivisionSelect = document.getElementById('field-contact-subdivision');
     dom.contactUcvRoleSelect = document.getElementById('field-contact-ucv-role');
     dom.contactUnitSelect = document.getElementById('field-contact-unit');
@@ -806,12 +808,20 @@
     renderUcvEventExtras();
   }
 
+  // Un contacto puede marcarse como que "también pertenece" a otras
+  // organizaciones (aparte de la dueña de su registro) — ver el campo del
+  // formulario de contacto. Vive como "extra_orgs" en Coalición (columna
+  // real) y "extraOrgs" en los demás (campo libre en su JSON).
+  function readExtraOrgs(raw) {
+    return Array.isArray(raw.extra_orgs) ? raw.extra_orgs : (Array.isArray(raw.extraOrgs) ? raw.extraOrgs : []);
+  }
+
   async function loadAll(silent) {
     // silent = actualización automática: sin pantalla de carga ni parpadeo.
     if (!silent) dom.loadingState.hidden = false;
     dom.connectivityBanner.hidden = true;
 
-    const [coalicionRes, coalicionContactsRes, florangelRes, florangelContactsRes, ucvRes, ucvContactsRes, ingeniaRes, ucvVolunteersRes, coalicionMotivoRes, coalicionRescheduleRes, coalicionRemindersRes] = await Promise.all([
+    const [coalicionRes, coalicionContactsRes, florangelRes, florangelContactsRes, ucvRes, ucvContactsRes, ingeniaRes, ucvVolunteersRes, coalicionMotivoRes, coalicionRescheduleRes, coalicionRemindersRes, coalicionContactsExtraOrgsRes] = await Promise.all([
       state.client.from('coalicion_events').select('id,title,event_date,start_time,end_time,location,maps_url,notes,status,jornada_type,specialties,collaborating_orgs,participants,participo_fundacion_ingenia,minuta,pendientes,minuta_files').is('archived_at', null),
       state.client.from('coalicion_contacts').select('id,name,role,belongs_to,national_id,phone,email,notes,status').is('archived_at', null),
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-events-v1').maybeSingle(),
@@ -831,6 +841,9 @@
       // Igual que "motivo" y "reschedule_history": los recordatorios viven
       // en su propia columna agregada por su propia migración.
       , state.client.from('coalicion_events').select('id,reminders').is('archived_at', null)
+      // "También pertenece a estas organizaciones" de un contacto de
+      // Coalición — misma columna-aparte-por-migración, mismo motivo.
+      , state.client.from('coalicion_contacts').select('id,extra_orgs').is('archived_at', null)
     ]);
     const coalicionMotivos = {};
     if (!coalicionMotivoRes.error && Array.isArray(coalicionMotivoRes.data)) {
@@ -843,6 +856,10 @@
     const coalicionReminders = {};
     if (!coalicionRemindersRes.error && Array.isArray(coalicionRemindersRes.data)) {
       coalicionRemindersRes.data.forEach(function (r) { coalicionReminders[r.id] = Array.isArray(r.reminders) ? r.reminders : []; });
+    }
+    const coalicionContactsExtraOrgs = {};
+    if (!coalicionContactsExtraOrgsRes.error && Array.isArray(coalicionContactsExtraOrgsRes.data)) {
+      coalicionContactsExtraOrgsRes.data.forEach(function (r) { coalicionContactsExtraOrgs[r.id] = Array.isArray(r.extra_orgs) ? r.extra_orgs : []; });
     }
     state.ucvVolunteers = (Array.isArray(ucvVolunteersRes.data && ucvVolunteersRes.data.value) ? ucvVolunteersRes.data.value : [])
       .filter(function (v) { return v && v.id && v.name; }).map(function (v) { return { id: v.id, name: v.name }; });
@@ -921,25 +938,25 @@
     state.events = coalicionEvents.concat(florangelEvents, ucvEvents, networkingEvents, otrosEvents, cmdltEvents, customEvents).filter(function (e) { return !!e.date; });
 
     const coalicionContacts = (coalicionContactsRes.data || []).map(function (c) {
-      return { id: 'coalicion-' + c.id, rawId: c.id, source: 'coalicion', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, status: c.status || 'pending', raw: c };
+      return { id: 'coalicion-' + c.id, rawId: c.id, source: 'coalicion', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, status: c.status || 'pending', extraOrgs: coalicionContactsExtraOrgs[c.id] || [], raw: c };
     });
     const florangelContacts = (Array.isArray(florangelContactsRes.data && florangelContactsRes.data.value) ? florangelContactsRes.data.value : []).map(function (c) {
-      return { id: 'florangel-' + c.id, rawId: c.id, source: 'florangel', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, status: c.status || 'pending', raw: c };
+      return { id: 'florangel-' + c.id, rawId: c.id, source: 'florangel', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, status: c.status || 'pending', extraOrgs: readExtraOrgs(c), raw: c };
     });
     const cmdltContactsRaw = ingeniaRowsEarly.find(function (r) { return r.key === 'cmdlt-contacts-v1'; });
     const cmdltContacts = (Array.isArray(cmdltContactsRaw && cmdltContactsRaw.value) ? cmdltContactsRaw.value : []).map(function (c) {
-      return { id: 'cmdlt-' + c.id, rawId: c.id, source: 'cmdlt', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, status: c.status || 'pending', raw: c };
+      return { id: 'cmdlt-' + c.id, rawId: c.id, source: 'cmdlt', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, status: c.status || 'pending', extraOrgs: readExtraOrgs(c), raw: c };
     });
     const ucvContacts = (Array.isArray(ucvContactsRes.data && ucvContactsRes.data.value) ? ucvContactsRes.data.value : []).map(function (c) {
       // UCV no usa el catálogo pending/contacted — tiene su propio campo de
       // texto libre "status" (más rico, ver Jerarquía/Contactos de UCV). Para
       // el filtro unificado de Networking, se traduce: "Por confirmar" (o
       // vacío) = pendiente, cualquier otro valor ya escrito = contactado.
-      return { id: 'ucv-' + c.id, rawId: c.id, source: 'ucv', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: '', status: ucvStatusToShared(c.status), raw: c };
+      return { id: 'ucv-' + c.id, rawId: c.id, source: 'ucv', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: '', status: ucvStatusToShared(c.status), extraOrgs: readExtraOrgs(c), raw: c };
     });
     const networkingContactsRaw = ingeniaRowsEarly.find(function (r) { return r.key === 'ingenia-networking-contacts-v1'; });
     const networkingContacts = (Array.isArray(networkingContactsRaw && networkingContactsRaw.value) ? networkingContactsRaw.value : []).map(function (c) {
-      return { id: 'networking-' + c.id, rawId: c.id, source: 'networking', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, status: c.status || 'pending', raw: c };
+      return { id: 'networking-' + c.id, rawId: c.id, source: 'networking', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, status: c.status || 'pending', extraOrgs: readExtraOrgs(c), raw: c };
     });
     state.contacts = coalicionContacts.concat(florangelContacts, cmdltContacts, ucvContacts, networkingContacts, customContacts).filter(function (c) { return !!c.name; });
 
@@ -1548,31 +1565,21 @@
     return { status: status, endTime: endTime, jornadaType: jornadaType, specialties: specialties, collaboratingOrgs: collaboratingOrgs, participants: participants, minuta: minuta, motivo: motivo, pendientes: pendientes, minutaFiles: minutaFiles, rescheduleHistory: rescheduleHistory, reminders: reminders };
   }
 
-  // Fuentes que tienen su propia lista de contactos, para ofrecerlos en
-  // "Participantes" junto con el roster compartido de Tareas de Equipo.
-  // Coalición vive en una tabla real de Postgres; las demás son un arreglo
-  // JSON en un board_state genérico.
-  const ORG_CONTACTS_BOARD_KEY = {
-    cmdlt: { table: 'ingenia_board_state', key: 'cmdlt-contacts-v1' },
-    ucv: { table: 'ucv_board_state', key: 'ucv-contacts-v1' },
-    florangel: { table: 'florangel_board_state', key: 'florangel-contacts-v1' },
-    networking: { table: 'ingenia_board_state', key: 'ingenia-networking-contacts-v1' }
-  };
+  // Contactos a ofrecer en "Participantes" para una organización — se
+  // derivan de state.contacts (ya cargado por loadAll, con todas las
+  // organizaciones) en vez de volver a pedirle cada una a Supabase por
+  // separado: así nunca falta una organización por un mapeo desactualizado
+  // (pasó con Dra Florangel y Fundación Ingenia), y de paso incluye a los
+  // contactos marcados con esta organización como "también pertenece a"
+  // (ver extraOrgs en el formulario de contacto).
+  function orgContactsFor(source) {
+    return state.contacts.filter(function (c) {
+      return c.source === source || (Array.isArray(c.extraOrgs) && c.extraOrgs.indexOf(source) > -1);
+    }).map(function (c) { return { id: c.rawId, name: c.name }; });
+  }
 
   async function loadOrgContacts(source) {
-    if (state.orgContactsCache[source]) return state.orgContactsCache[source];
-    let contacts = [];
-    try {
-      if (source === 'coalicion') {
-        const res = await state.client.from('coalicion_contacts').select('id,name').is('archived_at', null);
-        contacts = (res.data || []).map(function (c) { return { id: c.id, name: c.name }; });
-      } else if (ORG_CONTACTS_BOARD_KEY[source]) {
-        const cfg = ORG_CONTACTS_BOARD_KEY[source];
-        const res = await state.client.from(cfg.table).select('value').eq('key', cfg.key).maybeSingle();
-        const list = Array.isArray(res.data && res.data.value) ? res.data.value : [];
-        contacts = list.map(function (c) { return { id: c.id, name: c.name }; });
-      }
-    } catch (_err) { contacts = []; }
+    const contacts = orgContactsFor(source);
     state.orgContactsCache[source] = contacts;
     return contacts;
   }
@@ -3045,6 +3052,26 @@
     // este selector pending/contacted no aplica ahí, para no pisarlo.
     dom.contactStatusField.hidden = org === 'ucv';
     dom.contactNetworkingFields.hidden = org !== 'networking';
+    renderContactExtraOrgs();
+  }
+
+  // Un contacto puede "también pertenecer" a otras organizaciones aparte
+  // de la dueña de su registro (org principal, elegida arriba) — así
+  // aparece como participante/responsable disponible en esas otras
+  // organizaciones también, sin duplicar sus datos.
+  function renderContactExtraOrgs() {
+    if (!dom.contactExtraOrgsList) return;
+    const primary = dom.contactOrgSelect.value;
+    const existing = state.editingContact;
+    const current = existing && existing.source === primary ? (existing.extraOrgs || []) : [];
+    renderMarkup(dom.contactExtraOrgsList, CONTACT_ORGS.filter(function (org) { return org !== primary; }).map(function (org) {
+      const checked = current.indexOf(org) > -1 ? ' checked' : '';
+      return '<label class="checkbox-chip"><input type="checkbox" class="contact-extra-org-checkbox" value="' + safe(org) + '"' + checked + '>' + FIXED_SOURCE_EMOJI[org] + ' ' + safe(SOURCE_LABELS[org]) + '</label>';
+    }).join(''));
+  }
+
+  function readContactExtraOrgs() {
+    return Array.from(dom.contactExtraOrgsList.querySelectorAll('.contact-extra-org-checkbox:checked')).map(function (cb) { return cb.value; });
   }
 
   function handleContactSearch(e) {
@@ -3062,10 +3089,20 @@
   // Total de contactos y cuántos tiene cada organización (sin importar el
   // filtro activo). Clic en una organización = filtrar por ella; otro clic
   // o clic en el total = quitar el filtro.
+  // Un contacto "cuenta" para una organización si es la dueña de su
+  // registro, o si lo marcaron como "también pertenece a" esa otra
+  // organización (ver extraOrgs en el formulario de contacto).
+  function contactMatchesOrg(c, org) {
+    return c.source === org || (Array.isArray(c.extraOrgs) && c.extraOrgs.indexOf(org) > -1);
+  }
+
   function renderContactsKpiStrip() {
     if (!dom.contactsKpiStrip) return;
     const counts = {};
-    state.contacts.forEach(function (c) { counts[c.source] = (counts[c.source] || 0) + 1; });
+    state.contacts.forEach(function (c) {
+      counts[c.source] = (counts[c.source] || 0) + 1;
+      (c.extraOrgs || []).forEach(function (org) { counts[org] = (counts[org] || 0) + 1; });
+    });
     const orgs = contactOrgOptions()
       .map(function (o) { return Object.assign({ n: counts[o.id] || 0 }, o); })
       .filter(function (o) { return o.n > 0; })
@@ -3087,7 +3124,7 @@
     const statusFilter = state.contactStatusFilter || null;
     const contacts = state.contacts.filter(function (c) {
       if (statusFilter && (c.status || 'pending') !== statusFilter) return false;
-      return (!orgFilter || c.source === orgFilter) && (!query || normalizeText([c.name, c.role].join(' ')).indexOf(query) > -1);
+      return (!orgFilter || contactMatchesOrg(c, orgFilter)) && (!query || normalizeText([c.name, c.role].join(' ')).indexOf(query) > -1);
     });
     dom.contactResultCount.textContent = contacts.length + ' de ' + state.contacts.length + ' contactos';
     dom.contactSearchClear.hidden = !state.contactQuery;
@@ -3119,7 +3156,7 @@
   function renderContactsKpiCards() {
     if (!dom.contactsKpiCards) return;
     const orgFilter = state.contactOrgFilter || null;
-    const scoped = state.contacts.filter(function (c) { return !orgFilter || c.source === orgFilter; });
+    const scoped = state.contacts.filter(function (c) { return !orgFilter || contactMatchesOrg(c, orgFilter); });
     function count(key) { return scoped.filter(function (c) { return (c.status || 'pending') === key; }).length; }
     const cards = [
       { icon: '👥', value: scoped.length, label: 'Contactos identificados', cls: 'kpi-primary' }
@@ -3139,7 +3176,7 @@
     const query = normalizeText(state.contactQuery);
     const orgFilter = state.contactOrgFilter || null;
     const contacts = state.contacts.filter(function (c) {
-      return (!orgFilter || c.source === orgFilter) && (!query || normalizeText([c.name, c.role].join(' ')).indexOf(query) > -1);
+      return (!orgFilter || contactMatchesOrg(c, orgFilter)) && (!query || normalizeText([c.name, c.role].join(' ')).indexOf(query) > -1);
     });
     renderMarkup(dom.contactsBoard, CONTACT_STATUSES.map(function (status) {
       const items = contacts.filter(function (c) { return (c.status || 'pending') === status.key; });
@@ -3276,6 +3313,7 @@
     }
     onContactOrgChange();
     syncUcvFunctionOther();
+    dom.contactIsResponsable.checked = !!(existing && state.teamMembers.some(function (m) { return m.linkedContactId === existing.id; }));
     dom.contactDialog.showModal();
     dom.contactForm.elements.name.focus();
   }
@@ -3313,7 +3351,8 @@
       ucvStatus: dom.contactUcvStatusInput.value.trim(),
       ucvAction: dom.contactUcvActionInput.value.trim(),
       ucvExtraUnits: Array.prototype.map.call(dom.contactUcvExtraUnits.querySelectorAll('input:checked'), function (i) { return i.value; }),
-      subdivision: dom.contactSubdivisionSelect.value
+      subdivision: dom.contactSubdivisionSelect.value,
+      extraOrgs: readContactExtraOrgs()
     };
     const existing = state.editingContact;
     if (existing && existing.source === 'coalicion' && org !== 'coalicion') {
@@ -3332,9 +3371,22 @@
     }
     submitBtn.disabled = false;
     if (!ok) { showError(dom.contactError, 'No se pudo guardar — revisa tu conexión e intenta de nuevo.'); return; }
+    const wantsResponsable = dom.contactIsResponsable.checked;
     closeContactDialog();
     await loadAll();
     toast('Contacto guardado.', 'success');
+    // Si marcó "Marcar como responsable" y todavía no hay un responsable
+    // vinculado a este contacto, lo crea — mismo mecanismo que el buscador
+    // en el diálogo de Responsables, para no tener que ir a vincularlo
+    // aparte. Si ya estaba vinculado, no hace nada (no lo duplica).
+    if (wantsResponsable) {
+      const savedContact = (existing && org === existing.source)
+        ? findById(state.contacts, existing.id)
+        : state.contacts.find(function (c) { return c.source === org && c.name === fields.name; });
+      if (savedContact && !state.teamMembers.some(function (m) { return m.linkedContactId === savedContact.id; })) {
+        await addResponsableFromContact(savedContact.id);
+      }
+    }
   }
 
   async function saveContact(org, fields, existing) {
@@ -3361,7 +3413,8 @@
       status: fields.ucvStatus !== undefined ? (fields.ucvStatus || 'Por confirmar') : (base.status || 'Por confirmar'),
       action: fields.ucvAction !== undefined ? (fields.ucvAction || 'Por confirmar') : (base.action || 'Por confirmar'),
       function: fields.ucvFunction !== undefined ? fields.ucvFunction : (base.function || ''),
-      extraUnits: (Array.isArray(fields.ucvExtraUnits) ? fields.ucvExtraUnits : (Array.isArray(base.extraUnits) ? base.extraUnits : [])).filter(function (u) { return u !== (fields.unit || base.unit); })
+      extraUnits: (Array.isArray(fields.ucvExtraUnits) ? fields.ucvExtraUnits : (Array.isArray(base.extraUnits) ? base.extraUnits : [])).filter(function (u) { return u !== (fields.unit || base.unit); }),
+      extraOrgs: fields.extraOrgs !== undefined ? fields.extraOrgs : (base.extraOrgs || [])
     });
     const next = existing
       ? current.map(function (c) { return c.id === existing.rawId ? payload : c; })
@@ -3387,7 +3440,8 @@
           action: 'save', entity: 'contact', id: existing ? existing.rawId : null,
           payload: {
             name: fields.name, role: fields.role, phone: fields.phone, email: fields.email,
-            notes: fields.notes, status: fields.status, belongs_to: fields.belongsTo, national_id: fields.nationalId
+            notes: fields.notes, status: fields.status, belongs_to: fields.belongsTo, national_id: fields.nationalId,
+            extra_orgs: fields.extraOrgs || []
           }
         })
       });
@@ -3401,7 +3455,7 @@
       return Object.assign({}, base, {
         id: existing ? existing.rawId : uid(), name: fields.name, role: fields.role,
         phone: fields.phone, email: fields.email, notes: fields.notes, status: fields.status || 'pending',
-        subdivision: fields.subdivision || ''
+        subdivision: fields.subdivision || '', extraOrgs: fields.extraOrgs || []
       });
     });
     return writeBoardKey(table, key, next);

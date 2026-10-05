@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=37">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=38">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=57" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=59" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -322,6 +322,14 @@
         <div class="field field-full" id="contact-notes-field">
           <label for="field-contact-notes">Notas</label>
           <textarea id="field-contact-notes" class="input" name="notes"></textarea>
+        </div>
+        <div class="field field-full">
+          <label>También pertenece a estas organizaciones (opcional)</label>
+          <div id="contact-extra-orgs-list" class="checkbox-list"></div>
+        </div>
+        <div class="field field-full">
+          <label class="checkbox-chip" style="width:fit-content"><input type="checkbox" id="field-contact-is-responsable"> 🔗 Marcar como responsable de su organización</label>
+          <p class="field-hint">Lo agrega (o lo mantiene) en la lista de Responsables, con su teléfono, para poder elegirlo en Tareas y Reuniones.</p>
         </div>
       </div>
       <div class="dialog-actions">
