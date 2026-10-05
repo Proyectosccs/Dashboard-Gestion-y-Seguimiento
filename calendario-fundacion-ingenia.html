@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
   <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=31">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=46" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=47" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -284,6 +284,7 @@
           <select id="field-contact-unit" class="input" name="unit"></select>
           <label for="field-contact-ucv-function" style="margin-top: 8px">Función (qué está desarrollando)</label>
           <select id="field-contact-ucv-function" class="input" name="ucv_function"></select>
+          <input id="field-contact-ucv-function-other" class="input" name="ucv_function_other" type="text" placeholder="Escribe la función" style="margin-top: 6px" hidden>
           <label for="field-contact-ucv-status" style="margin-top: 8px">Estado actual</label>
           <input id="field-contact-ucv-status" class="input" name="ucv_status" type="text" list="ucv-status-options" placeholder="Por confirmar">
           <datalist id="ucv-status-options"></datalist>

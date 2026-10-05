@@ -1027,11 +1027,14 @@
                 <option value="{{ o.id }}">{{ o.label }}</option>
               </sc-for>
             </select>
-            <select value="{{ unitForm.responsibleFunction }}" onChange="{{ onUnitResponsibleFunction }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+            <select value="{{ respFnSel }}" onChange="{{ onRespFnSelect }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
               <sc-for list="{{ personFunctionOptions }}" as="o" hint-placeholder-count="8">
                 <option value="{{ o.id }}">{{ o.label }}</option>
               </sc-for>
             </select>
+            <sc-if value="{{ respFnOther }}" hint-placeholder-val="{{ false }}">
+              <input type="text" placeholder="Escribe la función" value="{{ respFnText }}" onChange="{{ onRespFnText }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+            </sc-if>
           </div>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px">
             <input type="text" placeholder="Cuenta corporativa" value="{{ unitForm.responsibleAccount }}" onChange="{{ onUnitResponsibleAccount }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
@@ -1056,11 +1059,14 @@
                 <option value="{{ o.id }}">{{ o.label }}</option>
               </sc-for>
             </select>
-            <select value="{{ unitForm.supportFunction }}" onChange="{{ onUnitSupportFunction }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+            <select value="{{ suppFnSel }}" onChange="{{ onSuppFnSelect }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
               <sc-for list="{{ personFunctionOptions }}" as="o" hint-placeholder-count="8">
                 <option value="{{ o.id }}">{{ o.label }}</option>
               </sc-for>
             </select>
+            <sc-if value="{{ suppFnOther }}" hint-placeholder-val="{{ false }}">
+              <input type="text" placeholder="Escribe la función" value="{{ suppFnText }}" onChange="{{ onSuppFnText }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+            </sc-if>
           </div>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px">
             <input type="text" placeholder="Cuenta corporativa" value="{{ unitForm.supportAccount }}" onChange="{{ onUnitSupportAccount }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)" />
@@ -1137,9 +1143,12 @@
             </select>
           </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Función (qué está desarrollando)
-            <select value="{{ contactForm.function }}" onChange="{{ onContactFunction }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+            <select value="{{ contactFnSel }}" onChange="{{ onContactFnSelect }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
               <sc-for list="{{ personFunctionOptions }}" as="o" hint-placeholder-count="8"><option value="{{ o.id }}">{{ o.label }}</option></sc-for>
             </select>
+            <sc-if value="{{ contactFnOther }}" hint-placeholder-val="{{ false }}">
+              <input type="text" placeholder="Escribe la función" value="{{ contactFnText }}" onChange="{{ onContactFnText }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
+            </sc-if>
           </label>
           <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Unidad
             <select value="{{ contactForm.unit }}" onChange="{{ onContactUnit }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: #fff; color: var(--color-text)">
@@ -1677,6 +1686,15 @@ const APP_STATUS = {
 
 const PERSON_ROLES = ['Responsable', 'Coordinador', 'Médico', 'Estudiante', 'Voluntario'];
 const PERSON_FUNCTIONS = ['Registro de datos', 'Triaje', 'Coordinación médica', 'Carga de pacientes', 'Seguimiento clínico', 'Logística', 'Inventario', 'Otra'];
+// «Otra» deja escribir la función a mano: el valor guardado es el texto
+// escrito (o «Otra» si no se escribió nada). Un valor que no está en la lista
+// se muestra como «Otra» + su texto.
+const FN_LISTED = PERSON_FUNCTIONS.slice(0, -1);
+const fnIsOther = v => !!v && FN_LISTED.indexOf(v) === -1;
+const fnSelectValue = v => fnIsOther(v) ? 'Otra' : (v || '');
+const fnTextValue = v => (v && v !== 'Otra' && fnIsOther(v)) ? v : '';
+const fnOnSelect = (cur, set) => e => { const v = e.target.value; set(v === 'Otra' ? (fnIsOther(cur) ? cur : 'Otra') : v); };
+const fnOnText = set => e => set(e.target.value.trim() ? e.target.value : 'Otra');
 
 const SPECIALTY_STATUS = {
   active: { label: 'Activo', emoji: '✅', color: '#1f7a3d', soft: '#e6f6f3' },
@@ -2262,6 +2280,7 @@ class Component extends DCLogic {
       email: s.contactForm.email.trim() || 'Por confirmar',
       phone: combinePhone(s.contactForm.phoneCode, s.contactForm.phone) || 'Por confirmar',
       status: s.contactForm.status.trim() || 'Por confirmar',
+      function: (s.contactForm.function || '').trim(),
       action: s.contactForm.action.trim() || 'Por confirmar',
       extraUnits: (Array.isArray(s.contactForm.extraUnits) ? s.contactForm.extraUnits : []).filter(id => id !== s.contactForm.unit)
     });
@@ -3398,6 +3417,10 @@ class Component extends DCLogic {
     }));
     const personRoleOptions = PERSON_ROLES.map(r => ({ id: r, label: r }));
     const personFunctionOptions = [{ id: '', label: 'Función específica…' }].concat(PERSON_FUNCTIONS.map(f => ({ id: f, label: f })));
+    const cf = s.contactForm.function, rf = s.unitForm.responsibleFunction, sf = s.unitForm.supportFunction;
+    const setContactFn = v => this.setState({ contactForm: Object.assign({}, this.state.contactForm, { function: v }) });
+    const setRespFn = v => this.setState({ unitForm: Object.assign({}, this.state.unitForm, { responsibleFunction: v }) });
+    const setSuppFn = v => this.setState({ unitForm: Object.assign({}, this.state.unitForm, { supportFunction: v }) });
 
     return {
       uiText: ui,
@@ -3568,6 +3591,9 @@ class Component extends DCLogic {
       involvementOptions: INVOLVEMENT_OPTIONS,
       onUnitInvolved: e => this.setState({ unitForm: Object.assign({}, s.unitForm, { involved: e.target.value }) }),
       personRoleOptions: personRoleOptions, personFunctionOptions: personFunctionOptions,
+      contactFnSel: fnSelectValue(cf), contactFnOther: fnIsOther(cf), contactFnText: fnTextValue(cf), onContactFnSelect: fnOnSelect(cf, setContactFn), onContactFnText: fnOnText(setContactFn),
+      respFnSel: fnSelectValue(rf), respFnOther: fnIsOther(rf), respFnText: fnTextValue(rf), onRespFnSelect: fnOnSelect(rf, setRespFn), onRespFnText: fnOnText(setRespFn),
+      suppFnSel: fnSelectValue(sf), suppFnOther: fnIsOther(sf), suppFnText: fnTextValue(sf), onSuppFnSelect: fnOnSelect(sf, setSuppFn), onSuppFnText: fnOnText(setSuppFn),
       unitHasAttachment: !!s.unitForm.attachmentName, unitAttachmentName: s.unitForm.attachmentName,
       unitAttachmentData: s.unitForm.attachmentData,
       closeUnitModal: this.closeUnitModal,

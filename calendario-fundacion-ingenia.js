@@ -677,6 +677,8 @@
     dom.contactUcvRoleSelect = document.getElementById('field-contact-ucv-role');
     dom.contactUnitSelect = document.getElementById('field-contact-unit');
     dom.contactUcvFunctionSelect = document.getElementById('field-contact-ucv-function');
+    dom.contactUcvFunctionOther = document.getElementById('field-contact-ucv-function-other');
+    dom.contactUcvFunctionSelect.addEventListener('change', syncUcvFunctionOther);
     dom.contactUcvStatusInput = document.getElementById('field-contact-ucv-status');
     dom.contactUcvActionInput = document.getElementById('field-contact-ucv-action');
     dom.contactUcvExtraUnits = document.getElementById('contact-ucv-extra-units');
@@ -2658,6 +2660,7 @@
     renderMarkup(dom.contactUnitSelect, UCV_UNITS.map(function (u) { return '<option value="' + safe(u.id) + '">' + safe(u.label) + '</option>'; }).join(''));
     renderMarkup(dom.contactUcvFunctionSelect, ['<option value="">— Sin función —</option>'].concat(UCV_FUNCTIONS.map(function (f) { return '<option value="' + safe(f) + '">' + safe(f) + '</option>'; })).join(''));
     renderMarkup(document.getElementById('ucv-status-options'), UCV_STATUS_SUGGESTIONS.map(function (x) { return '<option value="' + safe(x) + '"></option>'; }).join(''));
+    dom.contactUcvFunctionOther.value = '';
     const rawUcv = existing && existing.source === 'ucv' ? (existing.raw || {}) : {};
     const extraNow = Array.isArray(rawUcv.extraUnits) ? rawUcv.extraUnits : [];
     renderMarkup(dom.contactUcvExtraUnits, UCV_UNITS.map(function (u) {
@@ -2682,7 +2685,10 @@
       if (existing.source === 'ucv') {
         dom.contactUcvRoleSelect.value = (existing.raw && existing.raw.role) || UCV_ROLES[0].id;
         dom.contactUnitSelect.value = (existing.raw && existing.raw.unit) || UCV_UNITS[0].id;
-        dom.contactUcvFunctionSelect.value = UCV_FUNCTIONS.indexOf(rawUcv.function) > -1 ? rawUcv.function : '';
+        // Una función que no está en la lista se muestra como «Otra» + su texto.
+        const fnListed = UCV_FUNCTIONS.slice(0, -1).indexOf(rawUcv.function) > -1;
+        dom.contactUcvFunctionSelect.value = fnListed ? rawUcv.function : (rawUcv.function ? 'Otra' : '');
+        dom.contactUcvFunctionOther.value = (rawUcv.function && !fnListed && rawUcv.function !== 'Otra') ? rawUcv.function : '';
         dom.contactUcvStatusInput.value = rawUcv.status && rawUcv.status !== 'Por confirmar' ? rawUcv.status : '';
         dom.contactUcvActionInput.value = rawUcv.action && rawUcv.action !== 'Por confirmar' ? rawUcv.action : '';
       }
@@ -2694,8 +2700,14 @@
       dom.contactUcvRoleSelect.value = UCV_ROLES[UCV_ROLES.length - 1].id;
     }
     onContactOrgChange();
+    syncUcvFunctionOther();
     dom.contactDialog.showModal();
     dom.contactForm.elements.name.focus();
+  }
+
+  // «Otra» abre un campo para escribir la función a mano.
+  function syncUcvFunctionOther() {
+    dom.contactUcvFunctionOther.hidden = dom.contactUcvFunctionSelect.value !== 'Otra';
   }
 
   function closeContactDialog() { dom.contactDialog.close(); state.editingContact = null; }
@@ -2720,7 +2732,9 @@
       nationalId: dom.contactForm.elements.national_id.value.trim(),
       ucvRole: dom.contactForm.elements.ucv_role.value,
       unit: dom.contactForm.elements.unit.value,
-      ucvFunction: dom.contactUcvFunctionSelect.value,
+      ucvFunction: dom.contactUcvFunctionSelect.value === 'Otra'
+        ? (dom.contactUcvFunctionOther.value.trim() || 'Otra')
+        : dom.contactUcvFunctionSelect.value,
       ucvStatus: dom.contactUcvStatusInput.value.trim(),
       ucvAction: dom.contactUcvActionInput.value.trim(),
       ucvExtraUnits: Array.prototype.map.call(dom.contactUcvExtraUnits.querySelectorAll('input:checked'), function (i) { return i.value; }),
