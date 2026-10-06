@@ -3720,13 +3720,16 @@
   // ---------- Organizaciones ----------
 
   function renderOrganizations() {
-    const fixedCards = ORG_DIRECTORY.map(function (key) {
-      return orgCardHtml(FIXED_SOURCE_EMOJI[key], SOURCE_LABELS[key], FIXED_SOURCE_COLOR[key], ORG_LINKS[key]);
+    const fixedEntries = ORG_DIRECTORY.map(function (key) {
+      return { name: SOURCE_LABELS[key], html: orgCardHtml(FIXED_SOURCE_EMOJI[key], SOURCE_LABELS[key], FIXED_SOURCE_COLOR[key], ORG_LINKS[key]) };
     });
-    const customCards = state.customCalendars.map(function (c) {
-      return orgCardHtml('🏷️', c.name, c.color, './organizacion.html?org=' + encodeURIComponent(c.id));
+    const customEntries = state.customCalendars.map(function (c) {
+      return { name: c.name, html: orgCardHtml('🏷️', c.name, c.color, './organizacion.html?org=' + encodeURIComponent(c.id)) };
     });
-    renderMarkup(dom.organizationsGrid, fixedCards.concat(customCards).join(''));
+    const sorted = fixedEntries.concat(customEntries).sort(function (a, b) {
+      return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+    });
+    renderMarkup(dom.organizationsGrid, sorted.map(function (e) { return e.html; }).join(''));
   }
 
   // Las organizaciones con tablero propio en el sitio (UCV/Coalición/
