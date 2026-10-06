@@ -34,7 +34,7 @@
   const EVENT_STATUS = { planned: 'Planificado', confirmed: 'Confirmado', in_progress: 'En Ejecución', completed: 'Completado', cancelled: 'Cancelada' };
   const JORNADA_TYPES = { insumos: 'Insumos', medica: 'Médica' };
   const MEDICAL_SPECIALTIES = [
-    'Medicina General', 'Medicina Interna', 'Pediatría', 'Ginecología y Obstetricia',
+    'Medicina General', 'Medicina Interna', 'Bioanálisis', 'Pediatría', 'Ginecología y Obstetricia',
     'Cardiología', 'Dermatología', 'Oftalmología', 'Otorrinolaringología', 'Psiquiatría',
     'Psicología', 'Nutrición y Dietética', 'Odontología', 'Fisioterapia', 'Endocrinología',
     'Urología', 'Traumatología', 'Gastroenterología', 'Neurología'
@@ -1307,11 +1307,14 @@
       const timeLabel = e.time ? formatTime(e.time) : (e.timeText || 'Hora por confirmar');
       const info = sourceInfo(e.source);
       const cs = sourceClassStyle(e.source);
+      const extra = readEventExtra(e.source, e.raw);
+      const specialties = extra.jornadaType === 'medica' ? extra.specialties : [];
       return '<button type="button" class="agenda-row' + (eventIsCancelled(e) ? ' is-cancelled' : '') + '" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
         sourceDotHtml(e.source) +
         '<div>' +
           '<p class="agenda-row-title">' + safe(e.title) + '</p>' +
           '<p class="agenda-row-meta">◷ ' + safe(timeLabel) + (e.location ? ' · ⌖ ' + safe(e.location) : '') + '</p>' +
+          (specialties.length ? '<p class="agenda-row-meta">🩺 ' + safe(specialties.join(', ')) + '</p>' : '') +
           '<span class="agenda-row-source ' + cs.cls + '" ' + cs.style + '>' + safe(info.label) + '</span>' +
           cancelledBadgeHtml(e) +
         '</div>' +

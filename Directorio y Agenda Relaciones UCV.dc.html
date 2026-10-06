@@ -41,6 +41,12 @@
         <sc-for list="{{ navigationTabs }}" as="t" hint-placeholder-count="5">
           <button onClick="{{ t.open }}" style="{{ t.style }}" style-hover="{{ tabHover }}">{{ t.emoji }} {{ t.label }}</button>
         </sc-for>
+        <sc-if value="{{ hasInstagram }}" hint-placeholder-val="{{ false }}">
+          <a href="{{ uiText.instagramUrl }}" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram" style="font-size: 18px; line-height: 1; margin-left: 4px">📷</a>
+        </sc-if>
+        <sc-if value="{{ hasWebsite }}" hint-placeholder-val="{{ false }}">
+          <a href="{{ uiText.websiteUrl }}" target="_blank" rel="noopener" aria-label="Página web" title="Página web" style="font-size: 18px; line-height: 1">🌐</a>
+        </sc-if>
         <button onClick="{{ openCustomize }}" style="border: 1px solid var(--color-neutral-400); cursor: pointer; border-radius: 999px; padding: 9px 14px; font-size: 13px; font-weight: 700; background: #fff; color: var(--color-neutral-800)" style-hover="{{ chipHover }}">✏️ Modo edición</button>
       </div>
     </header>
@@ -265,6 +271,9 @@
                         <span style="font-size: 10.5px; color: {{ j.color }}; font-weight: 700">{{ j.statusLabel }}</span>
                       </div>
                       <div style="font-size: 12px; color: var(--color-neutral-700); margin-top: 5px">{{ j.timeLabel }} · {{ j.location }}</div>
+                      <sc-if value="{{ j.hasSpecialties }}" hint-placeholder-val="{{ false }}">
+                        <div style="font-size: 12px; color: var(--color-neutral-700); margin-top: 3px">🩺 {{ j.specialtiesLabel }}</div>
+                      </sc-if>
                     </button>
                   </sc-for>
                 </div>
@@ -739,6 +748,12 @@
             <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">Título del calendario
               <input type="text" value="{{ customizeForm.calendarTitle }}" onChange="{{ onCustomCalendarTitle }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: var(--color-neutral-100); color: var(--color-text)" />
             </label>
+            <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">📷 Instagram (enlace)
+              <input type="url" placeholder="https://instagram.com/..." value="{{ customizeForm.instagramUrl }}" onChange="{{ onCustomInstagramUrl }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: var(--color-neutral-100); color: var(--color-text)" />
+            </label>
+            <label style="font-size: 12px; font-weight: 700; display: grid; gap: 5px">🌐 Página web (enlace)
+              <input type="url" placeholder="https://..." value="{{ customizeForm.websiteUrl }}" onChange="{{ onCustomWebsiteUrl }}" style="border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 10px 12px; background: var(--color-neutral-100); color: var(--color-text)" />
+            </label>
           </div>
         </section>
 
@@ -809,6 +824,9 @@
               </div>
               <div style="font-size: 11px; color: var(--color-accent-700); margin-top: 4px; font-weight: 700">{{ j.eventTypeLabel }}</div>
               <div style="font-size: 12px; color: var(--color-neutral-700); margin-top: 5px">{{ j.timeLabel }} · {{ j.location }}</div>
+              <sc-if value="{{ j.hasSpecialties }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size: 12px; color: var(--color-neutral-700); margin-top: 3px">🩺 {{ j.specialtiesLabel }}</div>
+              </sc-if>
               <div style="font-size: 11.5px; margin-top: 6px">Auditoría interna: <strong>{{ j.readiness }}</strong></div>
             </button>
           </sc-for>
@@ -1672,7 +1690,7 @@ const JORNADA_TYPES = [
   { id: 'reunion', label: 'Reunión' }
 ];
 const MEDICAL_SPECIALTIES = [
-  'Medicina General', 'Medicina Interna', 'Pediatría', 'Ginecología y Obstetricia',
+  'Medicina General', 'Medicina Interna', 'Bioanálisis', 'Pediatría', 'Ginecología y Obstetricia',
   'Cardiología', 'Dermatología', 'Oftalmología', 'Otorrinolaringología', 'Psiquiatría',
   'Psicología', 'Nutrición y Dietética', 'Odontología', 'Fisioterapia', 'Endocrinología',
   'Urología', 'Traumatología', 'Gastroenterología', 'Neurología'
@@ -1732,6 +1750,7 @@ const DEFAULT_UI = {
   boardIntro: 'De contactos dispersos a una agenda semanal accionable.',
   questionsTitle: 'Checklist de auditoría interna por evento',
   calendarTitle: 'Calendario de eventos',
+  instagramUrl: '', websiteUrl: '',
   bubbleSize: 'normal', titleSize: '40', showAppStatus: true,
   tabOrder: ['board', 'calendar', 'hierarchy', 'list', 'timeline', 'volunteers'],
   boardOrder: ['intro', 'kanban']
@@ -2726,6 +2745,7 @@ class Component extends DCLogic {
       const dateLabel = dates.length > 1
         ? fmt(dates[0]) + ' (+' + (dates.length - 1) + (dates.length - 1 === 1 ? ' fecha más)' : ' fechas más)')
         : fmt(dates[0]);
+      const cardSpecialties = j.jornadaType === 'medica' && Array.isArray(j.specialties) ? j.specialties : [];
       return Object.assign({}, j, {
         title: j.title || 'Evento por confirmar',
         eventTypeLabel: type.label,
@@ -2737,7 +2757,9 @@ class Component extends DCLogic {
         soft: meta.soft,
         readiness: readinessCount(j) + '/' + JOURNEY_QUESTIONS.length,
         cardStyle: { textAlign: 'left', minWidth: bubble.minCard, flex: '1 0 ' + bubble.minCard + 'px', border: '1px solid var(--color-neutral-200)', borderLeft: '5px solid ' + meta.color, borderRadius: bubble.radius, background: 'var(--color-neutral-100)', padding: bubble.padding + 'px', cursor: 'pointer' },
-        edit: () => this.openJourney(j.id)
+        edit: () => this.openJourney(j.id),
+        hasSpecialties: cardSpecialties.length > 0,
+        specialtiesLabel: cardSpecialties.join(', ')
       });
     };
     const sortedJourneys = s.journeys.slice().sort((a, b) => (primaryDate(a) + (a.time || '')).localeCompare(primaryDate(b) + (b.time || '')));
@@ -3425,6 +3447,7 @@ class Component extends DCLogic {
     return {
       uiText: ui,
       pageTitleStyle: { fontFamily: 'var(--font-heading)', fontWeight: 400, fontSize: Number(ui.titleSize || 40), lineHeight: 1.05, margin: '8px 0 6px' },
+      hasInstagram: !!ui.instagramUrl, hasWebsite: !!ui.websiteUrl,
       navigationTabs: navigationTabs, boardSectionStyles: boardSectionStyles,
       kpis: kpis, medCards: medCards, otherCards: otherCards, adminUnits: adminUnits, unplacedUnit: unplacedUnit, listContacts: listContacts, timeline: timeline,
       boardColumns: boardColumns,
@@ -3522,6 +3545,8 @@ class Component extends DCLogic {
       onCustomBoardIntro: e => this.setState({ customizeForm: Object.assign({}, draftUI, { boardIntro: e.target.value }) }),
       onCustomQuestionsTitle: e => this.setState({ customizeForm: Object.assign({}, draftUI, { questionsTitle: e.target.value }) }),
       onCustomCalendarTitle: e => this.setState({ customizeForm: Object.assign({}, draftUI, { calendarTitle: e.target.value }) }),
+      onCustomInstagramUrl: e => this.setState({ customizeForm: Object.assign({}, draftUI, { instagramUrl: e.target.value }) }),
+      onCustomWebsiteUrl: e => this.setState({ customizeForm: Object.assign({}, draftUI, { websiteUrl: e.target.value }) }),
       onCustomBubbleSize: e => this.setState({ customizeForm: Object.assign({}, draftUI, { bubbleSize: e.target.value }) }),
       onCustomTitleSize: e => this.setState({ customizeForm: Object.assign({}, draftUI, { titleSize: e.target.value }) }),
       setViewBoard: () => this.setState({ view: 'board' }),
