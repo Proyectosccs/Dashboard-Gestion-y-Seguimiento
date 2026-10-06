@@ -384,7 +384,7 @@
   const PARTICIPATES_INGENIA_OPTIONS = { no: 'No', si: 'Sí' };
   const JORNADA_TYPE_OPTIONS = { '': 'Sin especificar', insumos: 'Insumos', medica: 'Médica', reunion: 'Reunión' };
   const MEDICAL_SPECIALTIES = [
-    'Medicina General', 'Medicina Interna', 'Pediatría', 'Ginecología y Obstetricia',
+    'Medicina General', 'Medicina Interna', 'Bioanálisis', 'Pediatría', 'Ginecología y Obstetricia',
     'Cardiología', 'Dermatología', 'Oftalmología', 'Otorrinolaringología', 'Psiquiatría',
     'Psicología', 'Nutrición y Dietética', 'Odontología', 'Fisioterapia', 'Endocrinología',
     'Urología', 'Traumatología', 'Gastroenterología', 'Neurología'
@@ -1081,10 +1081,12 @@
         '<h4 class="calendar-agenda-group-label">' + safe(formatDate(g.date)) + '</h4>' +
         '<div class="agenda-list">' + g.items.map(function (e) {
           const timeLabel = e.start_time ? formatTime(e.start_time) : 'Hora por confirmar';
+          const specialties = e.jornada_type === 'medica' && Array.isArray(e.specialties) ? e.specialties : [];
           return '<button type="button" class="agenda-row' + (eventIsCancelled(e) ? ' is-cancelled' : '') + '" data-action="edit-event" data-id="' + safe(e.id) + '" style="width:100%;text-align:left;font:inherit;cursor:pointer">' +
             '<div>' +
               '<p class="agenda-row-title">' + safe(e.title) + '</p>' +
               '<p class="agenda-row-meta">◷ ' + safe(timeLabel) + (e.location ? ' · ⌖ ' + safe(e.location) : '') + '</p>' +
+              (specialties.length ? '<p class="agenda-row-meta">🩺 ' + safe(specialties.join(', ')) + '</p>' : '') +
               cancelledBadgeHtml(e) +
             '</div>' +
           '</button>';
