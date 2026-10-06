@@ -1356,12 +1356,17 @@
     '</button>';
   }
 
-  // Un área es "contenedora" si tiene sus propios hijos — esas se dibujan
-  // como cajas conectadas (se ramifican). Un área sin hijos es un contacto
-  // suelto — se lista como fila compacta dentro de la caja de su área
-  // superior, en vez de ser una caja aparte.
+  // Un área es "contenedora" si tiene sus propios hijos (se dibuja como
+  // caja conectada, se ramifica) — o si todavía no tiene a nadie asignado
+  // (sin nombre ni teléfono de responsable): recién creada, una
+  // "Gerencia" o área estructural así se ve como lo que es (una caja a la
+  // que luego se le agregan contactos) en vez de confundirse con un
+  // contacto suelto. Un área sin hijos pero CON un responsable puesto
+  // (nombre o teléfono) sigue siendo un contacto suelto — se lista como
+  // fila compacta dentro de la caja de su área superior.
   function isContainerArea(area) {
-    return state.hierarchy.some(function (a) { return a.parentId === area.id; });
+    if (state.hierarchy.some(function (a) { return a.parentId === area.id; })) return true;
+    return !area.responsibleName && !area.responsiblePhone;
   }
 
   function hierarchyNodeHtml(area, skipChildren) {
