@@ -67,7 +67,8 @@
     { code: '+54', label: '🇦🇷 +54 Argentina' },
     { code: '+56', label: '🇨🇱 +56 Chile' },
     { code: '+593', label: '🇪🇨 +593 Ecuador' },
-    { code: '+507', label: '🇵🇦 +507 Panamá' }
+    { code: '+507', label: '🇵🇦 +507 Panamá' },
+    { code: '+599', label: '🇨🇼 +599 Curazao' }
   ];
   const DEFAULT_PHONE_CODE = PHONE_COUNTRIES[0].code;
 
