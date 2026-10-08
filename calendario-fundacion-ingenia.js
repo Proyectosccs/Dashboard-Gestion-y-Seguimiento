@@ -943,7 +943,13 @@
       return { id: 'cmdlt-' + e.id, rawId: e.id, source: 'cmdlt', title: e.title, date: e.event_date, time: e.start_time, location: e.location, notes: e.notes || '', raw: e };
     });
 
-    state.events = coalicionEvents.concat(florangelEvents, ucvEvents, networkingEvents, otrosEvents, cmdltEvents, customEvents).filter(function (e) { return !!e.date; });
+    // No se descartan los eventos sin fecha: una reunión "Pendiente por
+    // planificar" puede no tener fecha todavía y aun así debe verse en el
+    // tablero de Reuniones. Las vistas de calendario (mes/semana/año/agenda)
+    // ya comparan contra una fecha exacta o un rango, así que un e.date=''
+    // simplemente no calza en ningún día — no hacía falta este filtro para
+    // que el calendario quedara limpio.
+    state.events = coalicionEvents.concat(florangelEvents, ucvEvents, networkingEvents, otrosEvents, cmdltEvents, customEvents);
 
     const coalicionContacts = (coalicionContactsRes.data || []).map(function (c) {
       return { id: 'coalicion-' + c.id, rawId: c.id, source: 'coalicion', name: c.name, role: c.role, phone: c.phone, email: c.email, notes: c.notes, status: c.status || 'pending', extraOrgs: coalicionContactsExtraOrgs[c.id] || [], raw: c };
@@ -2234,7 +2240,9 @@
     const pendientes = jornadaType === 'reunion' ? readPendientes() : [];
     const reminders = jornadaType === 'reunion' ? state.remindersDraft : [];
     const minutaFiles = jornadaType === 'reunion' ? state.minutaFilesDraft : [];
-    if (!title || !eventDate) { showError(dom.eventError, 'Nombre del evento y fecha son obligatorios.'); return; }
+    // "Pendiente por planificar" es justamente para una reunión que todavía
+    // no tiene fecha/hora definida — no se le exige fecha como al resto.
+    if (!title || (!eventDate && status !== 'pending_schedule')) { showError(dom.eventError, 'Nombre del evento y fecha son obligatorios.'); return; }
     if (state.minutaFileUploading) { showError(dom.eventError, 'Espera a que termine de subirse el archivo.'); return; }
     if (source === 'coalicion' && !location) { showError(dom.eventError, 'Coalición con Amor a Venezuela necesita una ubicación.'); return; }
 
@@ -2724,7 +2732,7 @@
       '<button type="button" class="reunion-card-body" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)">' +
         '<div class="reunion-card-head">' +
           '<span class="agenda-row-source ' + cs.cls + '" ' + cs.style + '>' + safe(info.label) + '</span>' +
-          '<span class="reunion-card-date">' + safe(formatDate(e.date)) + '</span>' +
+          '<span class="reunion-card-date">' + safe(e.date ? formatDate(e.date) : 'Sin fecha') + '</span>' +
           cancelledBadgeHtml(e) +
         '</div>' +
         '<p class="reunion-card-title' + (eventIsCancelled(e) ? ' is-cancelled' : '') + '">' + safe(e.title) + '</p>' +
@@ -2927,8 +2935,9 @@
     return '<article class="kanban-card" draggable="true" data-id="' + safe(e.id) + '" style="--status-color:' + safe(STATUS_COLOR[extra.status] || '#82796a') + '">' +
       '<button type="button" style="all:unset;cursor:pointer;display:block;width:100%" data-event-id="' + safe(e.id) + '" onclick="window.ingeniaAction(event)">' +
         '<p class="kanban-card-title">' + safe(e.title) + '</p>' +
-        '<p style="font-size:12px;color:var(--color-neutral-600);margin:4px 0">' + safe(info.label) + ' · ' + safe(formatDate(e.date)) + '</p>' +
+        '<p style="font-size:12px;color:var(--color-neutral-600);margin:4px 0">' + safe(info.label) + ' · ' + safe(e.date ? formatDate(e.date) : 'Sin fecha') + '</p>' +
         (extra.motivo ? '<p style="font-size:12px;color:var(--color-neutral-700);margin:0 0 6px">' + safe(extra.motivo) + '</p>' : '') +
+        (extra.rescheduleHistory.length ? '<p class="reunion-card-reagendada">🔁 Reagendada — cancelada antes el ' + safe(formatDate(extra.rescheduleHistory[extra.rescheduleHistory.length - 1].date)) + '</p>' : '') +
       '</button>' +
       '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' +
     '</article>';
@@ -3836,8 +3845,11 @@
         const dates = Array.isArray(j.dates) ? j.dates.slice() : [];
         const idx = dates.indexOf(existing.date);
         if (idx > -1) dates[idx] = fields.event_date; else dates.push(fields.event_date);
+        // "Pendiente por planificar" permite guardar sin fecha — no se deja
+        // una fecha vacía colada en el arreglo de fechas de la jornada.
+        const cleanDates = dates.filter(function (d) { return d; });
         return Object.assign({}, j, {
-          title: fields.title, dates: dates, time: fields.start_time || '', endTime: fields.end_time,
+          title: fields.title, dates: cleanDates, time: fields.start_time || '', endTime: fields.end_time,
           location: fields.location, status: sharedStatus,
           notes: fields.notes, participatesIngenia: fields.participatesIngenia, jornadaType: fields.jornadaType,
           specialties: fields.specialties, collaboratingOrgs: fields.collaboratingOrgs, participants: fields.participants,
@@ -3848,7 +3860,7 @@
       return writeBoardKey('ucv_board_state', 'ucv-journeys-v3', next);
     }
     const next = current.concat({
-      id: uid(), title: fields.title, dates: [fields.event_date], time: fields.start_time || '',
+      id: uid(), title: fields.title, dates: fields.event_date ? [fields.event_date] : [], time: fields.start_time || '',
       endTime: fields.end_time, location: fields.location, status: sharedStatus,
       eventType: 'other',
       owner: '', doctors: '', students: '', assignedVolunteers: fields.ucvAssigned || [], checks: fields.ucvChecks || {}, notes: fields.notes,
