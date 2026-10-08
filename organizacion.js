@@ -1438,6 +1438,13 @@
   // nivel superior existan realmente en los datos — esas pasan a ser sus
   // ramas, apiladas en filas separadas si hay más de una (ver nota de
   // renderRootSection original sobre "Área Internacional"/"En Venezuela").
+  // INABIO cuelga del Vicerrectorado Académico UCV: ese nombre va arriba del
+  // todo en su árbol, con "INABIO" como área real debajo (no como el
+  // sinónimo automático de arriba) — una excepción puntual a "el nombre de
+  // la organización siempre va arriba", sin renombrar la organización en el
+  // resto del tablero (pestañas, tarjeta del directorio, etc.).
+  const HIERARCHY_ROOT_OVERRIDES = { 'inabio-ugaw': 'Vicerrectorado Académico UCV' };
+
   function renderOrgRootSection(orgName, roots) {
     const pill = '<div class="hierarchy-node-card hierarchy-node-pill"><div class="hierarchy-node-head"><span class="hierarchy-node-name">' + safe(orgName) + '</span></div></div>';
     if (roots.length <= 1) {
@@ -1457,7 +1464,7 @@
       return;
     }
     const roots = state.hierarchy.filter(function (a) { return !a.parentId || !findById(state.hierarchy, a.parentId); });
-    renderMarkup(dom.hierarchyTree, renderOrgRootSection(state.org.name, roots));
+    renderMarkup(dom.hierarchyTree, renderOrgRootSection(HIERARCHY_ROOT_OVERRIDES[state.org.id] || state.org.name, roots));
   }
 
   function openContactDetail(c) {
