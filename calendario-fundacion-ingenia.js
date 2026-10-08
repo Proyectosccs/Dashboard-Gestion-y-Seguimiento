@@ -31,7 +31,7 @@
 
   // Campos compartidos del formulario de eventos, iguales en todos los
   // calendarios (Networking, Organización, Dra Florangel, CMDLT, Coalición).
-  const EVENT_STATUS = { pending_schedule: 'Pendiente por planificar', planned: 'Planificado', confirmed: 'Confirmado', in_progress: 'En Ejecución', completed: 'Completado', cancelled: 'Cancelada' };
+  const EVENT_STATUS = { pending_schedule: 'Pendiente por planificar', planned: 'Planificado', in_progress: 'En Ejecución', completed: 'Completado', cancelled: 'Cancelada' };
   const JORNADA_TYPES = { insumos: 'Insumos', medica: 'Médica' };
   const MEDICAL_SPECIALTIES = [
     'Medicina General', 'Medicina Interna', 'Bioanálisis', 'Pediatría', 'Ginecología y Obstetricia',
@@ -2922,7 +2922,7 @@
     });
   }
 
-  const STATUS_COLOR = { pending_schedule: '#b45309', planned: '#82796a', confirmed: '#2563eb', in_progress: '#0f766e', completed: '#0f7a3d', cancelled: '#a02525' };
+  const STATUS_COLOR = { pending_schedule: '#b45309', planned: '#82796a', in_progress: '#0f766e', completed: '#0f7a3d', cancelled: '#a02525' };
 
   function renderReunionBoardCard(e) {
     const extra = readEventExtra(e.source, e.raw);
