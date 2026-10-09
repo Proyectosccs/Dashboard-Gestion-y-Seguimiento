@@ -649,6 +649,7 @@
     dom.responsableChecklist = document.getElementById('responsable-checklist');
     dom.newResponsableField = document.getElementById('new-responsable-field');
     dom.taskDueDate = document.getElementById('field-task-due-date');
+    dom.taskMeetingDate = document.getElementById('field-task-meeting-date');
     dom.taskStatusSelect = document.getElementById('field-task-status');
     dom.taskFollowupField = document.getElementById('task-followup-field');
     dom.taskFollowupSelect = document.getElementById('field-task-followup');
@@ -3701,6 +3702,18 @@
 
   function taskDetailText(task) { return task.detail != null ? task.detail : (task.notes || ''); }
 
+  // Fecha de la reunión de una tarea. Las tareas nuevas la guardan en
+  // meetingDate; si no la tienen (creadas antes de ese campo), se toma del
+  // final de meetingKey ("reunion|título|fecha").
+  function taskMeetingDate(task) {
+    if (task.meetingDate) return task.meetingDate;
+    if (task.meetingKey) {
+      const parts = String(task.meetingKey).split('|');
+      return parts[parts.length - 1] || '';
+    }
+    return '';
+  }
+
   function taskFollowupLabel(task) {
     if (task.status !== 'en_proceso' || !task.followupStatus) return '';
     const f = FOLLOWUP_STATUSES.find(function (x) { return x.key === task.followupStatus; });
@@ -3724,7 +3737,7 @@
         '<button type="button" style="all:unset;cursor:pointer" data-task-id="' + safe(task.id) + '" onclick="window.ingeniaAction(event)">' +
           '<span class="org-tag" style="--source-color:' + safe(info.color) + '">' + safe(info.label) + '</span>' +
           '<p class="kanban-card-title">' + safe(task.title) + '</p>' +
-          (task.meetingDate ? '<span class="responsable-tag">📅 ' + safe(formatDate(task.meetingDate)) + '</span>' : '') +
+          (taskMeetingDate(task) ? '<span class="responsable-tag">📅 ' + safe(formatDate(taskMeetingDate(task))) + '</span>' : '') +
           (responsable ? '<span class="responsable-tag">👤 ' + safe(responsable) + '</span>' : '') +
           '<span class="responsable-tag">● ' + safe(status.label) + '</span>' +
         '</button>' +
@@ -3768,6 +3781,7 @@
     dom.taskForm.elements.title.value = existing ? (existing.title || '') : '';
     populateResponsableChecklist(existing ? existing.responsable : []);
     dom.taskDueDate.value = existing ? (existing.dueDate || '') : '';
+    dom.taskMeetingDate.value = existing ? taskMeetingDate(existing) : '';
     dom.taskDetail.value = existing ? taskDetailText(existing) : '';
     dom.taskNextAction.value = existing ? (existing.nextAction || '') : '';
     dom.taskPrioritySelect.value = existing ? (existing.priority || 'media') : 'media';
@@ -3811,11 +3825,11 @@
       priority: dom.taskPrioritySelect.value,
       responsable: responsableIds,
       dueDate: dom.taskDueDate.value,
+      meetingDate: dom.taskMeetingDate.value,
       nextAction: dom.taskNextAction.value.trim(),
       created_at: state.editingTask ? state.editingTask.created_at : new Date().toISOString(),
       checklist: current ? current.checklist : undefined,
-      meetingKey: current ? current.meetingKey : undefined,
-      meetingDate: current ? current.meetingDate : undefined
+      meetingKey: current ? current.meetingKey : undefined
     };
     const freshTasks = await readBoardKey('ingenia_board_state', TEAM_TASKS_KEY, []);
     const next = state.editingTask
