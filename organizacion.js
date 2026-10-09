@@ -1443,7 +1443,8 @@
   }
 
   // Bajo un área, sus hijos contenedores se dibujan así:
-  // - Organizaciones apiladas (INABIO) y área ya profunda (nivel 3 o más):
+  // - Organizaciones apiladas (INABIO) y área ya profunda (nivel 2 o más, contando
+  //   desde la organización como nivel 0; las áreas bajo Dirección son nivel 2):
   //   todos sus hijos van en una columna, uno debajo del otro.
   // - Organizaciones apiladas en niveles altos (ej. las áreas bajo Dirección):
   //   las áreas sin subáreas se agrupan en una sola columna, y las que sí
@@ -1455,7 +1456,7 @@
     if (!stacked) {
       return '<ul>' + children.map(function (a) { return hierarchyNodeHtml(a, false, childLevel); }).join('') + '</ul>';
     }
-    if (level >= 3) {
+    if (level >= 2) {
       return '<ul class="org-stack">' + children.map(function (a) { return hierarchyNodeHtml(a, false, childLevel); }).join('') + '</ul>';
     }
     const leaves = children.filter(function (a) { return !hasHierarchyChildren(a); });
