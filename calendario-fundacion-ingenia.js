@@ -2323,6 +2323,8 @@
   // y el diálogo, igual que toggleTaskChecklistItem.
   async function saveTaskChecklistChange(taskId, apply, errorMessage) {
     const previousTasks = state.tasks;
+    const scrollers = [document.getElementById('task-dialog'), document.getElementById('task-form')].filter(Boolean);
+    const scrollTops = scrollers.map(function (el) { return el.scrollTop; });
     state.tasks = state.tasks.map(apply);
     refreshTaskBoards();
     const fresh = (await readBoardKey('ingenia_board_state', TEAM_TASKS_KEY, [])).map(apply);
@@ -2335,7 +2337,10 @@
     }
     refreshTaskBoards();
     renderReunionesBoard();
-    if (state.editingTask && state.editingTask.id === taskId) renderTaskChecklistBox(findById(state.tasks, taskId));
+    if (state.editingTask && state.editingTask.id === taskId) {
+      renderTaskChecklistBox(findById(state.tasks, taskId));
+      scrollers.forEach(function (el, i) { el.scrollTop = scrollTops[i]; });
+    }
   }
 
   // Marca o desmarca un ítem del checklist de una tarea de reunión. Igual que
@@ -2356,10 +2361,25 @@
     } else {
       state.tasks = previousTasks;
       toast('No se pudo guardar el check — revisa tu conexión.', 'error');
+      if (state.editingTask && state.editingTask.id === taskId) renderTaskChecklistBox(findById(state.tasks, taskId));
     }
     refreshTaskBoards();
     renderReunionesBoard();
-    if (state.editingTask && state.editingTask.id === taskId) renderTaskChecklistBox(findById(state.tasks, taskId));
+    if (ok && state.editingTask && state.editingTask.id === taskId) updateTaskChecklistDone(taskId, itemId, done);
+  }
+
+  // Actualiza solo el ítem marcado y el contador del diálogo, sin volver a
+  // dibujar el checklist: volver a dibujarlo hace que el diálogo salte al inicio.
+  function updateTaskChecklistDone(taskId, itemId, done) {
+    const box = document.getElementById('task-checklist-box');
+    if (!box) return;
+    const task = findById(state.tasks, taskId);
+    const checklist = task && Array.isArray(task.checklist) ? task.checklist : [];
+    const cb = box.querySelector('input[data-item-id="' + itemId + '"]');
+    const span = cb && cb.parentElement ? cb.parentElement.querySelector('span') : null;
+    if (span) span.className = done ? 'task-checklist-done' : '';
+    const progress = box.querySelector('.task-checklist-progress');
+    if (progress) progress.textContent = '☑ ' + checklist.filter(function (it) { return it.done; }).length + '/' + checklist.length;
   }
 
   async function onEventSubmit(e) {
