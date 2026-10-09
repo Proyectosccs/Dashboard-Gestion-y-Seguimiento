@@ -383,6 +383,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .task-checklist-item input { margin-top: 2px; flex-shrink: 0; }
 .task-checklist-done { text-decoration: line-through; color: var(--color-neutral-500); }
 #task-checklist-field[hidden] { display: none; }
+.task-checklist-row { display: flex; align-items: center; gap: 6px; }
+.task-checklist-row .task-checklist-item { flex: 1; min-width: 0; }
+.task-checklist-add { display: flex; gap: 6px; margin-top: 8px; }
+.task-checklist-add .input { flex: 1; min-width: 0; }
 .pendiente-create-task, .pendiente-remove { border: 1px solid var(--color-neutral-300); background: #fff; border-radius: 999px; padding: 6px 10px; font-size: 11.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .pendiente-remove { padding: 6px 9px; }
 .reminders-list { display: flex; flex-direction: column; gap: 8px; }

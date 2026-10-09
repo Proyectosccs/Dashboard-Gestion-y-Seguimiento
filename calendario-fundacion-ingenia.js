@@ -480,6 +480,12 @@
     if (target.dataset.action === 'toggle-task-checklist') {
       toggleTaskChecklistItem(target.dataset.taskId, target.dataset.itemId, target.checked);
     }
+    if (target.dataset.action === 'task-checklist-add') {
+      addTaskChecklistItem(target.dataset.taskId);
+    }
+    if (target.dataset.action === 'task-checklist-remove') {
+      removeTaskChecklistItem(target.dataset.taskId, target.dataset.itemId);
+    }
     if (target.dataset.action === 'delete-responsable-only') {
       deleteResponsableOnly(target.dataset.id);
     }
@@ -1935,7 +1941,7 @@
         item.done = cb.checked;
         // Si el pendiente está en una tarea, el check va al ítem de esa tarea
         // (y el tablero se actualiza), así queda igual en los dos lados.
-        if (item.taskItemId) toggleTaskChecklistItem(item.taskId, item.taskItemId, cb.checked);
+        if (item.taskItemId && taskItemDone(item) !== null) toggleTaskChecklistItem(item.taskId, item.taskItemId, cb.checked);
       });
     });
     dom.eventPendientesList.querySelectorAll('.pendiente-create-task').forEach(function (btn) {
@@ -2262,22 +2268,74 @@
   }
 
   // Checklist de una tarea de reunión dentro del diálogo de la tarea (al abrir
-  // la tarjeta). Marcar un ítem aquí usa la misma acción que los demás lados.
+  // la tarjeta). Se puede marcar, agregar y quitar ítems; cada cambio se guarda
+  // al instante, igual que marcar desde el Kanban o desde la reunión.
   function renderTaskChecklistBox(task) {
     const field = document.getElementById('task-checklist-field');
     const box = document.getElementById('task-checklist-box');
     if (!field || !box) return;
-    const checklist = task && Array.isArray(task.checklist) ? task.checklist : [];
-    field.hidden = !checklist.length;
-    if (!checklist.length) { renderMarkup(box, ''); return; }
+    const isMeetingTask = !!(task && task.meetingKey);
+    field.hidden = !isMeetingTask;
+    if (!isMeetingTask) { renderMarkup(box, ''); return; }
+    const checklist = Array.isArray(task.checklist) ? task.checklist : [];
     const done = checklist.filter(function (it) { return it.done; }).length;
-    renderMarkup(box, '<p class="task-checklist-progress">☑ ' + done + '/' + checklist.length + '</p>' +
-      checklist.map(function (it) {
-        return '<label class="task-checklist-item">' +
+    const items = checklist.map(function (it) {
+      return '<div class="task-checklist-row">' +
+        '<label class="task-checklist-item">' +
           '<input type="checkbox" data-action="toggle-task-checklist" data-task-id="' + safe(task.id) + '" data-item-id="' + safe(it.id) + '"' + (it.done ? ' checked' : '') + ' onchange="window.ingeniaAction(event)">' +
           '<span' + (it.done ? ' class="task-checklist-done"' : '') + '>' + safe(it.text) + '</span>' +
-        '</label>';
-      }).join(''));
+        '</label>' +
+        '<button type="button" class="pendiente-remove" data-action="task-checklist-remove" data-task-id="' + safe(task.id) + '" data-item-id="' + safe(it.id) + '" onclick="window.ingeniaAction(event)" aria-label="Quitar ítem">🗑️</button>' +
+      '</div>';
+    }).join('');
+    renderMarkup(box,
+      (checklist.length ? '<p class="task-checklist-progress">☑ ' + done + '/' + checklist.length + '</p>' + items : '<p class="task-checklist-progress">Sin ítems todavía.</p>') +
+      '<div class="task-checklist-add">' +
+        '<input id="task-checklist-new-item" class="input" type="text" placeholder="Nuevo ítem…" data-action="task-checklist-add" data-task-id="' + safe(task.id) + '" onkeydown="if(event.key===\'Enter\'){event.preventDefault();window.ingeniaAction(event);}">' +
+        '<button type="button" class="btn btn-secondary" data-action="task-checklist-add" data-task-id="' + safe(task.id) + '" onclick="window.ingeniaAction(event)">+ Ítem</button>' +
+      '</div>');
+  }
+
+  // Agrega un ítem al checklist de una tarea de reunión desde el diálogo.
+  async function addTaskChecklistItem(taskId) {
+    const input = document.getElementById('task-checklist-new-item');
+    const text = input ? input.value.trim() : '';
+    if (!text) { toast('Escribe el ítem antes de agregarlo.', 'error'); return; }
+    const newItem = { id: uid(), text: text, done: false };
+    const apply = function (t) {
+      return t.id === taskId ? Object.assign({}, t, { checklist: (t.checklist || []).concat([newItem]) }) : t;
+    };
+    await saveTaskChecklistChange(taskId, apply, 'No se pudo agregar el ítem — revisa tu conexión.');
+    if (input) input.value = '';
+  }
+
+  // Quita un ítem del checklist de una tarea de reunión. Si una pendiente de
+  // la reunión estaba enlazada a ese ítem, deja de estar enlazada y vuelve a
+  // usar su propio check.
+  async function removeTaskChecklistItem(taskId, itemId) {
+    const apply = function (t) {
+      return t.id === taskId ? Object.assign({}, t, { checklist: (t.checklist || []).filter(function (it) { return it.id !== itemId; }) }) : t;
+    };
+    await saveTaskChecklistChange(taskId, apply, 'No se pudo quitar el ítem — revisa tu conexión.');
+  }
+
+  // Guarda un cambio del checklist (agregar o quitar) y refresca los tableros
+  // y el diálogo, igual que toggleTaskChecklistItem.
+  async function saveTaskChecklistChange(taskId, apply, errorMessage) {
+    const previousTasks = state.tasks;
+    state.tasks = state.tasks.map(apply);
+    refreshTaskBoards();
+    const fresh = (await readBoardKey('ingenia_board_state', TEAM_TASKS_KEY, [])).map(apply);
+    const ok = await writeBoardKey('ingenia_board_state', TEAM_TASKS_KEY, fresh);
+    if (ok) {
+      state.tasks = fresh.map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); });
+    } else {
+      state.tasks = previousTasks;
+      toast(errorMessage, 'error');
+    }
+    refreshTaskBoards();
+    renderReunionesBoard();
+    if (state.editingTask && state.editingTask.id === taskId) renderTaskChecklistBox(findById(state.tasks, taskId));
   }
 
   // Marca o desmarca un ítem del checklist de una tarea de reunión. Igual que
