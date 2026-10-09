@@ -2241,8 +2241,9 @@
       taskId = uid();
       next = freshTasks.concat([{
         id: taskId, org: source, title: meetingTitle,
-        // La fecha va en el detalle: dos reuniones distintas pueden llamarse igual.
-        detail: 'Reunión del ' + formatDate(eventDate),
+        // Fecha de la reunión (no la límite de la tarea): dos reuniones pueden
+        // llamarse igual, y esta fecha es la que las distingue en el Kanban.
+        detail: '', meetingDate: eventDate,
         status: 'pendiente', followupStatus: '', priority: 'media', responsable: [],
         dueDate: '', nextAction: '', created_at: new Date().toISOString(),
         meetingKey: meetingKey, checklist: [checklistItem]
@@ -2257,6 +2258,25 @@
     renderPendientesList();
     refreshTaskBoards();
     toast(existing ? 'Pendiente agregado a la tarea de la reunión.' : 'Tarea de la reunión creada.', 'success');
+  }
+
+  // Checklist de una tarea de reunión dentro del diálogo de la tarea (al abrir
+  // la tarjeta). Marcar un ítem aquí usa la misma acción que los demás lados.
+  function renderTaskChecklistBox(task) {
+    const field = document.getElementById('task-checklist-field');
+    const box = document.getElementById('task-checklist-box');
+    if (!field || !box) return;
+    const checklist = task && Array.isArray(task.checklist) ? task.checklist : [];
+    field.hidden = !checklist.length;
+    if (!checklist.length) { renderMarkup(box, ''); return; }
+    const done = checklist.filter(function (it) { return it.done; }).length;
+    renderMarkup(box, '<p class="task-checklist-progress">☑ ' + done + '/' + checklist.length + '</p>' +
+      checklist.map(function (it) {
+        return '<label class="task-checklist-item">' +
+          '<input type="checkbox" data-action="toggle-task-checklist" data-task-id="' + safe(task.id) + '" data-item-id="' + safe(it.id) + '"' + (it.done ? ' checked' : '') + ' onchange="window.ingeniaAction(event)">' +
+          '<span' + (it.done ? ' class="task-checklist-done"' : '') + '>' + safe(it.text) + '</span>' +
+        '</label>';
+      }).join(''));
   }
 
   // Marca o desmarca un ítem del checklist de una tarea de reunión. Igual que
@@ -2280,6 +2300,7 @@
     }
     refreshTaskBoards();
     renderReunionesBoard();
+    if (state.editingTask && state.editingTask.id === taskId) renderTaskChecklistBox(findById(state.tasks, taskId));
   }
 
   async function onEventSubmit(e) {
@@ -3696,21 +3717,20 @@
     const responsable = responsableNamesLabel(task.responsable);
     const detailText = taskDetailText(task);
     const followupLabel = taskFollowupLabel(task);
-    // Checklist de una tarea de reunión: va fuera del botón principal para que
-    // marcar un ítem no abra la tarjeta en modo edición.
-    const checklist = Array.isArray(task.checklist) ? task.checklist : [];
-    const checklistDone = checklist.filter(function (it) { return it.done; }).length;
-    const checklistHtml = checklist.length
-      ? '<div class="task-checklist">' +
-          '<p class="task-checklist-progress">☑ ' + checklistDone + '/' + checklist.length + '</p>' +
-          checklist.map(function (it) {
-            return '<label class="task-checklist-item">' +
-              '<input type="checkbox" data-action="toggle-task-checklist" data-task-id="' + safe(task.id) + '" data-item-id="' + safe(it.id) + '"' + (it.done ? ' checked' : '') + ' onchange="window.ingeniaAction(event)">' +
-              '<span' + (it.done ? ' class="task-checklist-done"' : '') + '>' + safe(it.text) + '</span>' +
-            '</label>';
-          }).join('') +
-        '</div>'
-      : '';
+    // Tarea de reunión: el Kanban muestra solo organización, título, fecha de
+    // la reunión, responsables y estado. El checklist se ve al abrir la tarjeta.
+    if (task.meetingKey) {
+      return '<article class="kanban-card" draggable="true" data-id="' + safe(task.id) + '" style="--status-color:' + safe(status.color) + '">' +
+        '<button type="button" style="all:unset;cursor:pointer" data-task-id="' + safe(task.id) + '" onclick="window.ingeniaAction(event)">' +
+          '<span class="org-tag" style="--source-color:' + safe(info.color) + '">' + safe(info.label) + '</span>' +
+          '<p class="kanban-card-title">' + safe(task.title) + '</p>' +
+          (task.meetingDate ? '<span class="responsable-tag">📅 ' + safe(formatDate(task.meetingDate)) + '</span>' : '') +
+          (responsable ? '<span class="responsable-tag">👤 ' + safe(responsable) + '</span>' : '') +
+          '<span class="responsable-tag">● ' + safe(status.label) + '</span>' +
+        '</button>' +
+        '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' +
+      '</article>';
+    }
     return '<article class="kanban-card" draggable="true" data-id="' + safe(task.id) + '" style="--status-color:' + safe(status.color) + '">' +
       '<button type="button" style="all:unset;cursor:pointer" data-task-id="' + safe(task.id) + '" onclick="window.ingeniaAction(event)">' +
         '<span class="org-tag" style="--source-color:' + safe(info.color) + '">' + safe(info.label) + '</span>' +
@@ -3720,7 +3740,6 @@
         (followupLabel ? '<span class="responsable-tag">↻ ' + safe(followupLabel) + '</span>' : '') +
         (task.dueDate ? '<span class="responsable-tag">⏰ ' + safe(formatDate(task.dueDate)) + '</span>' : '') +
       '</button>' +
-      checklistHtml +
       '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' +
     '</article>';
   }
@@ -3755,6 +3774,7 @@
     dom.taskStatusSelect.value = existing ? (existing.status || 'pendiente') : 'pendiente';
     dom.taskFollowupSelect.value = existing ? (existing.followupStatus || 'in_progress') : 'in_progress';
     onTaskStatusChange();
+    renderTaskChecklistBox(existing ? (findById(state.tasks, existing.id) || existing) : null);
     dom.taskDialog.showModal();
     dom.taskForm.elements.title.focus();
   }
@@ -3777,6 +3797,10 @@
       populateTasksResponsableFilter();
     }
     const status = dom.taskForm.elements.status.value;
+    // Los campos de una tarea de reunión (checklist, vínculo y fecha de la
+    // reunión) se toman del estado actual, no de state.editingTask: el checklist
+    // se puede marcar con el diálogo abierto, así que ese objeto puede estar viejo.
+    const current = state.editingTask ? (findById(state.tasks, state.editingTask.id) || state.editingTask) : null;
     const payload = {
       id: state.editingTask ? state.editingTask.id : uid(),
       org: org,
@@ -3789,10 +3813,9 @@
       dueDate: dom.taskDueDate.value,
       nextAction: dom.taskNextAction.value.trim(),
       created_at: state.editingTask ? state.editingTask.created_at : new Date().toISOString(),
-      // Una tarea de reunión conserva su checklist y su vínculo con la reunión
-      // al editarla desde el diálogo (que no los muestra ni los reescribe).
-      checklist: state.editingTask ? state.editingTask.checklist : undefined,
-      meetingKey: state.editingTask ? state.editingTask.meetingKey : undefined
+      checklist: current ? current.checklist : undefined,
+      meetingKey: current ? current.meetingKey : undefined,
+      meetingDate: current ? current.meetingDate : undefined
     };
     const freshTasks = await readBoardKey('ingenia_board_state', TEAM_TASKS_KEY, []);
     const next = state.editingTask
