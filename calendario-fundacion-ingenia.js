@@ -1589,7 +1589,7 @@
     const participants = Array.isArray(raw.participants) ? raw.participants : [];
     const minuta = raw.minuta || '';
     const motivo = raw.motivo || '';
-    const pendientes = Array.isArray(raw.pendientes) ? raw.pendientes : [];
+    const pendientes = (Array.isArray(raw.pendientes) ? raw.pendientes : []).map(pendienteWithTaskState);
     const minutaFiles = Array.isArray(raw.minuta_files) ? raw.minuta_files : (Array.isArray(raw.minutaFiles) ? raw.minutaFiles : []);
     const rescheduleHistory = Array.isArray(raw.reschedule_history) ? raw.reschedule_history : (Array.isArray(raw.rescheduleHistory) ? raw.rescheduleHistory : []);
     const reminders = Array.isArray(raw.reminders) ? raw.reminders : [];
@@ -1879,8 +1879,25 @@
   // no perder lo escrito si la lista se re-renderiza mientras se edita.
   function readPendientes() {
     return state.pendientesDraft.filter(function (p) { return p.text && p.text.trim(); }).map(function (p) {
-      return { id: p.id, text: p.text.trim(), done: !!p.done, taskId: p.taskId || null, taskItemId: p.taskItemId || null };
+      const linked = taskItemDone(p);
+      return { id: p.id, text: p.text.trim(), done: linked === null ? !!p.done : linked, taskId: p.taskId || null, taskItemId: p.taskItemId || null };
     });
+  }
+
+  // Un pendiente enlazado a un ítem del checklist de una tarea toma su estado
+  // de esa tarea: la tarjeta es la fuente de verdad, así marcar cualquiera de
+  // los dos lados se refleja en el otro. Devuelve null si no está enlazado (o
+  // si la tarea ya no existe), y entonces vale el check propio del pendiente.
+  function taskItemDone(p) {
+    if (!p || !p.taskItemId) return null;
+    const task = (state.tasks || []).find(function (t) { return t.id === p.taskId; });
+    const item = task && Array.isArray(task.checklist) ? task.checklist.find(function (it) { return it.id === p.taskItemId; }) : null;
+    return item ? !!item.done : null;
+  }
+
+  function pendienteWithTaskState(p) {
+    const linked = taskItemDone(p);
+    return linked === null ? p : Object.assign({}, p, { done: linked });
   }
 
   function renderPendientesList() {
@@ -1891,8 +1908,10 @@
       return;
     }
     renderMarkup(dom.eventPendientesList, state.pendientesDraft.map(function (p) {
+      const linked = taskItemDone(p);
+      const done = linked === null ? !!p.done : linked;
       return '<div class="pendiente-row" data-pendiente-id="' + safe(p.id) + '">' +
-        '<input type="checkbox" class="pendiente-done" data-id="' + safe(p.id) + '"' + (p.done ? ' checked' : '') + ' aria-label="Resuelto">' +
+        '<input type="checkbox" class="pendiente-done" data-id="' + safe(p.id) + '"' + (done ? ' checked' : '') + ' aria-label="Resuelto">' +
         '<input type="text" class="input pendiente-text" data-id="' + safe(p.id) + '" value="' + safe(p.text) + '" placeholder="Pendiente o acuerdo…">' +
         (p.taskItemId ? '<span class="pendiente-task-badge">✅ En la tarea de la reunión</span>' : p.taskId ? '<span class="pendiente-task-badge">✅ Tarea creada</span>' : (allowTasks ? '<button type="button" class="pendiente-create-task" data-id="' + safe(p.id) + '">+ Tarea</button>' : '')) +
         '<button type="button" class="pendiente-remove" data-id="' + safe(p.id) + '" aria-label="Eliminar pendiente">🗑️</button>' +
@@ -1911,7 +1930,11 @@
     dom.eventPendientesList.querySelectorAll('.pendiente-done').forEach(function (cb) {
       cb.addEventListener('change', function () {
         const item = state.pendientesDraft.find(function (p) { return p.id === cb.dataset.id; });
-        if (item) item.done = cb.checked;
+        if (!item) return;
+        item.done = cb.checked;
+        // Si el pendiente está en una tarea, el check va al ítem de esa tarea
+        // (y el tablero se actualiza), así queda igual en los dos lados.
+        if (item.taskItemId) toggleTaskChecklistItem(item.taskId, item.taskItemId, cb.checked);
       });
     });
     dom.eventPendientesList.querySelectorAll('.pendiente-create-task').forEach(function (btn) {
@@ -2256,6 +2279,7 @@
       toast('No se pudo guardar el check — revisa tu conexión.', 'error');
     }
     refreshTaskBoards();
+    renderReunionesBoard();
   }
 
   async function onEventSubmit(e) {
