@@ -1374,7 +1374,20 @@
     return !area.responsibleName && !area.responsiblePhone;
   }
 
-  function hierarchyNodeHtml(area, skipChildren) {
+  // Organizaciones cuyo árbol se apila hacia abajo en vez de hacia los lados.
+  // INABIO tiene demasiados hermanos en el mismo nivel (ej. 5 áreas bajo
+  // "Coordinación de Extensión") y el árbol mide más de 2800 px de ancho: con
+  // esto, las áreas de cada coordinación van una debajo de otra, y solo las
+  // áreas principales bajo Dirección quedan en fila.
+  const STACKED_TREE_ORGS = ['inabio-ugaw'];
+
+  function hasHierarchyChildren(area) {
+    return state.hierarchy.some(function (a) { return a.parentId === area.id; });
+  }
+
+  function hierarchyNodeHtml(area, skipChildren, depth) {
+    const level = depth || 0;
+    const stacked = STACKED_TREE_ORGS.indexOf(state.org.id) > -1;
     const status = contactStatusInfo(area);
     // Un área marcada explícitamente como "rótulo" (ej. "Coalición con
     // Amor a Venezuela") se dibuja como una píldora neutra, igual que
@@ -1393,7 +1406,7 @@
       // cada una se apila en su propia fila en vez de ponerse una al lado
       // de la otra — para no obligar a desplazarse horizontalmente.
       if (directChildren.length <= 1) {
-        return '<li>' + pill + (directChildren.length ? '<ul>' + hierarchyNodeHtml(directChildren[0]) + '</ul>' : '') + '</li>';
+        return '<li>' + pill + (directChildren.length ? '<ul>' + hierarchyNodeHtml(directChildren[0], false, level + 1) + '</ul>' : '') + '</li>';
       }
       // Sin la clase "org-tree" acá (a diferencia del nivel raíz): este
       // <ul> ya es descendiente del árbol raíz, así que hereda sus
@@ -1402,7 +1415,7 @@
       // que el ancho se calculara mal y el árbol se fuera kilómetros a la
       // derecha cuando este rótulo estaba anidado dentro de otro.
       const branchRows = directChildren.map(function (a) {
-        return '<ul class="hierarchy-branch-row">' + hierarchyNodeHtml(a) + '</ul>';
+        return '<ul class="hierarchy-branch-row">' + hierarchyNodeHtml(a, false, level + 1) + '</ul>';
       }).join('');
       return '<li>' + pill + branchRows + '</li>';
     }
@@ -1425,8 +1438,32 @@
           '<button type="button" class="icon-button icon-button-sm" data-area-id="' + safe(area.id) + '" onclick="window.orgAction(event)" aria-label="Editar ' + safe(area.name) + '">✏️</button>' +
         '</div>' +
       '</div>' +
-      (containerChildren.length ? '<ul>' + containerChildren.map(function (a) { return hierarchyNodeHtml(a); }).join('') + '</ul>' : '') +
+      childrenBlockHtml(containerChildren, level, stacked) +
     '</li>';
+  }
+
+  // Bajo un área, sus hijos contenedores se dibujan así:
+  // - Organizaciones apiladas (INABIO) y área ya profunda (nivel 3 o más):
+  //   todos sus hijos van en una columna, uno debajo del otro.
+  // - Organizaciones apiladas en niveles altos (ej. las áreas bajo Dirección):
+  //   las áreas sin subáreas se agrupan en una sola columna, y las que sí
+  //   tienen subáreas siguen en fila, como antes.
+  // - Resto de organizaciones: fila de siempre.
+  function childrenBlockHtml(children, level, stacked) {
+    if (!children.length) return '';
+    const childLevel = level + 1;
+    if (!stacked) {
+      return '<ul>' + children.map(function (a) { return hierarchyNodeHtml(a, false, childLevel); }).join('') + '</ul>';
+    }
+    if (level >= 3) {
+      return '<ul class="org-stack">' + children.map(function (a) { return hierarchyNodeHtml(a, false, childLevel); }).join('') + '</ul>';
+    }
+    const leaves = children.filter(function (a) { return !hasHierarchyChildren(a); });
+    const branches = children.filter(hasHierarchyChildren);
+    const leafGroup = leaves.length
+      ? '<li><ul class="org-stack">' + leaves.map(function (a) { return hierarchyNodeHtml(a, false, childLevel); }).join('') + '</ul></li>'
+      : '';
+    return '<ul>' + leafGroup + branches.map(function (a) { return hierarchyNodeHtml(a, false, childLevel); }).join('') + '</ul>';
   }
 
   // Cuando una raíz tiene varias ramas directas (ej. "Área Internacional"
