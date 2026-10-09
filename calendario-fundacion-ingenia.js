@@ -455,7 +455,10 @@
     if (target.dataset.contactDetailId) {
       openContactDetail(findById(state.contacts, target.dataset.contactDetailId));
     }
-    if (target.dataset.taskId) {
+    // Solo las tarjetas abren el diálogo. Los controles del checklist también
+    // llevan data-task-id, pero tienen data-action: si abrieran el diálogo,
+    // el formulario se reiniciaría y saltaría al inicio al marcar un ítem.
+    if (target.dataset.taskId && !target.dataset.action) {
       openTaskDialog(findById(state.tasks, target.dataset.taskId));
     }
     if (target.dataset.action === 'move-contact-status') {
