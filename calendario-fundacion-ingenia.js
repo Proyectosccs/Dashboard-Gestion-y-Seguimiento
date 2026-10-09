@@ -477,6 +477,9 @@
     if (target.dataset.action === 'move-task-status') {
       moveTaskStatus(target.dataset.id, target.dataset.status);
     }
+    if (target.dataset.action === 'toggle-task-checklist') {
+      toggleTaskChecklistItem(target.dataset.taskId, target.dataset.itemId, target.checked);
+    }
     if (target.dataset.action === 'delete-responsable-only') {
       deleteResponsableOnly(target.dataset.id);
     }
@@ -1876,7 +1879,7 @@
   // no perder lo escrito si la lista se re-renderiza mientras se edita.
   function readPendientes() {
     return state.pendientesDraft.filter(function (p) { return p.text && p.text.trim(); }).map(function (p) {
-      return { id: p.id, text: p.text.trim(), done: !!p.done, taskId: p.taskId || null };
+      return { id: p.id, text: p.text.trim(), done: !!p.done, taskId: p.taskId || null, taskItemId: p.taskItemId || null };
     });
   }
 
@@ -1891,7 +1894,7 @@
       return '<div class="pendiente-row" data-pendiente-id="' + safe(p.id) + '">' +
         '<input type="checkbox" class="pendiente-done" data-id="' + safe(p.id) + '"' + (p.done ? ' checked' : '') + ' aria-label="Resuelto">' +
         '<input type="text" class="input pendiente-text" data-id="' + safe(p.id) + '" value="' + safe(p.text) + '" placeholder="Pendiente o acuerdo…">' +
-        (p.taskId ? '<span class="pendiente-task-badge">✅ Tarea creada</span>' : (allowTasks ? '<button type="button" class="pendiente-create-task" data-id="' + safe(p.id) + '">+ Tarea</button>' : '')) +
+        (p.taskItemId ? '<span class="pendiente-task-badge">✅ En la tarea de la reunión</span>' : p.taskId ? '<span class="pendiente-task-badge">✅ Tarea creada</span>' : (allowTasks ? '<button type="button" class="pendiente-create-task" data-id="' + safe(p.id) + '">+ Tarea</button>' : '')) +
         '<button type="button" class="pendiente-remove" data-id="' + safe(p.id) + '" aria-label="Eliminar pendiente">🗑️</button>' +
       '</div>';
     }).join(''));
@@ -2185,9 +2188,11 @@
     try { await state.client.storage.from(MINUTA_FILES_BUCKET).remove([path]); } catch (_err) { /* no crítico */ }
   }
 
-  // Crea una tarea de equipo a partir de un pendiente de la minuta, sin
-  // cerrar el diálogo del evento — el pendiente queda enlazado a esa tarea
-  // (taskId) para no volver a crearla dos veces.
+  // Una reunión produce UNA sola tarea de equipo, con el título de la reunión
+  // y un checklist donde cada pendiente es un ítem que se puede marcar. La
+  // primera pendiente crea esa tarea; las siguientes se agregan a su checklist.
+  // La tarea se reconoce por "meetingKey" (título + fecha de la reunión), así
+  // que no se duplica aunque el diálogo se cierre antes de guardar la reunión.
   async function createTaskFromPendiente(pendienteId) {
     const item = state.pendientesDraft.find(function (p) { return p.id === pendienteId; });
     if (!item) return;
@@ -2196,23 +2201,61 @@
     if (!text) { toast('Escribe el pendiente antes de crear la tarea.', 'error'); return; }
     const source = dom.eventForm.elements.source.value;
     if (!source || source === NEW_CALENDAR_VALUE) return;
-    const payload = {
-      id: uid(), org: source, title: text,
-      // Incluye la fecha de la reunión, no solo el título — dos reuniones
-      // distintas pueden llamarse igual, y la fecha es lo que las distingue.
-      detail: 'Pendiente de la reunión: ' + (dom.eventForm.elements.title.value.trim() || 'Sin título') + ' (' + formatDate(dom.eventForm.elements.event_date.value) + ')',
-      status: 'pendiente', followupStatus: '', priority: 'media', responsable: [],
-      dueDate: '', nextAction: '', created_at: new Date().toISOString()
-    };
-    const next = (await readBoardKey('ingenia_board_state', TEAM_TASKS_KEY, [])).concat(payload);
+    const meetingTitle = dom.eventForm.elements.title.value.trim() || 'Sin título';
+    const eventDate = dom.eventForm.elements.event_date.value;
+    const meetingKey = 'reunion|' + meetingTitle + '|' + eventDate;
+    const checklistItem = { id: uid(), text: text, done: false };
+    const freshTasks = await readBoardKey('ingenia_board_state', TEAM_TASKS_KEY, []);
+    const existing = freshTasks.find(function (t) { return t.meetingKey === meetingKey; });
+    let next;
+    let taskId;
+    if (existing) {
+      taskId = existing.id;
+      next = freshTasks.map(function (t) {
+        return t.id === existing.id ? Object.assign({}, t, { checklist: (t.checklist || []).concat([checklistItem]) }) : t;
+      });
+    } else {
+      taskId = uid();
+      next = freshTasks.concat([{
+        id: taskId, org: source, title: meetingTitle,
+        // La fecha va en el detalle: dos reuniones distintas pueden llamarse igual.
+        detail: 'Reunión del ' + formatDate(eventDate),
+        status: 'pendiente', followupStatus: '', priority: 'media', responsable: [],
+        dueDate: '', nextAction: '', created_at: new Date().toISOString(),
+        meetingKey: meetingKey, checklist: [checklistItem]
+      }]);
+    }
     const ok = await writeBoardKey('ingenia_board_state', TEAM_TASKS_KEY, next);
     if (!ok) { toast('No se pudo crear la tarea — revisa tu conexión.', 'error'); return; }
     state.tasks = next.map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); });
     item.text = text;
-    item.taskId = payload.id;
+    item.taskId = taskId;
+    item.taskItemId = checklistItem.id;
     renderPendientesList();
     refreshTaskBoards();
-    toast('Tarea creada.', 'success');
+    toast(existing ? 'Pendiente agregado a la tarea de la reunión.' : 'Tarea de la reunión creada.', 'success');
+  }
+
+  // Marca o desmarca un ítem del checklist de una tarea de reunión. Igual que
+  // moveTaskStatus: se muestra el cambio al instante y se guarda aparte.
+  async function toggleTaskChecklistItem(taskId, itemId, done) {
+    const previousTasks = state.tasks;
+    const apply = function (t) {
+      return t.id === taskId
+        ? Object.assign({}, t, { checklist: (t.checklist || []).map(function (it) { return it.id === itemId ? Object.assign({}, it, { done: done }) : it; }) })
+        : t;
+    };
+    state.tasks = state.tasks.map(apply);
+    refreshTaskBoards();
+    const fresh = (await readBoardKey('ingenia_board_state', TEAM_TASKS_KEY, [])).map(apply);
+    const ok = await writeBoardKey('ingenia_board_state', TEAM_TASKS_KEY, fresh);
+    if (ok) {
+      state.tasks = fresh.map(function (t) { return Object.assign({}, t, { responsable: normalizeResponsableList(t.responsable) }); });
+    } else {
+      state.tasks = previousTasks;
+      toast('No se pudo guardar el check — revisa tu conexión.', 'error');
+    }
+    refreshTaskBoards();
   }
 
   async function onEventSubmit(e) {
@@ -3629,6 +3672,21 @@
     const responsable = responsableNamesLabel(task.responsable);
     const detailText = taskDetailText(task);
     const followupLabel = taskFollowupLabel(task);
+    // Checklist de una tarea de reunión: va fuera del botón principal para que
+    // marcar un ítem no abra la tarjeta en modo edición.
+    const checklist = Array.isArray(task.checklist) ? task.checklist : [];
+    const checklistDone = checklist.filter(function (it) { return it.done; }).length;
+    const checklistHtml = checklist.length
+      ? '<div class="task-checklist">' +
+          '<p class="task-checklist-progress">☑ ' + checklistDone + '/' + checklist.length + '</p>' +
+          checklist.map(function (it) {
+            return '<label class="task-checklist-item">' +
+              '<input type="checkbox" data-action="toggle-task-checklist" data-task-id="' + safe(task.id) + '" data-item-id="' + safe(it.id) + '"' + (it.done ? ' checked' : '') + ' onchange="window.ingeniaAction(event)">' +
+              '<span' + (it.done ? ' class="task-checklist-done"' : '') + '>' + safe(it.text) + '</span>' +
+            '</label>';
+          }).join('') +
+        '</div>'
+      : '';
     return '<article class="kanban-card" draggable="true" data-id="' + safe(task.id) + '" style="--status-color:' + safe(status.color) + '">' +
       '<button type="button" style="all:unset;cursor:pointer" data-task-id="' + safe(task.id) + '" onclick="window.ingeniaAction(event)">' +
         '<span class="org-tag" style="--source-color:' + safe(info.color) + '">' + safe(info.label) + '</span>' +
@@ -3638,6 +3696,7 @@
         (followupLabel ? '<span class="responsable-tag">↻ ' + safe(followupLabel) + '</span>' : '') +
         (task.dueDate ? '<span class="responsable-tag">⏰ ' + safe(formatDate(task.dueDate)) + '</span>' : '') +
       '</button>' +
+      checklistHtml +
       '<div class="kanban-card-actions">' + moveButtons.join('') + '</div>' +
     '</article>';
   }
@@ -3705,7 +3764,11 @@
       responsable: responsableIds,
       dueDate: dom.taskDueDate.value,
       nextAction: dom.taskNextAction.value.trim(),
-      created_at: state.editingTask ? state.editingTask.created_at : new Date().toISOString()
+      created_at: state.editingTask ? state.editingTask.created_at : new Date().toISOString(),
+      // Una tarea de reunión conserva su checklist y su vínculo con la reunión
+      // al editarla desde el diálogo (que no los muestra ni los reescribe).
+      checklist: state.editingTask ? state.editingTask.checklist : undefined,
+      meetingKey: state.editingTask ? state.editingTask.meetingKey : undefined
     };
     const freshTasks = await readBoardKey('ingenia_board_state', TEAM_TASKS_KEY, []);
     const next = state.editingTask
