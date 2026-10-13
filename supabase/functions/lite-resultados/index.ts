@@ -77,7 +77,13 @@ Deno.serve(async (request: Request) => {
       return jsonResponse(origin, 429, { error: 'demasiadas solicitudes a conektados Lite, intenta en un momento' });
     }
     if (!upstream.ok) {
-      return jsonResponse(origin, upstream.status === 401 ? 401 : 502, { error: 'conektados Lite respondió con un error' });
+      // upstreamStatus ayuda a diagnosticar sin exponer el token: 404 suele
+      // significar que el endpoint todavía no está en el servidor desplegado.
+      return jsonResponse(origin, upstream.status === 401 ? 401 : 502, {
+        error: 'conektados Lite respondió con un error',
+        upstreamStatus: upstream.status,
+        resource: resource
+      });
     }
 
     return jsonResponse(origin, 200, { data: upstreamBody });

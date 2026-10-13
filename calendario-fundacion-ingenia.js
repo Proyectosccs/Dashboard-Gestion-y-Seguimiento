@@ -1046,11 +1046,17 @@
         body: JSON.stringify({ resource: 'voluntarios', params: {} })
       });
       const body = await response.json().catch(function () { return {}; });
-      if (!response.ok) throw new Error(body.error || 'operation unavailable');
+      if (!response.ok) {
+        // Para diagnosticar: estado HTTP de la función y, si lo hay, el de conektados.
+        console.error('[voluntarios] lite-resultados respondió', response.status, body);
+        const upstream = body.upstreamStatus ? ' (conektados respondió ' + body.upstreamStatus + ')' : '';
+        throw new Error((body.error || 'operation unavailable') + ' [HTTP ' + response.status + ']' + upstream);
+      }
       const raw = Array.isArray(body.data && body.data.voluntarios) ? body.data.voluntarios : [];
       state.volunteers = raw.map(normalizeVolunteer);
       state.volunteersLoaded = true;
     } catch (err) {
+      console.error('[voluntarios] no se pudo cargar', err);
       state.volunteersError = (err && err.message) || 'operation unavailable';
     }
     state.volunteersLoading = false;
@@ -1113,7 +1119,7 @@
     }
     if (state.volunteersError) {
       renderMarkup(dom.volunteersKpiCards, '');
-      renderMarkup(dom.volunteersList, '<div class="empty-state"><strong>No pudimos traer los voluntarios</strong><span>Revisa la conexión con conektados e intenta con Actualizar.</span></div>');
+      renderMarkup(dom.volunteersList, '<div class="empty-state"><strong>No pudimos traer los voluntarios</strong><span>Revisa la conexión con conektados e intenta con Actualizar.</span><span class="volunteers-error-detail">Detalle: ' + safe(state.volunteersError) + '</span></div>');
       return;
     }
     const orgFilter = state.volunteerOrgFilter || null;

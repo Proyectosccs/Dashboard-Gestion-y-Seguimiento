@@ -396,6 +396,7 @@ button.volunteer-row { width: 100%; text-align: left; font: inherit; cursor: poi
 button.volunteer-row:hover { border-color: var(--color-neutral-500); }
 .volunteer-row-inactive { opacity: 0.7; }
 .volunteers-subtitle { margin: 14px 0 2px; font-size: 13px; color: var(--color-neutral-700); }
+.volunteers-error-detail { font-family: monospace; font-size: 12px; margin-top: 6px; }
 .volunteer-detail { display: flex; flex-direction: column; gap: 8px; }
 .volunteer-detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--color-neutral-200, #eee); font-size: 13px; }
 .volunteer-detail-row span { color: var(--color-neutral-700); }
