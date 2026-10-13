@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=43">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=44">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=76" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=77" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -30,6 +30,7 @@
       <button class="tab-button" type="button" data-view="calendar" aria-current="page" onclick="window.ingeniaAction(event)">🗓️ Calendario</button>
       <button class="tab-button" type="button" data-view="reuniones" onclick="window.ingeniaAction(event)">🗒️ Reuniones</button>
       <button class="tab-button" type="button" data-view="contacts" onclick="window.ingeniaAction(event)">🤝 Contactos</button>
+      <button class="tab-button" type="button" data-view="volunteers" onclick="window.ingeniaAction(event)">🙋 Voluntarios</button>
       <button class="tab-button" type="button" data-view="tasks" onclick="window.ingeniaAction(event)">📋 Tareas de Equipo</button>
       <button class="tab-button" type="button" data-view="organizations" onclick="window.ingeniaAction(event)">🏢 Organizaciones</button>
       <button class="tab-button" type="button" data-view="leaders" onclick="window.ingeniaAction(event)">🧑‍🤝‍🧑 Líderes de Comunidades</button>
@@ -139,6 +140,22 @@
       </nav>
       <div id="contacts-list" class="contact-grid"></div>
       <div id="contacts-board" class="kanban-board" hidden></div>
+    </section>
+
+    <section id="volunteers-view" class="view" aria-labelledby="volunteers-view-title" hidden>
+      <div id="volunteers-kpi-cards" class="kpi-grid"></div>
+      <div class="view-heading">
+        <div>
+          <p class="eyebrow">🙋 Banco</p>
+          <h2 id="volunteers-view-title">Voluntarios</h2>
+          <p class="view-description">Voluntarios de cada organización, con los datos que se traen desde Conectados.</p>
+        </div>
+        <div class="resumen-filters">
+          <label class="sr-only" for="volunteers-org-filter">Filtrar por organización</label>
+          <select id="volunteers-org-filter" class="input"></select>
+        </div>
+      </div>
+      <div id="volunteers-list" class="volunteers-list"></div>
     </section>
 
     <section id="calendar-view" class="view" hidden>

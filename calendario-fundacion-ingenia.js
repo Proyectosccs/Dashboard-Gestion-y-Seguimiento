@@ -234,6 +234,9 @@
   const ORG_DIRECTORY = ['coalicion', 'florangel', 'ucv', 'cmdlt'];
 
   const TEAM_TASKS_KEY = 'ingenia-team-tasks-v1';
+  // Banco de voluntarios: los datos vienen de la app Conectados. Cada registro:
+  // { id, org, name, cedula, phone, email, availability, conectadosId }.
+  const VOLUNTEERS_KEY = 'ingenia-volunteers-v1';
   const TASK_STATUSES = [
     { key: 'pendiente', label: 'Pendiente', color: '#82796a' },
     { key: 'en_proceso', label: 'En proceso', color: '#0f766e' },
@@ -278,7 +281,7 @@
     leadersTitle: 'Líderes de Comunidades',
     instagramUrl: '',
     websiteUrl: '',
-    tabOrder: ['resumen', 'calendar', 'reuniones', 'contacts', 'tasks', 'organizations', 'leaders'],
+    tabOrder: ['resumen', 'calendar', 'reuniones', 'contacts', 'volunteers', 'tasks', 'organizations', 'leaders'],
     boardOrder: ['kpis', 'board']
   };
   const NAV_ITEMS = {
@@ -286,6 +289,7 @@
     calendar: { emoji: '🗓️', label: 'Calendario' },
     reuniones: { emoji: '🗒️', label: 'Reuniones' },
     contacts: { emoji: '🤝', label: 'Contactos' },
+    volunteers: { emoji: '🙋', label: 'Voluntarios' },
     tasks: { emoji: '📋', label: 'Tareas de Equipo' },
     organizations: { emoji: '🏢', label: 'Organizaciones' },
     leaders: { emoji: '🧑‍🤝‍🧑', label: 'Líderes de Comunidades' }
@@ -341,6 +345,8 @@
     kpiOffset: 0,
     kpiOrgFilter: '',
     reunionOrgFilter: '',
+    volunteerOrgFilter: '',
+    volunteers: [],
     reunionesViewMode: 'list',
     dragReunionId: null,
     ucvVolunteers: [],
@@ -582,6 +588,10 @@
       state.reunionOrgFilter = dom.reunionesOrgFilter.value;
       renderReunionesView();
     });
+    dom.volunteersOrgFilter.addEventListener('change', function () {
+      state.volunteerOrgFilter = dom.volunteersOrgFilter.value;
+      renderVolunteers();
+    });
     dom.responsableChecklist.addEventListener('change', onResponsableChecklistChange);
     dom.responsableContactSearch.addEventListener('input', renderResponsableContactResults);
     dom.taskStatusSelect.addEventListener('change', onTaskStatusChange);
@@ -735,6 +745,9 @@
     dom.contactsKpiCards = document.getElementById('contacts-kpi-cards');
     dom.contactsList = document.getElementById('contacts-list');
     dom.contactsBoard = document.getElementById('contacts-board');
+    dom.volunteersOrgFilter = document.getElementById('volunteers-org-filter');
+    dom.volunteersKpiCards = document.getElementById('volunteers-kpi-cards');
+    dom.volunteersList = document.getElementById('volunteers-list');
     dom.contactDialog = document.getElementById('contact-dialog');
     dom.contactDialogTitle = document.getElementById('contact-dialog-title');
     dom.contactForm = document.getElementById('contact-form');
@@ -849,7 +862,7 @@
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-contacts-v1').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-contacts-v1').maybeSingle(),
-      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', 'cmdlt-contacts-v1', 'ingenia-networking-contacts-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
+      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', 'cmdlt-contacts-v1', 'ingenia-networking-contacts-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY, VOLUNTEERS_KEY])
       , state.client.from('ucv_board_state').select('value').eq('key', 'ucv-volunteers-v1').maybeSingle()
       // «Motivo» de las reuniones de Coalición vive en una columna aparte que
       // se agrega con una migración: se pide por separado para que, si aún no
@@ -901,6 +914,8 @@
     });
     const membersRaw = ingeniaRowsEarly.find(function (r) { return r.key === TEAM_MEMBERS_KEY; });
     state.teamMembers = Array.isArray(membersRaw && membersRaw.value) ? membersRaw.value : [];
+    const volunteersRaw = ingeniaRowsEarly.find(function (r) { return r.key === VOLUNTEERS_KEY; });
+    state.volunteers = Array.isArray(volunteersRaw && volunteersRaw.value) ? volunteersRaw.value : [];
     const uiRaw = ingeniaRowsEarly.find(function (r) { return r.key === UI_KEY; });
     state.ui = cloneUI(uiRaw && uiRaw.value);
     applyUI();
@@ -1002,8 +1017,52 @@
     populateContactOrgFilter();
     populateContactOrgSelect();
     renderContacts();
+    populateVolunteerOrgFilter();
+    renderVolunteers();
     setView(state.view);
     renderCalendar();
+  }
+
+  // ---------- Banco de voluntarios ----------
+  // Solo total y filtro por organización por ahora. La cédula se guarda en el
+  // registro, pero no se muestra en pantalla.
+
+  function populateVolunteerOrgFilter() {
+    if (!dom.volunteersOrgFilter) return;
+    const current = state.volunteerOrgFilter || '';
+    renderMarkup(dom.volunteersOrgFilter, '<option value="">Todas las organizaciones</option>' + REAL_ORGS.map(function (k) {
+      return '<option value="' + safe(k) + '">' + safe(sourceInfo(k).label) + '</option>';
+    }).join(''));
+    dom.volunteersOrgFilter.value = REAL_ORGS.indexOf(current) > -1 ? current : '';
+    state.volunteerOrgFilter = dom.volunteersOrgFilter.value;
+  }
+
+  function renderVolunteers() {
+    if (!dom.volunteersKpiCards || !dom.volunteersList) return;
+    const orgFilter = state.volunteerOrgFilter || null;
+    const scoped = state.volunteers.filter(function (v) { return !orgFilter || v.org === orgFilter; });
+    const totalLabel = orgFilter ? 'voluntarios de ' + sourceInfo(orgFilter).label : 'voluntarios en total';
+    const cards = [{ icon: '🙋', value: scoped.length, label: totalLabel }];
+    if (!orgFilter) {
+      REAL_ORGS.forEach(function (k) {
+        const n = state.volunteers.filter(function (v) { return v.org === k; }).length;
+        cards.push({ icon: '🏢', value: n, label: sourceInfo(k).label });
+      });
+    }
+    renderMarkup(dom.volunteersKpiCards, cards.map(function (c) {
+      return '<article class="kpi-card"><span class="kpi-icon" aria-hidden="true">' + c.icon + '</span><strong>' + c.value + '</strong><span class="kpi-label">' + safe(c.label) + '</span></article>';
+    }).join(''));
+    if (!scoped.length) {
+      renderMarkup(dom.volunteersList, '<div class="empty-state"><strong>Sin voluntarios cargados</strong><span>Cuando conectemos Conectados, los voluntarios de cada organización aparecerán aquí.</span></div>');
+      return;
+    }
+    renderMarkup(dom.volunteersList, scoped.slice().sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); }).map(function (v) {
+      return '<div class="volunteer-row"><strong>' + safe(v.name || 'Sin nombre') + '</strong>' +
+        '<span>' + safe(sourceInfo(v.org).label) + '</span>' +
+        (v.phone ? '<span>' + safe(v.phone) + '</span>' : '') +
+        (v.email ? '<span>' + safe(v.email) + '</span>' : '') +
+      '</div>';
+    }).join(''));
   }
 
   // ---------- Modo edición ----------
