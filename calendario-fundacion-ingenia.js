@@ -804,8 +804,8 @@
     document.querySelectorAll('.view').forEach(function (view) { view.hidden = true; });
     const active = document.getElementById(viewName + '-view');
     if (active) active.hidden = false;
-    // Voluntarios se traen de conektados al abrir la pestaña (una vez por carga).
-    if (viewName === 'volunteers' && !state.volunteersLoaded && !state.volunteersLoading) loadVolunteers();
+    // Voluntarios se consultan a conektados cada vez que se abre la pestaña (dato en vivo).
+    if (viewName === 'volunteers' && !state.volunteersLoading) loadVolunteers();
     // Las jornadas del mes solo tienen sentido en Calendario.
     if (dom.kpiStrip) dom.kpiStrip.hidden = !state.kpiStripReady || viewName !== 'calendar';
   }
