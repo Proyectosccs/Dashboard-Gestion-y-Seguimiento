@@ -6,9 +6,9 @@
   <meta name="description" content="Dashboard de Gestión y Seguimiento del Equipo de Networking de Fundación Ingenia.">
   <title>Networking Fundación Ingenia</title>
   <link rel="stylesheet" href="./_ds/organic-5d4bae59-5302-4756-be68-5d7b615c4f3b/styles.css">
-  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=44">
+  <link rel="stylesheet" href="./calendario-fundacion-ingenia.css?v=45">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
-  <script src="./calendario-fundacion-ingenia.js?v=77" defer></script>
+  <script src="./calendario-fundacion-ingenia.js?v=78" defer></script>
 </head>
 <body>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -153,6 +153,7 @@
         <div class="resumen-filters">
           <label class="sr-only" for="volunteers-org-filter">Filtrar por organización</label>
           <select id="volunteers-org-filter" class="input"></select>
+          <button class="btn btn-secondary" type="button" data-action="refresh-volunteers" onclick="window.ingeniaAction(event)">🔄 Actualizar</button>
         </div>
       </div>
       <div id="volunteers-list" class="volunteers-list"></div>
@@ -501,6 +502,21 @@
         <button class="btn btn-primary" type="submit">Guardar</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="volunteer-dialog" class="editor-dialog" aria-labelledby="volunteer-dialog-title">
+    <div class="dialog-form">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">🙋 Voluntario</p>
+          <h2 id="volunteer-dialog-title">Voluntario</h2>
+        </div>
+      </div>
+      <div id="volunteer-dialog-body" class="volunteer-detail"></div>
+      <div class="dialog-actions">
+        <button class="btn btn-secondary" type="button" onclick="this.closest('dialog').close()">Cerrar</button>
+      </div>
+    </div>
   </dialog>
 
   <dialog id="task-dialog" class="editor-dialog" aria-labelledby="task-dialog-title">
