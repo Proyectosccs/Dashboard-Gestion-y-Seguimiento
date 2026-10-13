@@ -7,7 +7,15 @@ const allowedOrigins = new Set([
 const ALLOWED_RESOURCES: Record<string, string[]> = {
   entregas: ['envioId', 'confirmadoRecibido', 'desde', 'hasta'],
   envios: ['estado', 'ubicacionId', 'desde', 'hasta'],
-  productos: []
+  productos: [],
+  // Voluntarios de todas las organizaciones (incluye cédula y teléfono). Vive
+  // fuera de /api/lite/, así que tiene su propia ruta abajo.
+  voluntarios: ['centroId', 'activo']
+};
+
+// Recursos que no viven bajo /api/lite/*.
+const RESOURCE_PATHS: Record<string, string> = {
+  voluntarios: '/api/voluntarios/externo'
 };
 
 function responseHeaders(origin: string | null) {
@@ -58,7 +66,8 @@ Deno.serve(async (request: Request) => {
       search.set(key, String(value));
     });
 
-    const targetUrl = baseUrl.replace(/\/$/, '') + '/api/lite/' + resource + (search.toString() ? '?' + search.toString() : '');
+    const path = RESOURCE_PATHS[resource] || ('/api/lite/' + resource);
+    const targetUrl = baseUrl.replace(/\/$/, '') + path + (search.toString() ? '?' + search.toString() : '');
     const upstream = await fetch(targetUrl, {
       headers: { Authorization: 'Bearer ' + token }
     });
