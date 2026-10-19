@@ -22,6 +22,21 @@
   const UI_KEY = 'ingenia-coalicion-ui-v1';
   const HIERARCHY_KEY = 'ingenia-coalicion-hierarchy-v1';
 
+  // Voluntarios de conektados que aparecen en el nodo "Equipo de Voluntarios"
+  // (ver voluntarios-conektados.js).
+  const VOLUNTEER_CENTRO_MATCH = /coalici/i;
+  let conektadosVolunteers = [];
+
+  function loadConektadosVolunteers() {
+    if (!window.ConektadosVoluntarios) return;
+    window.ConektadosVoluntarios.load().then(function (all) {
+      conektadosVolunteers = window.ConektadosVoluntarios.forCentro(all, VOLUNTEER_CENTRO_MATCH);
+      renderHierarchy();
+    }).catch(function (err) {
+      console.warn('[voluntarios] no se cargaron para la jerarquía', err);
+    });
+  }
+
   // Modo edición: textos y orden personalizables, igual que en el tablero
   // UCV — pero sin los controles de tamaño de burbuja/título, porque este
   // sitio usa una hoja de estilos fija en vez de estilos calculados en JS.
@@ -534,6 +549,7 @@
     event.stopPropagation();
     const target = event.currentTarget;
     if (!target) return;
+    if (target.dataset.volunteerId) return window.ConektadosVoluntarios.openDetailById(target.dataset.volunteerId);
     if (target.dataset.view) return setView(target.dataset.view);
     if (target.dataset.calendarView) return setCalendarViewMode(target.dataset.calendarView);
     if (target.dataset.contactsView) return setContactsViewMode(target.dataset.contactsView);
@@ -2187,6 +2203,7 @@
         respLine +
         (area.notes ? '<div class="hierarchy-node-notes">' + safe(area.notes) + '</div>' : '') +
         (leafChildren.length ? '<div class="hierarchy-contacts-list">' + leafChildren.map(contactRowHtml).join('') + '</div>' : '') +
+        (area.name === 'Equipo de Voluntarios' && conektadosVolunteers.length ? '<div class="hierarchy-contacts-list">' + conektadosVolunteers.map(function (v) { return window.ConektadosVoluntarios.rowHtml(v, 'coalicionAction'); }).join('') + '</div>' : '') +
         '<button type="button" class="hierarchy-add-contact" data-action="add-child-area" data-id="' + safe(area.id) + '" onclick="window.coalicionAction(event)">➕ Agregar contacto</button>' +
         '<div class="hierarchy-node-actions">' +
           '<button type="button" class="icon-button icon-button-sm" data-action="edit-area" data-id="' + safe(area.id) + '" onclick="window.coalicionAction(event)" aria-label="Editar ' + safe(area.name) + '">✏️</button>' +
@@ -2555,6 +2572,7 @@
     applyUI();
     populateTasksResponsableFilter();
     renderHierarchy();
+    loadConektadosVolunteers();
     if (state.view === 'tasks') { renderTasksBoard(); renderTasksKpis(); }
   }
 
