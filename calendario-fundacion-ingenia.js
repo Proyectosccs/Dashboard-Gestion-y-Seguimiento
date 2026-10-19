@@ -1101,11 +1101,11 @@
 
   function volunteerRowsHtml(list) {
     return list.slice().sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); }).map(function (v) {
-      return '<button type="button" class="volunteer-row' + (v.active ? '' : ' volunteer-row-inactive') + '" data-action="open-volunteer" data-id="' + safe(v.id) + '" onclick="window.ingeniaAction(event)">' +
-        '<strong>' + safe(v.name || 'Sin nombre') + '</strong>' +
-        '<span>' + safe(v.centroNombre) + '</span>' +
-        (v.tipo ? '<span>' + safe(v.tipo) + '</span>' : '') +
-        (v.phone ? '<span>' + safe(v.phone) + '</span>' : '') +
+      const contact = [v.phone, v.email].filter(Boolean).map(safe).join(' · ');
+      return '<button type="button" class="volunteer-card' + (v.active ? '' : ' volunteer-card-inactive') + '" data-action="open-volunteer" data-id="' + safe(v.id) + '" onclick="window.ingeniaAction(event)">' +
+        '<span class="volunteer-card-name">' + safe(v.name || 'Sin nombre') + '</span>' +
+        '<span class="volunteer-card-org">' + safe(v.centroNombre) + (v.tipo ? ' · ' + safe(v.tipo) : '') + '</span>' +
+        (contact ? '<span class="volunteer-card-contact">' + contact + '</span>' : '') +
       '</button>';
     }).join('');
   }
