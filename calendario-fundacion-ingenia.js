@@ -236,6 +236,8 @@
   const ORG_DIRECTORY = ['coalicion', 'florangel', 'ucv', 'cmdlt'];
 
   const TEAM_TASKS_KEY = 'ingenia-team-tasks-v1';
+  // Observaciones de voluntarios (solo de nuestro dashboard): { [afiliacionId]: texto }.
+  const VOLUNTEER_NOTES_KEY = 'ingenia-volunteer-notes-v1';
   const TASK_STATUSES = [
     { key: 'pendiente', label: 'Pendiente', color: '#82796a' },
     { key: 'en_proceso', label: 'En proceso', color: '#0f766e' },
@@ -349,6 +351,7 @@
     volunteersLoaded: false,
     volunteersLoading: false,
     volunteersError: '',
+    volunteerNotes: {},
     reunionesViewMode: 'list',
     dragReunionId: null,
     ucvVolunteers: [],
@@ -496,6 +499,14 @@
     }
     if (target.dataset.action === 'refresh-volunteers') {
       loadVolunteers();
+    }
+    if (target.dataset.action === 'set-volunteer-org') {
+      state.volunteerOrgFilter = target.dataset.org;
+      dom.volunteersOrgFilter.value = target.dataset.org;
+      renderVolunteers();
+    }
+    if (target.dataset.action === 'save-volunteer-note') {
+      saveVolunteerNote(target.dataset.id);
     }
     if (target.dataset.action === 'task-checklist-add') {
       addTaskChecklistItem(target.dataset.taskId);
@@ -872,7 +883,7 @@
       state.client.from('florangel_board_state').select('value').eq('key', 'florangel-contacts-v1').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-journeys-v3').maybeSingle(),
       state.client.from('ucv_board_state').select('value').eq('key', 'ucv-contacts-v1').maybeSingle(),
-      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', 'cmdlt-contacts-v1', 'ingenia-networking-contacts-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY])
+      state.client.from('ingenia_board_state').select('key,value').in('key', ['ingenia-networking-events-v1', 'ingenia-otros-events-v1', 'ingenia-custom-cmdlt-events-v1', 'cmdlt-contacts-v1', 'ingenia-networking-contacts-v1', CUSTOM_CALENDARS_KEY, TEAM_TASKS_KEY, TEAM_MEMBERS_KEY, UI_KEY, VOLUNTEER_NOTES_KEY])
       , state.client.from('ucv_board_state').select('value').eq('key', 'ucv-volunteers-v1').maybeSingle()
       // «Motivo» de las reuniones de Coalición vive en una columna aparte que
       // se agrega con una migración: se pide por separado para que, si aún no
@@ -924,6 +935,8 @@
     });
     const membersRaw = ingeniaRowsEarly.find(function (r) { return r.key === TEAM_MEMBERS_KEY; });
     state.teamMembers = Array.isArray(membersRaw && membersRaw.value) ? membersRaw.value : [];
+    const volunteerNotesRaw = ingeniaRowsEarly.find(function (r) { return r.key === VOLUNTEER_NOTES_KEY; });
+    state.volunteerNotes = volunteerNotesRaw && volunteerNotesRaw.value && typeof volunteerNotesRaw.value === 'object' && !Array.isArray(volunteerNotesRaw.value) ? volunteerNotesRaw.value : {};
     const uiRaw = ingeniaRowsEarly.find(function (r) { return r.key === UI_KEY; });
     state.ui = cloneUI(uiRaw && uiRaw.value);
     applyUI();
@@ -1106,6 +1119,7 @@
         '<span class="volunteer-card-name">' + safe(v.name || 'Sin nombre') + '</span>' +
         '<span class="volunteer-card-org">' + safe(v.centroNombre) + (v.tipo ? ' · ' + safe(v.tipo) : '') + '</span>' +
         (contact ? '<span class="volunteer-card-contact">' + contact + '</span>' : '') +
+        (state.volunteerNotes[v.id] ? '<span class="volunteer-card-note">📝 Con observaciones</span>' : '') +
       '</button>';
     }).join('');
   }
@@ -1126,24 +1140,35 @@
     const scoped = state.volunteers.filter(function (v) { return !orgFilter || v.centroId === orgFilter; });
     const activos = scoped.filter(function (v) { return v.active; });
     const desafiliados = scoped.filter(function (v) { return !v.active; });
-    const filterCenter = orgFilter ? volunteerCenters().filter(function (c) { return c.id === orgFilter; })[0] : null;
-    const totalLabel = filterCenter ? 'voluntarios activos de ' + filterCenter.label : 'voluntarios activos en total';
-    const cards = [
-      { icon: '🙋', value: activos.length, label: totalLabel },
-      { icon: '↩️', value: desafiliados.length, label: 'desafiliados' }
-    ];
-    if (!orgFilter) {
-      volunteerCenters().forEach(function (c) {
+    // Barra de chips igual a la de Contactos: el total y un chip por organización,
+    // para moverse entre organizaciones con un clic. Cuenta solo activos.
+    const activosTotal = state.volunteers.filter(function (v) { return v.active; }).length;
+    renderMarkup(dom.volunteersKpiCards,
+      '<button type="button" class="kpi-strip-chip" data-action="set-volunteer-org" data-org="" aria-pressed="' + (orgFilter ? 'false' : 'true') + '" onclick="window.ingeniaAction(event)">🙋 <strong>' + activosTotal + '</strong> voluntarios activos en total</button>' +
+      '<span class="kpi-strip-divider" aria-hidden="true"></span>' +
+      volunteerCenters().map(function (c) {
         const n = state.volunteers.filter(function (v) { return v.active && v.centroId === c.id; }).length;
-        cards.push({ icon: '🏢', value: n, label: c.label });
-      });
-    }
-    renderMarkup(dom.volunteersKpiCards, cards.map(function (c) {
-      return '<article class="kpi-card"><span class="kpi-icon" aria-hidden="true">' + c.icon + '</span><strong>' + c.value + '</strong><span class="kpi-label">' + safe(c.label) + '</span></article>';
-    }).join(''));
+        return '<button type="button" class="kpi-strip-chip" data-action="set-volunteer-org" data-org="' + safe(c.id) + '" aria-pressed="' + (orgFilter === c.id ? 'true' : 'false') + '" title="Ver solo ' + safe(c.label) + '" onclick="window.ingeniaAction(event)">🏢 ' + safe(c.label) + ' <strong>' + n + '</strong></button>';
+      }).join(''));
     renderMarkup(dom.volunteersList,
       (activos.length ? volunteerRowsHtml(activos) : '<div class="empty-state"><strong>Sin voluntarios activos</strong><span>No hay voluntarios activos para este filtro.</span></div>') +
       (desafiliados.length ? '<h3 class="volunteers-subtitle">Desafiliados</h3>' + volunteerRowsHtml(desafiliados) : ''));
+  }
+
+  // Guarda (o borra, si queda vacía) la observación de un voluntario. Va en un
+  // registro aparte de conektados: solo alimenta nuestro dashboard.
+  async function saveVolunteerNote(id) {
+    const input = document.getElementById('volunteer-note-input');
+    if (!input) return;
+    const text = input.value.trim();
+    const fresh = await readBoardKey('ingenia_board_state', VOLUNTEER_NOTES_KEY, {});
+    const next = Object.assign({}, fresh);
+    if (text) next[id] = text; else delete next[id];
+    const ok = await writeBoardKey('ingenia_board_state', VOLUNTEER_NOTES_KEY, next);
+    if (!ok) { toast('No se pudo guardar la observación — revisa tu conexión.', 'error'); return; }
+    state.volunteerNotes = next;
+    renderVolunteers();
+    toast('Observación guardada.', 'success');
   }
 
   // Detalle de un voluntario: aquí sí se muestra la cédula.
@@ -1159,9 +1184,16 @@
       ['Desde', volunteerDate(v.desde)], ['Vence', volunteerDate(v.venceEn)],
       ['Estado', v.active ? 'Activo' : 'Desafiliado el ' + volunteerDate(v.revocadaEn)]
     ];
+    // Observaciones: viven solo en nuestro dashboard; no tocan los datos de conektados.
+    const note = state.volunteerNotes[v.id] || '';
     renderMarkup(body, rows.filter(function (r) { return r[1]; }).map(function (r) {
       return '<div class="volunteer-detail-row"><span>' + safe(r[0]) + '</span><strong>' + safe(r[1]) + '</strong></div>';
-    }).join(''));
+    }).join('') +
+      '<div class="volunteer-note-field">' +
+        '<label for="volunteer-note-input">Observaciones <small>(solo en nuestro dashboard)</small></label>' +
+        '<textarea id="volunteer-note-input" class="input" rows="3">' + safe(note) + '</textarea>' +
+        '<button type="button" class="btn btn-secondary" data-action="save-volunteer-note" data-id="' + safe(v.id) + '" onclick="window.ingeniaAction(event)">Guardar observación</button>' +
+      '</div>');
     dialog.showModal();
   }
 
