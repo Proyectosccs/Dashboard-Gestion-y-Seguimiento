@@ -63,7 +63,7 @@
     return '<button type="button" class="hierarchy-contact-row" data-volunteer-id="' + esc(v.id) + '" onclick="window.' + handler + '(event)">' +
       '<span class="hierarchy-contact-info">' +
         '<span class="hierarchy-contact-name">' + esc(v.name || 'Sin nombre') + '</span>' +
-        (v.tipo ? '<span class="hierarchy-contact-role">' + esc(v.tipo) + '</span>' : '') +
+        (v.funcion ? '<span class="hierarchy-contact-role">' + esc(v.funcion) + '</span>' : '') +
       '</span>' +
     '</button>';
   }
