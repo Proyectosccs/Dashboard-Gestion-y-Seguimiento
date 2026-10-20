@@ -2920,7 +2920,7 @@
     const stats = { total: 0, ingenia: 0, insumos: 0, medica: 0, cancelled: 0, collab: 0, specialtiesCount: {}, byOrg: {} };
     events.forEach(function (e) {
       const extra = readEventExtra(e.source, e.raw);
-      if (extra.jornadaType !== 'insumos' && extra.jornadaType !== 'medica' && extra.jornadaType !== 'capacitacion') return;
+      if (extra.jornadaType !== 'insumos' && extra.jornadaType !== 'medica') return;
       stats.total += 1;
       if (readParticipatesIngenia(e.raw) === 'si') stats.ingenia += 1;
       if (extra.jornadaType === 'insumos') stats.insumos += 1;
@@ -3044,7 +3044,7 @@
     const today = new Date().toISOString().slice(0, 10);
     const upcoming = events.filter(function (e) {
       const extra = readEventExtra(e.source, e.raw);
-      return e.date >= today && (extra.jornadaType === 'insumos' || extra.jornadaType === 'medica' || extra.jornadaType === 'capacitacion');
+      return e.date >= today && (extra.jornadaType === 'insumos' || extra.jornadaType === 'medica');
     }).sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); }).slice(0, 8);
     if (!upcoming.length) {
       renderMarkup(dom.resumenUpcoming, '<div class="empty-state"><strong>Sin próximas jornadas</strong><span>No hay jornadas de insumos o médicas programadas en este período.</span></div>');
